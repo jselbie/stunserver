@@ -1,0 +1,757 @@
+/*
+   Copyright 2011 John Selbie
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+
+
+#include "commonincludes.h"
+
+#include "stunreader.h"
+#include "stunutils.h"
+#include "socketaddress.h"
+#include <boost/crc.hpp>
+#include <openssl/evp.h>
+#include <openssl/hmac.h>
+#include <openssl/md5.h>
+#include "stunauth.h"
+
+
+
+
+
+CStunMessageReader::CStunMessageReader() :
+_fAllowLegacyFormat(false),
+_fMessageIsLegacyFormat(false),
+_state(HeaderNotRead),
+_nAttributeCount(0),
+_transactionid(),
+_msgTypeNormalized(0xffff),
+_msgClass(StunMsgClassInvalidMessageClass),
+_msgLength(0),
+_indexFingerprint(-1),
+_indexResponsePort(-1),
+_indexChangeRequest(-1),
+_indexPaddingAttribute(-1),
+_indexErrorCode(-1),
+_indexMessageIntegrity(-1)
+{
+    ;
+}
+
+void CStunMessageReader::SetAllowLegacyFormat(bool fAllowLegacyFormat)
+{
+    _fAllowLegacyFormat = fAllowLegacyFormat;
+}
+
+bool CStunMessageReader::IsMessageLegacyFormat()
+{
+    return _fMessageIsLegacyFormat;
+}
+
+uint16_t CStunMessageReader::HowManyBytesNeeded()
+{
+    size_t currentSize = _stream.GetSize();
+    switch (_state)
+    {
+    case HeaderNotRead:
+        BOOST_ASSERT(STUN_HEADER_SIZE > currentSize);
+        return STUN_HEADER_SIZE - currentSize;
+    case HeaderValidated:
+        BOOST_ASSERT(_msgLength > currentSize);
+        return _msgLength - currentSize;
+    default:
+    	return 0;
+    }
+    return 0;
+}
+
+bool CStunMessageReader::HasFingerprintAttribute()
+{
+    return (_indexFingerprint >= 0);
+}
+
+bool CStunMessageReader::IsFingerprintAttributeValid()
+{
+    HRESULT hr = S_OK;
+    StunAttribute attrib={};
+    CRefCountedBuffer spBuffer;
+    size_t size=0;
+    boost::crc_32_type crc;
+    uint32_t computedValue=1;
+    uint32_t readValue=0;
+    uint8_t* ptr = NULL;
+
+
+    // the fingerprint attribute MUST be the last attribute in the stream.
+    // If it's not, then the code below will return false
+
+
+    GetAttributeByIndex(_indexFingerprint, &attrib);
+    ChkIfA(attrib.attributeType != STUN_ATTRIBUTE_FINGERPRINT, E_FAIL);
+
+    ChkIf(attrib.size != 4, E_FAIL);
+    ChkIf(_state != BodyValidated, E_FAIL);
+    Chk(_stream.GetBuffer(&spBuffer));
+
+    size = _stream.GetSize();
+    ChkIf(size < STUN_HEADER_SIZE, E_FAIL);
+
+    ptr = spBuffer->GetData();
+    ChkIfA(ptr==NULL, E_FAIL);
+
+    crc.process_bytes(ptr, size-8); // -8 because we're assuming the fingerprint attribute is 8 bytes and is the last attribute in the stream
+    computedValue = crc.checksum();
+    computedValue = computedValue ^ STUN_FINGERPRINT_XOR;
+
+    readValue = *(uint32_t*)(ptr+attrib.offset);
+    readValue = ntohl(readValue);
+    hr = (readValue==computedValue) ? S_OK : E_FAIL;
+
+Cleanup:
+    return (SUCCEEDED(hr));
+}
+
+bool CStunMessageReader::HasMessageIntegrityAttribute()
+{
+    return (_indexMessageIntegrity >= 0);
+}
+
+HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylength)
+{
+    HRESULT hr = S_OK;
+    int lastAttributeIndex = _nAttributeCount - 1;
+    bool fFingerprintAdjustment = false;
+    bool fNoOtherAttributesAfterIntegrity = false;
+    const size_t c_hmacsize = 20;
+    uint8_t hmaccomputed[c_hmacsize] = {}; // zero-init
+    unsigned int hmaclength = c_hmacsize;
+    HMAC_CTX ctx = {};
+    uint32_t chunk32;
+    uint16_t chunk16;
+    size_t len, nChunks;
+    CDataStream stream;
+    CRefCountedBuffer spBuffer;
+    StunAttribute attribIntegrity;
+    int cmp = 0;
+    
+    ChkIf(_state != BodyValidated, E_FAIL);
+    ChkIf(_indexMessageIntegrity < 0, E_FAIL);
+    
+    // can a key be empty?
+    ChkIfA(key==NULL, E_INVALIDARG);
+    ChkIfA(keylength==0, E_INVALIDARG);
+    
+    
+    Chk(this->GetAttributeByIndex(_indexMessageIntegrity, &attribIntegrity));
+    
+    ChkIf(attribIntegrity.size != c_hmacsize, E_FAIL);
+    
+    ChkIfA(lastAttributeIndex < 0, E_FAIL);
+    
+    // first, check to make sure that no other attributes (other than fingerprint) follow the message integrity
+    fNoOtherAttributesAfterIntegrity = (_indexMessageIntegrity == lastAttributeIndex) || ((_indexMessageIntegrity == (lastAttributeIndex-1)) && (_indexFingerprint == lastAttributeIndex));
+    ChkIf(fNoOtherAttributesAfterIntegrity==false, E_FAIL);
+    
+    fFingerprintAdjustment = (_indexMessageIntegrity == (lastAttributeIndex-1));
+
+    Chk(GetBuffer(&spBuffer));
+    stream.Attach(spBuffer, false);
+    
+    // Here comes the fun part.  If there is a fingerprint attribute, we have to adjust the length header in computing the hash
+    HMAC_CTX_init(&ctx);
+    HMAC_Init(&ctx, key, keylength, EVP_sha1());
+    
+    // message type
+    Chk(stream.ReadUint16(&chunk16));
+    HMAC_Update(&ctx, (unsigned char*)&chunk16, sizeof(chunk16));
+    
+    // message length
+    Chk(stream.ReadUint16(&chunk16));
+    if (fFingerprintAdjustment)
+    {
+        // subtract the length of the fingerprint off the length header
+        // fingerprint attribute is 8 bytes long including it's own header
+        // and to do this, we have to fix the network byte ordering issue
+        uint16_t lengthHeader = ntohs(chunk16);
+        lengthHeader -= 8;
+        chunk16 = htons(lengthHeader);
+    }
+    HMAC_Update(&ctx, (unsigned char*)&chunk16, sizeof(chunk16));
+    
+    // now include everything up to the hash attribute itself.
+    len = _attributes[_indexMessageIntegrity].offset;
+    len -= 4; // subtract the size of the attribute header
+    len -= 4; // subtrack the size of the message header (not including the transaction id)
+    
+    // len should be the number of bytes from the start of the transaction ID up through to the start of the integrity attribute header
+    // the stun message has to be a multiple of 4 bytes, so we can read in 32 bit chunks
+    nChunks = len / 4;
+    ASSERT((len % 4) == 0);
+    for (size_t count = 0; count < nChunks; count++)
+    {
+        Chk(stream.ReadUint32(&chunk32));
+        HMAC_Update(&ctx, (unsigned char*)&chunk32, sizeof(chunk32));
+    }
+    
+    HMAC_Final(&ctx, hmaccomputed, &hmaclength);
+    
+    // now compare the bytes
+    cmp = memcmp(hmaccomputed, spBuffer->GetData() + attribIntegrity.offset, c_hmacsize);
+    
+    hr = (cmp == 0 ? S_OK : E_FAIL);
+    
+Cleanup:
+    return hr;
+}
+
+HRESULT CStunMessageReader::ValidateMessageIntegrityShort(const char* pszPassword)
+{
+    return ValidateMessageIntegrity((uint8_t*)pszPassword, strlen(pszPassword));
+}
+
+HRESULT CStunMessageReader::ValidateMessageIntegrityLong(const char* pszUser, const char* pszRealm, const char* pszPassword)
+{
+    HRESULT hr = S_OK;
+    const size_t MAX_KEY_SIZE = MAX_STUN_AUTH_STRING_SIZE*3 + 2;
+    uint8_t key[MAX_KEY_SIZE + 1]; // long enough for 64-char strings and two semicolons and a null char
+    uint8_t* pData = NULL;
+    uint8_t* pDst = key;
+    size_t totallength = 0;
+    
+    size_t passwordlength = pszPassword ? strlen(pszPassword) : 0;
+    size_t userLength = pszUser ? strlen(pszUser)  : 0;
+    size_t realmLength = pszRealm ? strlen(pszRealm) : 0;
+    
+    uint8_t hash[MD5_DIGEST_LENGTH] = {};
+    
+    ChkIf(_state != BodyValidated, E_FAIL);
+   
+    totallength = userLength + realmLength + passwordlength + 2; // +2 for two semi-colons
+    
+    pData = GetStream().GetDataPointerUnsafe();
+    ChkIfA(pData==NULL, E_FAIL);
+    
+    if (userLength > 0)
+    {
+        memcpy(pDst, pszUser, userLength);
+        pDst += userLength;
+    }
+    *pDst = ':';
+    pDst++;
+    
+    
+    if (realmLength > 0)
+    {
+        memcpy(pDst, pszRealm, realmLength);
+        pDst += realmLength;
+    }
+    *pDst = ':';
+    pDst++;
+
+    if (passwordlength > 0)
+    {
+        memcpy(pDst, pszPassword, passwordlength);
+        pDst += passwordlength;
+    }
+    *pDst = '0'; // null terminate for debugging (does not get hashed)
+    
+    ASSERT((pDst-key) == totallength);
+    
+    ChkIfA(NULL == MD5(key, totallength, hash), E_FAIL);
+    Chk(ValidateMessageIntegrity(hash, ARRAYSIZE(hash)));
+    
+Cleanup:
+    return hr;    
+}
+
+
+
+
+
+HRESULT CStunMessageReader::GetAttributeByType(uint16_t attributeType, StunAttribute* pAttribute)
+{
+    HRESULT hr = E_FAIL;
+
+    for (size_t index = 0; index < _nAttributeCount; index++)
+    {
+        if (attributeType == _attributes[index].attributeType)
+        {
+            hr = S_OK;
+
+            // pAttribute can be NULL - useful if the caller just wants to detect the presence of an attribute
+            if (pAttribute)
+            {
+                *pAttribute = _attributes[index];
+            }
+        }
+    }
+
+    return hr;
+}
+
+HRESULT CStunMessageReader::GetAttributeByIndex(int index, StunAttribute* pAttribute)
+{
+    HRESULT hr = E_FAIL;
+
+    if ((index >= 0) && (index < (int)_nAttributeCount))
+    {
+        hr = S_OK;
+
+        if (pAttribute)
+        {
+            *pAttribute = _attributes[index];
+        }
+    }
+
+    return hr;
+}
+
+HRESULT CStunMessageReader::GetResponsePort(uint16_t* pPort)
+{
+    StunAttribute attrib;
+    HRESULT hr = S_OK;
+    uint16_t portNBO;
+    uint8_t *pData = NULL;
+
+    ChkIfA(pPort == NULL, E_INVALIDARG);
+
+    Chk(GetAttributeByIndex(_indexResponsePort, &attrib));
+    ChkIf(attrib.size != STUN_ATTRIBUTE_RESPONSE_PORT_SIZE, E_UNEXPECTED);
+
+    pData = _stream.GetDataPointerUnsafe();
+    ChkIf(pData==NULL, E_UNEXPECTED);
+
+    memcpy(&portNBO, pData + attrib.offset, STUN_ATTRIBUTE_RESPONSE_PORT_SIZE);
+    *pPort = ntohs(portNBO);
+Cleanup:
+    return hr;
+}
+
+HRESULT CStunMessageReader::GetChangeRequest(StunChangeRequestAttribute* pChangeRequest)
+{
+    HRESULT hr = S_OK;
+    uint8_t *pData = NULL;
+    StunAttribute attrib;
+    uint32_t value = 0;
+
+    ChkIfA(pChangeRequest == NULL, E_INVALIDARG);
+
+    Chk(GetAttributeByIndex(_indexChangeRequest, &attrib));
+    ChkIf(attrib.size != STUN_ATTRIBUTE_CHANGEREQUEST_SIZE, E_UNEXPECTED);
+
+    pData = _stream.GetDataPointerUnsafe();
+    ChkIf(pData==NULL, E_UNEXPECTED);
+
+    memcpy(&value, pData + attrib.offset, STUN_ATTRIBUTE_CHANGEREQUEST_SIZE);
+
+    value = ntohl(value);
+
+    pChangeRequest->fChangeIP = !!(value & 0x0004);
+    pChangeRequest->fChangePort = !!(value & 0x0002);
+
+Cleanup:
+    if (FAILED(hr) && pChangeRequest)
+    {
+        pChangeRequest->fChangeIP = false;
+        pChangeRequest->fChangePort = false;
+    }
+
+    return hr;
+}
+
+
+HRESULT CStunMessageReader::GetPaddingAttributeSize(uint16_t* pSizePadding)
+{
+    HRESULT hr = S_OK;
+    StunAttribute attrib;
+
+    ChkIfA(pSizePadding == NULL, E_INVALIDARG);
+
+    *pSizePadding = 0;
+
+    Chk(GetAttributeByIndex(_indexPaddingAttribute, &attrib));
+
+    *pSizePadding = attrib.size;
+
+Cleanup:
+    return hr;
+}
+
+HRESULT CStunMessageReader::GetErrorCode(uint16_t* pErrorNumber)
+{
+    HRESULT hr = S_OK;
+    uint8_t* ptr = NULL;
+    uint8_t cl = 0;
+    uint8_t num = 0;
+
+    StunAttribute attrib;
+
+    ChkIf(pErrorNumber==NULL, E_INVALIDARG);
+
+    Chk(GetAttributeByIndex(_indexErrorCode, &attrib));
+
+    // first 21 bits of error-code attribute must be zero.
+    // followed by 3 bits of "class" and 8 bits for the error number modulo 100
+    ptr = _stream.GetDataPointerUnsafe() + attrib.offset + 2;
+
+    cl = *ptr++;
+    cl = cl & 0x07;
+    num = *ptr;
+    *pErrorNumber = cl * 100 + num;
+
+Cleanup:
+    return hr;
+}
+
+
+HRESULT CStunMessageReader::GetAddressHelper(uint16_t attribType, CSocketAddress* pAddr)
+{
+    HRESULT hr = S_OK;
+    StunAttribute attrib={};
+    uint8_t *pAddrStart = NULL;
+
+    Chk(GetAttributeByType(attribType, &attrib));
+    pAddrStart = _stream.GetDataPointerUnsafe() + attrib.offset;
+    Chk(::GetMappedAddress(pAddrStart, attrib.offset, pAddr));
+
+Cleanup:
+    return hr;
+
+}
+
+HRESULT CStunMessageReader::GetMappedAddress(CSocketAddress* pAddr)
+{
+    HRESULT hr = S_OK;
+    Chk(GetAddressHelper(STUN_ATTRIBUTE_MAPPEDADDRESS, pAddr));
+Cleanup:
+    return hr;
+}
+
+HRESULT CStunMessageReader::GetOtherAddress(CSocketAddress* pAddr)
+{
+    HRESULT hr = S_OK;
+    
+    hr = GetAddressHelper(STUN_ATTRIBUTE_OTHER_ADDRESS, pAddr);
+    
+    if (FAILED(hr))
+    {
+        // look for the legacy changed address attribute that a legacy (RFC 3489) server would send
+        hr = GetAddressHelper(STUN_ATTRIBUTE_CHANGEDADDRESS, pAddr);
+    }
+    
+    return hr;
+}
+
+
+HRESULT CStunMessageReader::GetXorMappedAddress(CSocketAddress* pAddr)
+{
+    HRESULT hr = S_OK;
+    Chk(GetAddressHelper(STUN_ATTRIBUTE_XORMAPPEDADDRESS, pAddr));
+    pAddr->ApplyStunXorMap(_transactionid);
+
+Cleanup:
+    return hr;
+}
+
+HRESULT CStunMessageReader::GetStringAttributeByType(uint16_t attributeType, char* pszValue, /*in-out*/ size_t size)
+{
+    HRESULT hr = S_OK;
+    StunAttribute attrib = {};
+    
+    ChkIfA(pszValue == NULL, E_INVALIDARG);
+    
+    Chk(GetAttributeByType(attributeType, &attrib));
+
+    // size needs to be 1 greater than attrib.size so we can properly copy over a null char at the end
+    ChkIf(attrib.size >= size, E_INVALIDARG);
+    
+    memcpy(pszValue, _stream.GetDataPointerUnsafe() + attrib.offset, attrib.size);
+    pszValue[attrib.size] = '\0';
+    
+Cleanup:
+    return hr;
+}
+
+
+
+
+HRESULT CStunMessageReader::ReadHeader()
+{
+
+    HRESULT hr = S_OK;
+    bool fHeaderValid = false;
+    uint16_t msgType;
+    uint16_t msgLength;
+    uint32_t cookie;
+    StunTransactionId transID;
+
+    Chk(_stream.SeekDirect(0));
+    Chk(_stream.ReadUint16(&msgType));
+    Chk(_stream.ReadUint16(&msgLength));
+    Chk(_stream.Read(&transID.id, sizeof(transID.id)));
+
+    // convert from big endian to native type
+    msgType = ntohs(msgType);
+    msgLength = ntohs(msgLength);
+
+    memcpy(&cookie, transID.id, 4);
+    cookie = ntohl(cookie);
+
+    _fMessageIsLegacyFormat = !(cookie == STUN_COOKIE);
+
+    fHeaderValid = ( (0==(msgType & 0xc000)) && ((msgLength%4)==0) );
+
+    // if we aren't in legacy format (the default), then the cookie field of the transaction id must be the STUN_COOKIE
+    fHeaderValid = (fHeaderValid && (_fAllowLegacyFormat || !_fMessageIsLegacyFormat));
+
+    ChkIf(fHeaderValid == false, E_FAIL);
+
+    _msgTypeNormalized = (  (msgType & 0x000f) | ((msgType & 0x00e0)>>1) | ((msgType & 0x3E00)>>2)  );
+    _msgLength = msgLength;
+
+    _transactionid = transID;
+
+    ChkIf(_msgLength > MAX_STUN_MESSAGE_SIZE, E_UNEXPECTED);
+
+
+    if (STUN_IS_REQUEST(msgType))
+    {
+        _msgClass = StunMsgClassRequest;
+    }
+    else if (STUN_IS_INDICATION(msgType))
+    {
+        _msgClass = StunMsgClassIndication;
+    }
+    else if (STUN_IS_SUCCESS_RESP(msgType))
+    {
+        _msgClass = StunMsgClassSuccessResponse;
+    }
+    else if (STUN_IS_ERR_RESP(msgType))
+    {
+        _msgClass = StunMsgClassFailureResponse;
+    }
+    else
+    {
+        // couldn't possibly happen, because msgClass is only two bits
+        _msgClass = StunMsgClassInvalidMessageClass;
+        ChkA(E_FAIL);
+    }
+
+
+
+Cleanup:
+    return hr;
+}
+
+HRESULT CStunMessageReader::ReadBody()
+{
+    size_t currentSize = _stream.GetSize();
+    size_t bytesConsumed = STUN_HEADER_SIZE;
+    HRESULT hr = S_OK;
+
+    Chk(_stream.SeekDirect(STUN_HEADER_SIZE));
+
+    while (SUCCEEDED(hr) && (bytesConsumed < currentSize))
+    {
+        uint16_t attributeType;
+        uint16_t attributeLength;
+        uint16_t attributeOffset;
+        int paddingLength=0;
+
+        hr = _stream.ReadUint16(&attributeType);
+
+        if (SUCCEEDED(hr))
+        {
+            hr = _stream.ReadUint16(&attributeLength);
+        }
+
+        if (SUCCEEDED(hr))
+        {
+            attributeOffset = _stream.GetPos();
+            attributeType = ntohs(attributeType);
+            attributeLength = ntohs(attributeLength);
+
+            // todo - if an attribute has no size, it's length is not padded by 4 bytes, right?
+            if (attributeLength % 4)
+            {
+                paddingLength = 4 - attributeLength % 4;
+            }
+
+            hr = (attributeLength <= MAX_STUN_ATTRIBUTE_SIZE) ? S_OK : E_FAIL;
+        }
+
+        if (SUCCEEDED(hr))
+        {
+            hr = (_nAttributeCount < MAX_NUM_ATTRIBUTES) ? S_OK : E_FAIL;
+        }
+
+        if (SUCCEEDED(hr))
+        {
+            StunAttribute attrib;
+            int attributeIndex = _nAttributeCount;
+            attrib.attributeType = attributeType;
+            attrib.size = attributeLength;
+            attrib.offset = attributeOffset;
+            _attributes[_nAttributeCount++] = attrib;
+
+            // now if this attribute is one we want to cache the index for, let's do it here
+            // todo - think about a "fast map" for this operation
+            switch (attributeType)
+            {
+                case STUN_ATTRIBUTE_FINGERPRINT:
+                    _indexFingerprint = attributeIndex; break;
+                case STUN_ATTRIBUTE_RESPONSE_PORT:
+                    _indexResponsePort = attributeIndex; break;
+                case STUN_ATTRIBUTE_CHANGEREQUEST:
+                    _indexChangeRequest = attributeIndex; break;
+                case STUN_ATTRIBUTE_PADDING:
+                    _indexPaddingAttribute = attributeIndex; break;
+                case STUN_ATTRIBUTE_ERRORCODE:
+                    _indexErrorCode = attributeIndex; break;
+                case STUN_ATTRIBUTE_MESSAGEINTEGRITY:
+                    _indexMessageIntegrity = attributeIndex; break;
+                    
+                default: break;
+            }
+
+
+            hr = _stream.SeekRelative(attributeLength);
+        }
+
+        // consume the padding
+        if (SUCCEEDED(hr))
+        {
+            if (paddingLength > 0)
+            {
+                hr = _stream.SeekRelative(paddingLength);
+            }
+        }
+
+        if (SUCCEEDED(hr))
+        {
+            bytesConsumed += sizeof(attributeType) + sizeof(attributeLength) + attributeLength + paddingLength;
+        }
+    }
+
+    // I don't think we could consume more bytes than stream size, but it's a worthy check to still keep here
+    hr = (bytesConsumed == currentSize) ? S_OK : E_FAIL;
+
+Cleanup:
+    return hr;
+
+}
+
+CStunMessageReader::ReaderParseState CStunMessageReader::AddBytes(const uint8_t* pData, uint32_t size)
+{
+    HRESULT hr = S_OK;
+    size_t currentSize;
+
+    if (_state == ParseError)
+    {
+        return ParseError;
+    }
+
+    if (size == 0)
+    {
+        return _state;
+    }
+
+    if (FAILED(_stream.Write(pData, size)))
+    {
+        return ParseError;
+    }
+
+    currentSize = _stream.GetSize();
+
+    if (_state == HeaderNotRead)
+    {
+        if (currentSize >= STUN_HEADER_SIZE)
+        {
+            hr = ReadHeader();
+
+            _state = SUCCEEDED(hr) ? HeaderValidated : ParseError;
+
+            if (SUCCEEDED(hr) && (_msgLength==0))
+            {
+                _state = BodyValidated;
+            }
+        }
+    }
+
+    if (_state == HeaderValidated)
+    {
+        if (currentSize >= (_msgLength+STUN_HEADER_SIZE))
+        {
+            if (currentSize == (_msgLength+STUN_HEADER_SIZE))
+            {
+                hr = ReadBody();
+                _state = SUCCEEDED(hr) ? BodyValidated : ParseError;
+            }
+            else
+            {
+                // TOO MANY BYTES FED IN
+                _state = ParseError;
+            }
+        }
+    }
+
+    if (_state == BodyValidated)
+    {
+        // What?  After validating the body, the caller still passes in way too many bytes?
+        if (currentSize > (_msgLength+STUN_HEADER_SIZE))
+        {
+            _state = ParseError;
+        }
+    }
+
+    return _state;
+
+}
+
+void CStunMessageReader::GetTransactionId(StunTransactionId* pTrans)
+{
+    if (pTrans)
+    {
+        *pTrans = _transactionid;
+    }
+}
+
+
+StunMessageClass CStunMessageReader::GetMessageClass()
+{
+    return _msgClass;
+}
+
+uint16_t CStunMessageReader::GetMessageType()
+{
+    return _msgTypeNormalized;
+}
+
+HRESULT CStunMessageReader::GetBuffer(CRefCountedBuffer* pRefBuffer)
+{
+    HRESULT hr = S_OK;
+
+    ChkIf(pRefBuffer == NULL, E_INVALIDARG);
+    Chk(_stream.GetBuffer(pRefBuffer));
+
+Cleanup:
+    return hr;
+}
+
+CDataStream& CStunMessageReader::GetStream()
+{
+    return _stream;
+}
+
