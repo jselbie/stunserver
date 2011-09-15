@@ -1,0 +1,11 @@
+*.o
+*.gch
+*.txtcode
+*.a
+
+/client/stunclient
+/stunclient
+/server/stunserver
+/stunserver
+/testcode/stuntestcode
+/stuntestcode
