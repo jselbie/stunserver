@@ -19,7 +19,6 @@
 #ifndef UNITTEST_DECLARE_H
 #define UNITTEST_DECLARE_H
 
-#include "commonincludes.h"
 
 class IUnitTest
 {
