@@ -8,7 +8,9 @@ PROJECT_INTERMEDIATES := usage.txtcode usagelite.txtcode
 
 INCLUDES := $(BOOST_INCLUDE) -I../common -I../stuncore -I../networkutils
 LIB_PATH := -L../common -L../stuncore -L../networkutils
-LIBS := -lnetworkutils -lstuncore -lcommon -lpthread -lcrypto
+LIBS := -lnetworkutils -lstuncore -lcommon -lcrypto
+CPPFLAGS += -pthread
+LDFLAGS += -pthread
 
 
 all: $(PROJECT_TARGET)
