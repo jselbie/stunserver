@@ -1,5 +1,5 @@
-BOOST_INCLUDE := -I/home/jselbie/lib/boost_1_46_1
-# OPENSSL_INCLUDE := /home/jselbie/lib/openssl
+# BOOST_INCLUDE := -I/home/jselbie/lib/boost_1_46_1
+# OPENSSL_INCLUDE := -I/home/jselbie/lib/openssl
 
 DEFINES := -DNDEBUG
 

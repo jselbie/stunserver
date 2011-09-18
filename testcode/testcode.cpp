@@ -67,15 +67,24 @@ void ReaderFuzzTest()
 void RunUnitTests()
 {
     std::vector<IUnitTest*> vecTests;
+    
+    boost::shared_ptr<CTestDataStream> spTestDataStream(new CTestDataStream);
+    boost::shared_ptr<CTestReader> spTestReader(new CTestReader);
+    boost::shared_ptr<CTestBuilder> spTestBuilder(new CTestBuilder);
+    boost::shared_ptr<CTestIntegrity> spTestIntegrity(new CTestIntegrity);
+    boost::shared_ptr<CTestMessageHandler> spTestMessageHandler(new CTestMessageHandler);
+    boost::shared_ptr<CTestCmdLineParser> spTestCmdLineParser(new CTestCmdLineParser);
+    boost::shared_ptr<CTestClientLogic> spTestClientLogic(new CTestClientLogic);
+    boost::shared_ptr<CTestRecvFromEx> spTestRecvFromEx(new CTestRecvFromEx);
 
-    vecTests.push_back(new CTestDataStream());
-    vecTests.push_back(new CTestReader());
-    vecTests.push_back(new CTestBuilder());
-    vecTests.push_back(new CTestIntegrity());
-    vecTests.push_back(new CTestMessageHandler());
-    vecTests.push_back(new CTestCmdLineParser());
-    vecTests.push_back(new CTestClientLogic());
-    vecTests.push_back(new CTestRecvFromEx());
+    vecTests.push_back(spTestDataStream.get());
+    vecTests.push_back(spTestReader.get());
+    vecTests.push_back(spTestBuilder.get());
+    vecTests.push_back(spTestIntegrity.get());
+    vecTests.push_back(spTestMessageHandler.get());
+    vecTests.push_back(spTestCmdLineParser.get());
+    vecTests.push_back(spTestClientLogic.get());
+    vecTests.push_back(spTestRecvFromEx.get());
 
     for (size_t index = 0; index < vecTests.size(); index++)
     {

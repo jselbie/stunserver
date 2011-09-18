@@ -145,6 +145,7 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
     CRefCountedBuffer spBuffer;
     StunAttribute attribIntegrity;
     int cmp = 0;
+    bool fContextInit = false;
     
     ChkIf(_state != BodyValidated, E_FAIL);
     ChkIf(_indexMessageIntegrity < 0, E_FAIL);
@@ -171,6 +172,7 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
     
     // Here comes the fun part.  If there is a fingerprint attribute, we have to adjust the length header in computing the hash
     HMAC_CTX_init(&ctx);
+    fContextInit = true;
     HMAC_Init(&ctx, key, keylength, EVP_sha1());
     
     // message type
@@ -213,6 +215,11 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
     hr = (cmp == 0 ? S_OK : E_FAIL);
     
 Cleanup:
+    if (fContextInit)
+    {
+        HMAC_CTX_cleanup(&ctx);
+    }
+        
     return hr;
 }
 

@@ -352,6 +352,9 @@ HRESULT CTestClientLogic::TestBehaviorAndFiltering(bool fBehaviorTest, NatBehavi
     ChkIfA(results.behavior != behavior, E_UNEXPECTED);
     
 Cleanup:
+   
+    _spTransport.ReleaseAndClear();
+            
     return hr;
     
 }

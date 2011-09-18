@@ -1,0 +1,12 @@
+nbproject/
+
+*.o
+*.gch
+*.a
+*.txtcode
+
+stunclient
+stunserver
+stuntestcode
+
+
