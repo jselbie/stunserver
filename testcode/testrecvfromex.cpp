@@ -25,10 +25,18 @@
 
 HRESULT CTestRecvFromEx::Run()
 {
+    HRESULT hr1=S_OK, hr2=S_OK;
     HRESULT hr = S_OK;
+
     
-    Chk(DoTest(false)); // ipv4
-    Chk(DoTest(true));  // ipv6
+    hr1 = DoTest(false); // ipv4
+    printf("Test result of recvfromex on ipv4.  Result: %s\n", SUCCEEDED(hr)?"Pass":"Fail");
+
+    hr2 = DoTest(true);  // ipv6
+    printf("Test result of recvfromex on ipv6.  Result: %s\n", SUCCEEDED(hr)?"Pass":"Fail");
+
+    Chk(hr1);
+    Chk(hr2);
     
 Cleanup:
     return hr;
