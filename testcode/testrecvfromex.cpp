@@ -30,10 +30,10 @@ HRESULT CTestRecvFromEx::Run()
 
     
     hr1 = DoTest(false); // ipv4
-    printf("Test result of recvfromex on ipv4.  Result: %s\n", SUCCEEDED(hr)?"Pass":"Fail");
+    printf("Test result of recvfromex on ipv4.  Result: %s\n", SUCCEEDED(hr1)?"Pass":"Fail");
 
     hr2 = DoTest(true);  // ipv6
-    printf("Test result of recvfromex on ipv6.  Result: %s\n", SUCCEEDED(hr)?"Pass":"Fail");
+    printf("Test result of recvfromex on ipv6.  Result: %s\n", SUCCEEDED(hr2)?"Pass":"Fail");
 
     Chk(hr1);
     Chk(hr2);
