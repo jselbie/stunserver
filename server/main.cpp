@@ -473,7 +473,7 @@ int main(int argc, char** argv)
 
     if (FAILED(hr))
     {
-        Logging::LogMsg(LL_ALWAYS, "Error building configuraton from command line options");
+        Logging::LogMsg(LL_ALWAYS, "Error building configuration from command line options");
         PrintUsage(true);
         return -3;
     }
