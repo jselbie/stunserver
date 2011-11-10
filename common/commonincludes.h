@@ -83,6 +83,10 @@ You_Didnt_Define_DEBUG_Or_NDEBUG g_compilererror[-1];
 #undef ASSERT_MSG
 #endif
 
+// older versions of BOOST don't have BOOST_VERIFY
+#ifndef BOOST_VERIFY
+#define BOOST_VERIFY(expr) ((void)(expr))
+#endif
 
 #define ASSERT(expr) BOOST_ASSERT(expr)
 #define VERIFY(expr) BOOST_VERIFY(expr)
