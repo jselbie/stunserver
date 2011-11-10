@@ -431,7 +431,7 @@ HRESULT CStunMessageReader::GetAddressHelper(uint16_t attribType, CSocketAddress
 
     Chk(GetAttributeByType(attribType, &attrib));
     pAddrStart = _stream.GetDataPointerUnsafe() + attrib.offset;
-    Chk(::GetMappedAddress(pAddrStart, attrib.offset, pAddr));
+    Chk(::GetMappedAddress(pAddrStart, attrib.size, pAddr));
 
 Cleanup:
     return hr;
