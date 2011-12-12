@@ -24,6 +24,7 @@
 #include "stuntypes.h"
 #include "datastream.h"
 #include "socketaddress.h"
+#include "fasthash.h"
 
 
 class CStunMessageReader
@@ -46,8 +47,13 @@ private:
     ReaderParseState _state;
 
     static const size_t MAX_NUM_ATTRIBUTES = 30;
-    StunAttribute _attributes[MAX_NUM_ATTRIBUTES];
-    size_t _nAttributeCount;
+    //StunAttribute _attributes[MAX_NUM_ATTRIBUTES];
+    //size_t _nAttributeCount;
+    
+    typedef FastHash<uint16_t, StunAttribute, MAX_NUM_ATTRIBUTES, 53> AttributeHashTable; // 53 is a prime number for a reasonable table width
+    
+    AttributeHashTable _mapAttributes;
+    
 
     StunTransactionId _transactionid;
     uint16_t _msgTypeNormalized;
