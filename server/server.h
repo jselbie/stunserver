@@ -51,7 +51,7 @@ public:
 class CStunServer :
 public CBasicRefCount,
 public CObjectFactory<CStunServer>,
-public IStunResponder
+public IRefCounted
 {
 private:
     CRefCountedStunSocket _arrSockets[4];
@@ -76,14 +76,6 @@ public:
 
     HRESULT Start();
     HRESULT Stop();
-
-
-    // IStunResponder
-    virtual HRESULT SendResponse(SocketRole roleOutput, const CSocketAddress& addr, CRefCountedBuffer& spResponse);
-    virtual bool HasAddress(SocketRole role);
-    virtual HRESULT GetSocketAddressForRole(SocketRole role, /*out*/ CSocketAddress* pAddr);
-    
-    
 
     ADDREF_AND_RELEASE_IMPL();
 };

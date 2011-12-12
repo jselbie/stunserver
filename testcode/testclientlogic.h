@@ -43,15 +43,15 @@ private:
     bool _fAllowChangeRequestAA;
     bool _fAllowChangeRequestPA;
     
+    TransportAddressSet _tsa;
+    
     NatBehavior _behavior;
     NatFiltering _filtering;
     
     
     boost::shared_ptr<CStunClientLogic> _spClientLogic;
     
-    boost::shared_ptr<CStunThreadMessageHandler> _spHandler;
-    CRefCountedPtr<CMockTransport> _spTransport;
-    
+
         
     HRESULT ValidateBindingRequest(CRefCountedBuffer& spMsg, StunTransactionId* pTransId);
     HRESULT GenerateBindingResponseMessage(const CSocketAddress& addrMapped , const StunTransactionId& transid, CRefCountedBuffer& spMsg);

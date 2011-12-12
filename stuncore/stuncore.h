@@ -27,7 +27,6 @@
 #include "stuntypes.h"
 #include "stunutils.h"
 #include "messagehandler.h"
-#include "stunresponder.h"
 #include "stunauth.h"
 #include "stunclienttests.h"
 #include "stunclientlogic.h"

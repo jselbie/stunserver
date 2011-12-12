@@ -15,15 +15,19 @@
 */
 
 
-#ifndef STUN_SERVER_H
-#define	STUN_SERVER_H
-
-#include "stunsocket.h"
-#include "stunauth.h"
+#include "tcpserver.h"
 #include "server.h"
 
+class CTCPStunServer
+{
+    
+public:
+    HRESULT Initialize(const CStunServerConfig& config);
+    HRESULT Shutdown();
 
-
+    HRESULT Start();
+    HRESULT Stop();
+};
 
 
 

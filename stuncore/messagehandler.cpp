@@ -17,159 +17,156 @@
 
 #include "commonincludes.h"
 #include "stuncore.h"
-#include "stunresponder.h"
 #include "messagehandler.h"
+#include "socketrole.h"
 
 
-CStunThreadMessageHandler::CStunThreadMessageHandler()
+CStunRequestHandler::CStunRequestHandler() :
+_pAuth(NULL),
+_pAddrSet(NULL),
+_pMsgIn(NULL),
+_pMsgOut(NULL),
+_integrity(), // zero-init
+_error(), // zero-init
+_fRequestHasResponsePort(), // zero-init,
+_transid() // zero-init
 {
-    CRefCountedBuffer spReaderBuffer(new CBuffer(1500));
-    CRefCountedBuffer spResponseBuffer(new CBuffer(1500));
-
-    _spReaderBuffer.swap(spReaderBuffer);
-    _spResponseBuffer.swap(spResponseBuffer);
+    
 }
 
-CStunThreadMessageHandler::~CStunThreadMessageHandler()
-{
-    ;
-}
 
-void CStunThreadMessageHandler::SetResponder(IStunResponder* pTransport)
+HRESULT CStunRequestHandler::ProcessRequest(const StunMessageIn& msgIn, StunMessageOut& msgOut, TransportAddressSet* pAddressSet, /*optional*/ IStunAuth* pAuth)
 {
-    _spStunResponder = pTransport;
-}
-
-void CStunThreadMessageHandler::SetAuth(IStunAuth* pAuth)
-{
-    _spAuth = pAuth;
-}
-
-void CStunThreadMessageHandler::ProcessRequest(StunMessageEnvelope& message)
-{
-    CStunMessageReader reader;
-    CStunMessageReader::ReaderParseState state;
-    uint16_t responsePort = 0;
     HRESULT hr = S_OK;
-
-
-    ChkIfA(_spStunResponder == NULL, E_FAIL);
-
-    _spReaderBuffer->SetSize(0);
-    _spResponseBuffer->SetSize(0);
-    _message = message;
-
-    _addrResponse = message.remoteAddr;
-    _socketOutput = message.localSocket;
-    _fRequestHasResponsePort = false;
     
-    // zero out _error without the overhead of zero'ing out every byte in the strings
-    _error.errorcode = 0;
-    _error.szNonce[0] = 0;
-    _error.szRealm[0] = 0;
-    _error.attribUnknown = 0;
+    CStunRequestHandler handler;
     
-    _integrity.fSendWithIntegrity = false;
-    _integrity.szUser[0] = '\0';
-    _integrity.szRealm[0] = '\0';
-    _integrity.szPassword[0] = '\0';
+    // parameter checking
+    ChkIfA(msgIn.pReader==NULL, E_INVALIDARG);
+    ChkIfA(IsValidSocketRole(msgIn.socketrole)==false, E_INVALIDARG);
     
+    ChkIfA(msgOut.spBufferOut==NULL, E_INVALIDARG);
+    ChkIfA(msgOut.spBufferOut->GetAllocatedSize() < 1000, E_INVALIDARG);
     
-    // attach the temp buffer to reader
-    reader.GetStream().Attach(_spReaderBuffer, true);
-
-
-    reader.SetAllowLegacyFormat(true);
-
-    // parse the request
-    state = reader.AddBytes(message.spBuffer->GetData(), message.spBuffer->GetSize());
+    ChkIf(pAddressSet == NULL, E_INVALIDARG);
 
     // If we get something that can't be validated as a stun message, don't send back a response
     // STUN RFC may suggest sending back a "500", but I think that's the wrong approach.
-    ChkIf (state != CStunMessageReader::BodyValidated, E_FAIL);
+    ChkIfA(msgIn.pReader->GetState() != CStunMessageReader::BodyValidated, E_UNEXPECTED);
     
-    // Regardless of what we send back, let's always attempt to honor a response port request
-    // Fix the destination port if the client asked for us to send back to another port
-    if (SUCCEEDED(reader.GetResponsePort(&responsePort)))
-    {
-        _addrResponse.SetPort(responsePort);
-        _fRequestHasResponsePort = true;
-    }
+    msgOut.spBufferOut->SetSize(0);
+    
+    // build the context object to pass around this "C" type code environment
+    handler._pAuth = pAuth;
+    handler._pAddrSet = pAddressSet;
+    handler._pMsgIn = &msgIn;
+    handler._pMsgOut = &msgOut;
+    
+    // pre-prep message out
+    handler._pMsgOut->socketrole = handler._pMsgIn->socketrole; // output socket is the socket that sent us the message
+    handler._pMsgOut->addrDest = handler._pMsgIn->addrRemote; // destination address is same as source
+    
+    // now call the function that does all the real work
+    hr = handler.ProcessRequestImpl();
+    
+Cleanup:
+    return hr;
+}
 
-    reader.GetTransactionId(&_transid);
+HRESULT CStunRequestHandler::ProcessRequestImpl()
+{
+    HRESULT hrResult = S_OK;
+    HRESULT hr = S_OK;
+    
 
+    // aliases
+    CStunMessageReader &reader = *(_pMsgIn->pReader);
+    
+    uint16_t responseport = 0;
+    
     // ignore anything that is not a request (with no response)
     ChkIf(reader.GetMessageClass() != StunMsgClassRequest, E_FAIL);
-
+    
     // pre-prep the error message in case we wind up needing to send it
     _error.msgtype = reader.GetMessageType();
     _error.msgclass = StunMsgClassFailureResponse;
-
-    if (reader.GetMessageType() != StunMsgTypeBinding)
+    
+    
+    reader.GetTransactionId(&_transid);
+    
+    // we always try to honor the response port
+    reader.GetResponsePort(&responseport);
+    if (responseport != 0)
     {
-        // we're going to send back an error response
-        _error.errorcode = STUN_ERROR_BADREQUEST; // invalid request
-    }
-    else
-    {
-        // handle authentication - but only if an auth provider has been set
-        hr = ValidateAuth(reader);
-
-        // if auth succeeded, then carry on to handling the request
-        if (SUCCEEDED(hr) && (_error.errorcode==0))
+        _fRequestHasResponsePort = true;
+        
+        if (_pMsgIn->fConnectionOriented)
         {
-            // handle the binding request
-            hr = ProcessBindingRequest(reader);
+            // special case for TCP - we can't do a response port for connection oriented sockets
+            // so just flag this request as an error
+            // todo - consider relaxing this check since the calling code is going to ignore the response address anyway for TCP
+            _error.errorcode = STUN_ERROR_BADREQUEST;
         }
+        else
+        {
+            _pMsgOut->addrDest.SetPort(responseport);
+        }
+    }
+    
 
-        // catch all for any case where an error occurred
-        if (FAILED(hr) && (_error.errorcode==0))
+    if (_error.errorcode == 0)
+    {
+       if (reader.GetMessageType() != StunMsgTypeBinding)
+       {
+            // we're going to send back an error response for requests that are not binding requests
+            _error.errorcode = STUN_ERROR_BADREQUEST; // invalid request
+       }
+    }
+    
+    
+    if (_error.errorcode == 0)
+    {
+        hrResult = ValidateAuth(); // returns S_OK if _pAuth is NULL
+        
+        // if auth didn't succeed, but didn't set an error code, then setup a generic error response
+        if (FAILED(hrResult) && (_error.errorcode == 0))
         {
             _error.errorcode = STUN_ERROR_BADREQUEST;
         }
     }
-
+    
+    
+    if (_error.errorcode == 0)
+    {
+        hrResult = ProcessBindingRequest();
+        if (FAILED(hrResult) && (_error.errorcode == 0))
+        {
+            _error.errorcode = STUN_ERROR_BADREQUEST;
+        }
+    }
+    
     if (_error.errorcode != 0)
     {
-        // if either ValidateAuth or ProcessBindingRequest set an errorcode, or a fatal error occurred
-        SendErrorResponse();
+        BuildErrorResponse();
     }
-    else
-    {
-        SendResponse();
-    }
-
-
+    
 Cleanup:
-    return;
+    return hr;
 }
 
-void CStunThreadMessageHandler::SendResponse()
+void CStunRequestHandler::BuildErrorResponse()
 {
-    HRESULT hr = S_OK;
-
-    ChkIfA(_spStunResponder == NULL, E_FAIL);
-    ChkIfA(_spResponseBuffer->GetSize() <= 0, E_FAIL);
-
-    Chk(_spStunResponder->SendResponse(_socketOutput, _addrResponse, _spResponseBuffer));
-
-Cleanup:
-    return;
-}
-
-void CStunThreadMessageHandler::SendErrorResponse()
-{
-    HRESULT hr = S_OK;
-
     CStunMessageBuilder builder;
     CRefCountedBuffer spBuffer;
+    
 
-    _spResponseBuffer->SetSize(0);
-    builder.GetStream().Attach(_spResponseBuffer, true);
-
+    _pMsgOut->spBufferOut->SetSize(0);
+    builder.GetStream().Attach(_pMsgOut->spBufferOut, true);
+    
     builder.AddHeader((StunMessageType)_error.msgtype, _error.msgclass);
     builder.AddTransactionId(_transid);
     builder.AddErrorCode(_error.errorcode, "FAILED");
+    
     if ((_error.errorcode == ::STUN_ERROR_UNKNOWNATTRIB) && (_error.attribUnknown != 0))
     {
         builder.AddUnknownAttributes(&_error.attribUnknown, 1);
@@ -187,26 +184,22 @@ void CStunThreadMessageHandler::SendErrorResponse()
         }
     }
 
-    ChkIfA(_spStunResponder == NULL, E_FAIL);
-
+    builder.FixLengthField();
     builder.GetResult(&spBuffer);
 
     ASSERT(spBuffer->GetSize() != 0);
-    ASSERT(spBuffer == _spResponseBuffer);
+    ASSERT(spBuffer == _pMsgOut->spBufferOut);
 
-    _spStunResponder->SendResponse(_socketOutput, _addrResponse, spBuffer);
-
-Cleanup:
     return;
-
 }
 
-HRESULT CStunThreadMessageHandler::ProcessBindingRequest(CStunMessageReader& reader)
-{
 
-    HRESULT hrTmp;
+HRESULT CStunRequestHandler::ProcessBindingRequest()
+{
+    CStunMessageReader& reader = *(_pMsgIn->pReader);
+    
     bool fRequestHasPaddingAttribute = false;
-    SocketRole socketOutput = _message.localSocket;
+    SocketRole socketOutput = _pMsgIn->socketrole; // initialize to be from the socket we received from
     StunChangeRequestAttribute changerequest = {};
     bool fSendOtherAddress = false;
     bool fSendOriginAddress = false;
@@ -217,15 +210,15 @@ HRESULT CStunThreadMessageHandler::ProcessBindingRequest(CStunMessageReader& rea
     uint16_t paddingSize = 0;
     bool fLegacyFormat = false; // set to true if the client appears to be rfc3489 based instead of based on rfc 5789
 
-
-    _spResponseBuffer->SetSize(0);
-    builder.GetStream().Attach(_spResponseBuffer, true);
+    
+    _pMsgOut->spBufferOut->SetSize(0);
+    builder.GetStream().Attach(_pMsgOut->spBufferOut, true);
     
     fLegacyFormat = reader.IsMessageLegacyFormat();
 
     // check for an alternate response port
     // check for padding attribute (todo - figure out how to inject padding into the response)
-    // check for a change request and validate we can do it.  If so, set _socketOutput.  If not, fill out _error and return.
+    // check for a change request and validate we can do it. If so, set _socketOutput. If not, fill out _error and return.
     // determine if we have an "other" address to notify the caller about
 
 
@@ -235,7 +228,7 @@ HRESULT CStunThreadMessageHandler::ProcessBindingRequest(CStunMessageReader& rea
         // todo - figure out how we're going to get the MTU size of the outgoing interface
         fRequestHasPaddingAttribute = true;
     }
-
+    
     // as per 5780, section 6.1, If the Request contained a PADDING attribute...
     // "If the Request also contains the RESPONSE-PORT attribute the server MUST return an error response of type 400."
     if (_fRequestHasResponsePort && fRequestHasPaddingAttribute)
@@ -243,7 +236,7 @@ HRESULT CStunThreadMessageHandler::ProcessBindingRequest(CStunMessageReader& rea
         _error.errorcode = STUN_ERROR_BADREQUEST;
         return E_FAIL;
     }
-
+    
     // handle change request logic and figure out what "other-address" attribute is going to be
     if (SUCCEEDED(reader.GetChangeRequest(&changerequest)))
     {
@@ -260,60 +253,68 @@ HRESULT CStunThreadMessageHandler::ProcessBindingRequest(CStunMessageReader& rea
         ASSERT(IsValidSocketRole(socketOutput));
 
         // now, make sure we have the ability to send from another socket
-        if (_spStunResponder->HasAddress(socketOutput) == false)
+        // For TCP/TLS, we can't send back from another port
+        if ((HasAddress(socketOutput) == false) || _pMsgIn->fConnectionOriented)
         {
-            // send back an error.  We're being asked to respond using another address that we don't have a socket for
+            // send back an error. We're being asked to respond using another address that we don't have a socket for
             _error.errorcode = STUN_ERROR_BADREQUEST;
             return E_FAIL;
         }
-    }
+    }    
 
-    // If we're only working one socket, then that's ok, we just don't send back an "other address" unless we have all four sockets confgiured
-
-    // now here's a problem.  If we binded to "INADDR_ANY", all of the sockets will have "0.0.0.0" for an address (same for IPV6)
+    // If we're only working one socket, then that's ok, we just don't send back an "other address" unless we have all four sockets configured
+    // now here's a problem. If we binded to "INADDR_ANY", all of the sockets will have "0.0.0.0" for an address (same for IPV6)
     // So we effectively can't send back "other address" if don't really know our own IP address
     // Fortunately, recvfromex and the ioctls on the socket allow address discovery a bit better
-
-    fSendOtherAddress = (_spStunResponder->HasAddress(RolePP) && _spStunResponder->HasAddress(RolePA) && _spStunResponder->HasAddress(RoleAP) && _spStunResponder->HasAddress(RoleAA));
+    
+    // For TCP, we can send back an other-address.  But it is only meant as as
+    // a hint to the client that he can try another server to infer NAT behavior
+    // Change-requests are disallowed
+    
+    // Note - As per RFC 5780 and RFC 3489, "other address" (aka "changed address")
+    // attribute is always the ip and port opposite of where the request was
+    // received on, irrespective of the client sending a change-requset that influenced
+    // the value of socketOutput value above.
+    
+    fSendOtherAddress = HasAddress(RolePP) && HasAddress(RolePA) && HasAddress(RoleAP) && HasAddress(RoleAA);
 
     if (fSendOtherAddress)
     {
-        socketOther = SocketRoleSwapIP(SocketRoleSwapPort(_message.localSocket));
-
-        hrTmp = _spStunResponder->GetSocketAddressForRole(socketOther, &addrOther);
-        ASSERT(SUCCEEDED(hrTmp));
-
+        socketOther = SocketRoleSwapIP(SocketRoleSwapPort(_pMsgIn->socketrole));
         // so if our ip address is "0.0.0.0", disable this attribute
-        fSendOtherAddress = (SUCCEEDED(hrTmp) && (addrOther.IsIPAddressZero()==false));
+        fSendOtherAddress = (IsIPAddressZeroOrInvalid(socketOther) == false);
+        
+        // so if the local address of the other socket isn't known (e.g. ip == "0.0.0.0"), disable this attribute
+        if (fSendOtherAddress)
+        {
+            addrOther = _pAddrSet->set[socketOther].addr;
+        }
     }
 
     // What's our address origin?
-    VERIFY(SUCCEEDED(_spStunResponder->GetSocketAddressForRole(socketOutput, &addrOrigin)));
+    addrOrigin = _pAddrSet->set[socketOutput].addr;
     if (addrOrigin.IsIPAddressZero())
     {
         // Since we're sending back from the IP address we received on, we can just use the address the message came in on
         // Otherwise, we don't actually know it
-        if (socketOutput == _message.localSocket)
+        if (socketOutput == _pMsgIn->socketrole)
         {
-            addrOrigin = _message.localAddr;
+            addrOrigin = _pMsgIn->addrLocal;
         }
     }
     fSendOriginAddress = (false == addrOrigin.IsIPAddressZero());
 
     // Success - we're all clear to build the response
-
-    _socketOutput = socketOutput;
-
-    _spResponseBuffer->SetSize(0);
-    builder.GetStream().Attach(_spResponseBuffer, true);
+    _pMsgOut->socketrole = socketOutput;
+    
 
     builder.AddHeader(StunMsgTypeBinding, StunMsgClassSuccessResponse);
     builder.AddTransactionId(_transid);
-    builder.AddMappedAddress(_message.remoteAddr);
+    builder.AddMappedAddress(_pMsgIn->addrRemote);
 
     if (fLegacyFormat == false)
     {
-        builder.AddXorMappedAddress(_message.remoteAddr);
+        builder.AddXorMappedAddress(_pMsgIn->addrRemote);
     }
 
     if (fSendOriginAddress)
@@ -345,14 +346,17 @@ HRESULT CStunThreadMessageHandler::ProcessBindingRequest(CStunMessageReader& rea
 }
 
 
-HRESULT CStunThreadMessageHandler::ValidateAuth(CStunMessageReader& reader)
+HRESULT CStunRequestHandler::ValidateAuth()
 {
     AuthAttributes authattributes;
     AuthResponse authresponse;
     HRESULT hr = S_OK;
     HRESULT hrRet = S_OK;
     
-    if (_spAuth == NULL)
+    // aliases
+    CStunMessageReader& reader = *(_pMsgIn->pReader);
+    
+    if (_pAuth == NULL)
     {
         return S_OK; // nothing to do if there is no auth mechanism in place
     }
@@ -366,16 +370,14 @@ HRESULT CStunThreadMessageHandler::ValidateAuth(CStunMessageReader& reader)
     reader.GetStringAttributeByType(::STUN_ATTRIBUTE_LEGACY_PASSWORD, authattributes.szLegacyPassword, ARRAYSIZE(authattributes.szLegacyPassword));
     authattributes.fMessageIntegrityPresent = reader.HasMessageIntegrityAttribute();
     
-    Chk(_spAuth->DoAuthCheck(&authattributes, &authresponse));
+    Chk(_pAuth->DoAuthCheck(&authattributes, &authresponse));
     
     // enforce that everything is null terminated
     authresponse.szNonce[ARRAYSIZE(authresponse.szNonce)-1] = 0;
     authresponse.szRealm[ARRAYSIZE(authresponse.szRealm)-1] = 0;
     authresponse.szPassword[ARRAYSIZE(authresponse.szPassword)-1] = 0;
 
-    
     // now decide how to handle the auth
-    
     if (authresponse.responseType == StaleNonce)
     {
         _error.errorcode = STUN_ERROR_STALENONCE;
@@ -394,7 +396,7 @@ HRESULT CStunThreadMessageHandler::ValidateAuth(CStunMessageReader& reader)
     }
     else if (authresponse.responseType == AllowConditional)
     {
-        // validate the message in    // if either ValidateAuth or ProcessBindingRequest set an errorcode....
+        // validate the message in // if either ValidateAuth or ProcessBindingRequest set an errorcode....
 
         if (authresponse.authCredMech == AuthCredLongTerm)
         {
@@ -433,4 +435,14 @@ Cleanup:
     return hr;
 }
 
+bool CStunRequestHandler::HasAddress(SocketRole role)
+{
+    return (_pAddrSet && ::IsValidSocketRole(role) && _pAddrSet->set[role].fValid);
+}
+
+bool CStunRequestHandler::IsIPAddressZeroOrInvalid(SocketRole role)
+{
+    bool fValid = HasAddress(role) && (_pAddrSet->set[role].addr.IsIPAddressZero()==false);
+    return !fValid;
+}
 

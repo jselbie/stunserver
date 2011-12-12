@@ -32,17 +32,24 @@
 
 
 
-CStunMessageReader::CStunMessageReader() :
-_fAllowLegacyFormat(false),
-_fMessageIsLegacyFormat(false),
-_state(HeaderNotRead),
-_transactionid(),
-_msgTypeNormalized(0xffff),
-_msgClass(StunMsgClassInvalidMessageClass),
-_msgLength(0)
+CStunMessageReader::CStunMessageReader()
 {
-    ;
+    Reset();
 }
+
+void CStunMessageReader::Reset()
+{
+    _fAllowLegacyFormat = true;
+    _fMessageIsLegacyFormat = false;
+    _state = HeaderNotRead;
+    _mapAttributes.Reset();
+    memset(&_transactionid, '\0', sizeof(_transactionid));
+    _msgTypeNormalized = 0xffff;
+    _msgClass = StunMsgClassInvalidMessageClass;
+    _msgLength = 0;
+    _stream.Reset();
+}
+
 
 void CStunMessageReader::SetAllowLegacyFormat(bool fAllowLegacyFormat)
 {
@@ -154,9 +161,10 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
     ChkIfA(keylength==0, E_INVALIDARG);
     
     pAttribIntegrity = _mapAttributes.Lookup(::STUN_ATTRIBUTE_MESSAGEINTEGRITY, &indexMessageIntegrity);
+    
+    ChkIf(pAttribIntegrity == NULL, E_FAIL);
 
     _mapAttributes.Lookup(::STUN_ATTRIBUTE_FINGERPRINT, &indexFingerprint);
-    
     
     ChkIf(pAttribIntegrity->size != c_hmacsize, E_FAIL);
     
@@ -414,7 +422,7 @@ HRESULT CStunMessageReader::GetErrorCode(uint16_t* pErrorNumber)
 
     ChkIf(pErrorNumber==NULL, E_INVALIDARG);
 
-    pAttrib = _mapAttributes.Lookup(::STUN_ATTRIBUTE_ERRORCODE);
+    pAttrib = _mapAttributes.Lookup(STUN_ATTRIBUTE_ERRORCODE);
     ChkIf(pAttrib == NULL, E_FAIL);
 
     // first 21 bits of error-code attribute must be zero.
@@ -480,6 +488,17 @@ HRESULT CStunMessageReader::GetXorMappedAddress(CSocketAddress* pAddr)
 Cleanup:
     return hr;
 }
+
+HRESULT CStunMessageReader::GetResponseOriginAddress(CSocketAddress* pAddr)
+{
+    HRESULT hr = S_OK;
+    Chk(GetAddressHelper(STUN_ATTRIBUTE_RESPONSE_ORIGIN, pAddr));
+    
+Cleanup:
+    return hr;
+    
+}
+
 
 HRESULT CStunMessageReader::GetStringAttributeByType(uint16_t attributeType, char* pszValue, /*in-out*/ size_t size)
 {
@@ -609,12 +628,15 @@ HRESULT CStunMessageReader::ReadBody()
 
         if (SUCCEEDED(hr))
         {
+            int resultindex;
             StunAttribute attrib;
             attrib.attributeType = attributeType;
             attrib.size = attributeLength;
             attrib.offset = attributeOffset;
-            
-            hr = _mapAttributes.Insert(attributeType, attrib);
+
+            // if we have already read in more attributes than MAX_NUM_ATTRIBUTES, then Insert call will fail (this is how we gate too many attributes)
+            resultindex = _mapAttributes.Insert(attributeType, attrib);
+            hr = (resultindex >= 0) ? S_OK : E_FAIL;
         }
         
         if (SUCCEEDED(hr))
@@ -710,6 +732,11 @@ CStunMessageReader::ReaderParseState CStunMessageReader::AddBytes(const uint8_t*
 
     return _state;
 
+}
+
+CStunMessageReader::ReaderParseState CStunMessageReader::GetState()
+{
+    return _state;
 }
 
 void CStunMessageReader::GetTransactionId(StunTransactionId* pTrans)

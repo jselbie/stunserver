@@ -110,7 +110,7 @@ HRESULT CStunServer::Initialize(const CStunServerConfig& config)
 
         _threads.push_back(pThread);
 
-        Chk(pThread->Init(listsockets, this, _spAuth));
+        Chk(pThread->Init(listsockets,  _spAuth));
     }
     else
     {
@@ -127,7 +127,7 @@ HRESULT CStunServer::Initialize(const CStunServerConfig& config)
                 pThread = new CStunSocketThread();
                 ChkIf(pThread==NULL, E_OUTOFMEMORY);
                 _threads.push_back(pThread);
-                Chk(pThread->Init(listsockets, this, _spAuth));
+                Chk(pThread->Init(listsockets, _spAuth));
             }
         }
     }
@@ -244,40 +244,5 @@ HRESULT CStunServer::Stop()
 }
 
 
-bool CStunServer::HasAddress(SocketRole role)
-{
-    return (::IsValidSocketRole(role) &&  (_arrSockets[role].get() != NULL));
-}
 
-HRESULT CStunServer::GetSocketAddressForRole(SocketRole role, CSocketAddress* pAddr)
-{
-    HRESULT hr = S_OK;
-
-    ChkIf(pAddr == NULL, E_INVALIDARG);
-    ChkIf(false == HasAddress(role), E_FAIL);
-
-    *pAddr = _arrSockets[role]->GetLocalAddress();
-
-Cleanup:
-    return S_OK;
-}
-
-HRESULT CStunServer::SendResponse(SocketRole roleOutput, const CSocketAddress& addr, CRefCountedBuffer& spResponse)
-{
-    HRESULT hr = S_OK;
-    int sockhandle = -1;
-    int ret;
-
-    ChkIf(false == HasAddress(roleOutput), E_FAIL);
-
-    sockhandle = _arrSockets[roleOutput]->GetSocketHandle();
-
-    ret = ::sendto(sockhandle, spResponse->GetData(), spResponse->GetSize(), 0, addr.GetSockAddr(), addr.GetSockAddrLength());
-
-    ChkIf(ret < 0, ERRNOHR);
-
-Cleanup:
-    return hr;
-
-}
 

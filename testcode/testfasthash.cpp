@@ -31,15 +31,17 @@ HRESULT CTestFastHash::TestFastHash()
     const size_t c_maxsize = 500;
     FastHash<int, Item, c_maxsize> hash;
     
-    for (size_t index = 0; index < c_maxsize; index++)
+    for (int index = 0; index < (int)c_maxsize; index++)
     {
         Item item;
-        item.key = (int)index;
-        ChkA(hash.Insert((int)index, item));
+        item.key = index;
+        
+        int result = hash.Insert(index, item);
+        ChkIfA(result < 0,E_FAIL);
     }
     
     // validate that all the items are in the table
-    for (size_t index = 0; index < c_maxsize; index++)
+    for (int index = 0; index < (int)c_maxsize; index++)
     {
         Item* pItem = NULL;
         Item* pItemDirect = NULL;
@@ -47,22 +49,22 @@ HRESULT CTestFastHash::TestFastHash()
         
         ChkIfA(hash.Exists(index)==false, E_FAIL);
         
-        pItem = hash.Lookup((int)index, &insertindex);
+        pItem = hash.Lookup(index, &insertindex);
         
         ChkIfA(pItem == NULL, E_FAIL);
-        ChkIfA(pItem->key != (int)index, E_FAIL);
-        ChkIfA((int)index != insertindex, E_FAIL);
+        ChkIfA(pItem->key != index, E_FAIL);
+        ChkIfA(index != insertindex, E_FAIL);
         
         pItemDirect = hash.GetItemByIndex((int)index);
         ChkIfA(pItemDirect != pItem, E_FAIL);
     }
     
     // validate that items aren't in the table don't get returned
-    for (size_t index = c_maxsize; index < (c_maxsize*2); index++)
+    for (int index = c_maxsize; index < (int)(c_maxsize*2); index++)
     {
-        ChkIfA(hash.Exists((int)index), E_FAIL);
-        ChkIfA(hash.Lookup((int)index)!=NULL, E_FAIL);
-        ChkIfA(hash.GetItemByIndex((int)index)!=NULL, E_FAIL);
+        ChkIfA(hash.Exists(index), E_FAIL);
+        ChkIfA(hash.Lookup(index)!=NULL, E_FAIL);
+        ChkIfA(hash.GetItemByIndex(index)!=NULL, E_FAIL);
     }
     
 Cleanup:

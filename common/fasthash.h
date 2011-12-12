@@ -76,25 +76,26 @@ public:
     }
     
     
-    HRESULT Insert(K key, const V& val)
+    int Insert(K key, const V& val)
     {
         size_t tableindex = FastHash_Hash(key) % TSIZE;
+        int slotindex;
         
         if (_count >= FSIZE)
         {
-            return false;
+            return -1;
         }
         
-        _list[_count] = val;
+        slotindex = _count++;
         
-        _tablenodes[_count].index = _count;
-        _tablenodes[_count].key = key;
-        _tablenodes[_count].pNext = _table[tableindex];
-        _table[tableindex] = &_tablenodes[_count];
+        _list[slotindex] = val;
         
-        _count++;
+        _tablenodes[slotindex].index = slotindex;
+        _tablenodes[slotindex].key = key;
+        _tablenodes[slotindex].pNext = _table[tableindex];
+        _table[tableindex] = &_tablenodes[slotindex];
         
-        return true;
+        return slotindex;
     }
     
     V* Lookup(K key, int* pIndex=NULL)

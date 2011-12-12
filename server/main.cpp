@@ -504,7 +504,7 @@ int main(int argc, char** argv)
     Logging::LogMsg(LL_DEBUG, "Server is exiting");
 
     spServer->Stop();
-    spServer->Release();
+    spServer.ReleaseAndClear();
 
     return 0;
 }

@@ -15,8 +15,8 @@
 */
 
 
-#ifndef STUN_SERVER_H
-#define	STUN_SERVER_H
+#ifndef STUN_TCP_SERVER_H
+#define	STUN_TCP_SERVER_H
 
 #include "stunsocket.h"
 #include "stunauth.h"
