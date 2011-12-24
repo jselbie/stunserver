@@ -16,7 +16,7 @@ Available options:
      PORTNUM is a value between 1 to 65535.  This is the UDP or TCP port that the primary and alternate interfaces listen on as the primary port for binding requests.  The default is 3478 for UDP and TCP.  For TLS it is 5349.
 
   --altport=PORTNUM
-     PORTNUM is a value between 1 to 65535.  This is the UDP or TCP port that the primary and alternate interfaces listen on as the alternate port. The default is 3479.  It has no meaning in FULL mode.
+     PORTNUM is a value between 1 to 65535.  This is the UDP or TCP port that the primary and alternate interfaces listen on as the alternate port. The default is 3479.  It has no meaning in basic mode.
 
   --family=IPVERSION
      IPVERSION is either "4" or "6" to specify the usage of IPV4 or IPV6. If not specified, the default value is "4".
