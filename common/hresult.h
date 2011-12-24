@@ -41,6 +41,9 @@ typedef int32_t HRESULT;
 #define ERRNO_TO_HRESULT(err) MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ERRNO, err)
 #define ERRNOHR ERRNO_TO_HRESULT(ERRNO_TO_HRESULT(errno))
 
+#define ERRNO_FROM_HRESULT
+
+
 #define S_OK                             ((HRESULT)0)
 #define S_FALSE                          ((HRESULT)1L)
 #define E_UNEXPECTED                     ((HRESULT)(0x8000FFFFL))

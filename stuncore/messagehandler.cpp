@@ -319,7 +319,7 @@ HRESULT CStunRequestHandler::ProcessBindingRequest()
 
     if (fSendOriginAddress)
     {
-        builder.AddResponseOriginAddress(addrOrigin);
+        builder.AddResponseOriginAddress(addrOrigin, fLegacyFormat); // pass true to send back SOURCE_ADDRESS, otherwise, pass false to send back RESPONSE-ORIGIN
     }
 
     if (fSendOtherAddress)

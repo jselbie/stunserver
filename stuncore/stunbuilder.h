@@ -54,7 +54,7 @@ public:
 
     HRESULT AddXorMappedAddress(const CSocketAddress& addr);
     HRESULT AddMappedAddress(const CSocketAddress& addr);
-    HRESULT AddResponseOriginAddress(const CSocketAddress& other);
+    HRESULT AddResponseOriginAddress(const CSocketAddress& other, bool fLegacy);
     HRESULT AddOtherAddress(const CSocketAddress& other, bool fLegacy);
 
     HRESULT AddResponsePort(uint16_t port);

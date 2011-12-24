@@ -257,9 +257,11 @@ HRESULT CStunMessageBuilder::AddMappedAddress(const CSocketAddress& addr)
     return AddMappedAddressImpl(STUN_ATTRIBUTE_MAPPEDADDRESS, addr);
 }
 
-HRESULT CStunMessageBuilder::AddResponseOriginAddress(const CSocketAddress& addr)
+HRESULT CStunMessageBuilder::AddResponseOriginAddress(const CSocketAddress& addr, bool fLegacy)
 {
-    return AddMappedAddressImpl(STUN_ATTRIBUTE_RESPONSE_ORIGIN, addr);
+    uint16_t attribid = fLegacy ? STUN_ATTRIBUTE_SOURCEADDRESS : STUN_ATTRIBUTE_RESPONSE_ORIGIN;
+    
+    return AddMappedAddressImpl(attribid, addr);
 }
 
 HRESULT CStunMessageBuilder::AddOtherAddress(const CSocketAddress& addr, bool fLegacy)

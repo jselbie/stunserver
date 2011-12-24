@@ -13,13 +13,8 @@
 //    Hence, it can be used off the stack or in cases where memory allocations impact performance
 //    Limitations:
 //        Fixed number of insertions (specified by FSIZE)
-//        Does not support removals
 //        Made for simple types and structs of simple types - as items are pre-allocated (no regards to constructors or destructors)
 //        Duplicate key insertions will not remove the previous item
-//    Additional:
-//        FastHash keeps a static array of items inserted (in insertion order)
-//        Then a hash table of <K,int> to map keys back to index values
-//        This allows calling code to be able to iterate over the table in insertion order
 //    Template parameters
 //        K = key type
 //        V = value type
@@ -30,122 +25,163 @@ inline size_t FastHash_Hash(unsigned int x)
 {
     return (size_t)x;
 }
-
 inline size_t FastHash_Hash(signed int x)
 {
     return (size_t)x;
 }
 
-const size_t FAST_HASH_DEFAULT_CAPACITY = 100;
-const size_t FASH_HASH_DEFAULT_TABLE_SIZE = 37;
 
-template <class K, class V, size_t FSIZE=FAST_HASH_DEFAULT_CAPACITY, size_t TSIZE=FASH_HASH_DEFAULT_TABLE_SIZE>
+// fast hash supports basic insert and remove
+template <class K, class V, size_t FSIZE=100, size_t TSIZE=37>
 class FastHash
 {
-private:
+protected:
     struct ItemNode
     {
         K key;
-        int index;    // index into _list where this item is stored
+        int index; // index into _nodes where value exists
         ItemNode* pNext;
+        ItemNode* pPrev;
     };
     
     
-    V _list[FSIZE];   // list of items
-    size_t _count;    // number of items inserted so far
+    int _insertindex;
     
-    ItemNode _tablenodes[FSIZE];
-    ItemNode* _table[TSIZE];
+    V _nodes[FSIZE];
+    ItemNode _itemnodes[FSIZE];
+    ItemNode* _freelist;
+    ItemNode* _lookuptable[TSIZE];
     
+    size_t _size;
+    
+    ItemNode* Find(const K& key)
+    {
+        size_t hashindex = FastHash_Hash(key) % TSIZE;
+        ItemNode* pProbe = _lookuptable[hashindex];
+        while (pProbe)
+        {
+            if (pProbe->key == key)
+            {
+                break;
+            }
+            pProbe = pProbe->pNext;
+        }
+        return pProbe;
+    }
 public:
-    
     FastHash()
     {
+#ifdef DEBUG
+        char compiletimeassert1[(FSIZE > 0)?1:-1];
+        char compiletimeassert2[(TSIZE > 0)?1:-1];
+        compiletimeassert1[0] = 'x';
+        compiletimeassert2[0] = 'x';
+#endif
+        
         Reset();
     }
     
     void Reset()
     {
-        _count = 0;
-        memset(_table, '\0', sizeof(_table));
+        memset(_lookuptable, '\0', sizeof(_lookuptable));
+        for (size_t x = 0; x < FSIZE; x++)
+        {
+            _itemnodes[x].pNext = &_itemnodes[x+1];
+            _itemnodes[x].pPrev = NULL;
+            _itemnodes[x].index = x;
+        }
+        _itemnodes[FSIZE-1].pNext = NULL;
+        _freelist = _itemnodes;
+        _size = 0;
     }
     
     size_t Size()
     {
-        return _count;
+        return _size;
     }
     
-    
-    int Insert(K key, const V& val)
+    int Insert(const K& key, V& value)
     {
-        size_t tableindex = FastHash_Hash(key) % TSIZE;
-        int slotindex;
+        size_t hashindex = FastHash_Hash(key) % TSIZE;
+        ItemNode* pInsert = NULL;
+        ItemNode* pHead = _lookuptable[hashindex];
         
-        if (_count >= FSIZE)
+        if (_freelist == NULL)
         {
             return -1;
         }
         
-        slotindex = _count++;
+        pInsert = _freelist;
+        _freelist = _freelist->pNext;
         
-        _list[slotindex] = val;
+        _nodes[pInsert->index] = value;
         
-        _tablenodes[slotindex].index = slotindex;
-        _tablenodes[slotindex].key = key;
-        _tablenodes[slotindex].pNext = _table[tableindex];
-        _table[tableindex] = &_tablenodes[slotindex];
-        
-        return slotindex;
-    }
-    
-    V* Lookup(K key, int* pIndex=NULL)
-    {
-        size_t tableindex = FastHash_Hash(key) % TSIZE;
-        
-        V* pFoundItem = NULL;
-        
-        ItemNode* pHead = _table[tableindex];
-        
-        if (pIndex)
+        pInsert->key = key;
+        pInsert->pPrev = NULL;
+        pInsert->pNext = pHead;
+        if (pHead)
         {
-            *pIndex = -1;
+            pHead->pPrev = pInsert;
         }
         
-        while (pHead)
-        {
-            if (pHead->key == key)
-            {
-                pFoundItem = &_list[pHead->index];
+        
+        _lookuptable[hashindex]= pInsert;
+        _size++;
                 
-                if (pIndex)
-                {
-                    *pIndex = pHead->index;
-                }
-                
-                break;
-            }
-            pHead = pHead->pNext;
-        }
-        
-        return pFoundItem;
+        return 1;
     }
-    
-    bool Exists(K key)
+    int Remove(const K& key)
     {
-        V* pItem = Lookup(key);
-        return (pItem != NULL);
-    }
-    
-    V* GetItemByIndex(int index)
-    {
-        if ((index < 0) || (((size_t)index) >= _count))
+        ItemNode* pNode = Find(key);
+        ItemNode* pPrev = NULL;
+        ItemNode* pNext = NULL;
+        if (pNode == NULL)
         {
-            return NULL;
+            return -1;
+        }
+        pPrev = pNode->pPrev;
+        pNext = pNode->pNext;
+        if (pPrev == NULL)
+        {
+            size_t hashindex = FastHash_Hash(key) % TSIZE;
+            _lookuptable[hashindex] = pNext;
+        }
+        if (pPrev)
+        {
+            pPrev->pNext = pNext;
+        }
+        if (pNext)
+        {
+            pNext->pPrev = pPrev;
         }
         
-        return &_list[index];
+        pNode->pPrev = NULL;
+        pNode->pNext = _freelist;
+        _freelist = pNode;
+        
+        _size--;
+        
+        return 1;
     }
+    V* Lookup(const K& key)
+    {
+        V* pValue = NULL;
+        ItemNode* pNode = Find(key);
+        if (pNode)
+        {
+            pValue = &_nodes[pNode->index];
+        }
+        return pValue;
+    }
+    bool Exists(const K& key)
+    {
+        return (Find(key) != NULL);
+    }
+    
+
 };
+
+
 
 
 #endif

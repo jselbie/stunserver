@@ -57,7 +57,7 @@ HRESULT CTestBuilder::Test1()
     ChkA(builder.AddMappedAddress(addr));
     ChkA(builder.AddXorMappedAddress(addr));
     ChkA(builder.AddOtherAddress(addrOther, false));
-    ChkA(builder.AddResponseOriginAddress(addrOrigin));
+    ChkA(builder.AddResponseOriginAddress(addrOrigin, false));
     ChkA(builder.AddFingerprintAttribute());
     ChkA(builder.GetResult(&spBuffer));
 

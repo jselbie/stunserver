@@ -24,13 +24,14 @@
 
 
 CStunSocketThread::CStunSocketThread() :
+_arrSendSockets(), // zero-init
 _fNeedToExit(false),
 _pthread((pthread_t)-1),
 _fThreadIsValid(false),
 _rotation(0),
 _tsa() // zero-init
 {
-    ;
+    ClearSocketArray();
 }
 
 CStunSocketThread::~CStunSocketThread()
@@ -39,25 +40,67 @@ CStunSocketThread::~CStunSocketThread()
     WaitForStopAndClose();
 }
 
-HRESULT CStunSocketThread::Init(std::vector<CRefCountedStunSocket>& listSockets, IStunAuth* pAuth)
+void CStunSocketThread::ClearSocketArray()
+{
+    _arrSendSockets[RolePP] = NULL;
+    _arrSendSockets[RolePA] = NULL;
+    _arrSendSockets[RoleAP] = NULL;
+    _arrSendSockets[RoleAA] = NULL;
+    
+    _socks.clear();
+}
+
+HRESULT CStunSocketThread::Init(CStunSocket* arrayOfFourSockets[], IStunAuth* pAuth, SocketRole rolePrimaryRecv)
 {
     HRESULT hr = S_OK;
     
+    bool fSingleSocketRecv = ::IsValidSocketRole(rolePrimaryRecv);
+    
     ChkIfA(_fThreadIsValid, E_UNEXPECTED);
 
-    ChkIfA(listSockets.size() <= 0, E_INVALIDARG);
+    ChkIfA(arrayOfFourSockets == NULL, E_INVALIDARG);
     
-    _socks = listSockets;
-
+    // if this thread was configured to listen on a single socket (aka "multi-threaded mode"), then 
+    // validate that it exists
+    if (fSingleSocketRecv)
+    {
+        ChkIfA(arrayOfFourSockets[rolePrimaryRecv] == NULL, E_UNEXPECTED);
+    }
+    
+    memcpy(_arrSendSockets, arrayOfFourSockets, sizeof(_arrSendSockets));
+    
     // initialize the TSA thing
     memset(&_tsa, '\0', sizeof(_tsa));
-    for (size_t i = 0; i < _socks.size(); i++)
+    for (size_t i = 0; i < ARRAYSIZE(_arrSendSockets); i++)
     {
-        SocketRole role = _socks[i]->GetRole();
-        ASSERT(_tsa.set[role].fValid == false); // two sockets for same role?
+        if (_arrSendSockets[i] == NULL)
+        {
+            continue;
+        }
+        
+        SocketRole role = _arrSendSockets[i]->GetRole();
+        ASSERT(role == (SocketRole)i);
         _tsa.set[role].fValid = true;
-        _tsa.set[role].addr = _socks[i]->GetLocalAddress();
+        _tsa.set[role].addr = _arrSendSockets[i]->GetLocalAddress();
     }
+    
+    if (fSingleSocketRecv)
+    {
+        // only one socket to listen on
+        _socks.push_back(_arrSendSockets[rolePrimaryRecv]);
+    }
+    else
+    {
+        for (size_t i = 0; i < ARRAYSIZE(_arrSendSockets); i++)
+        {
+            if (_arrSendSockets[i] != NULL)
+            {
+                _socks.push_back(_arrSendSockets[i]);
+            }
+        }
+    }
+    
+    
 
     Chk(InitThreadBuffers());
 
@@ -112,7 +155,6 @@ HRESULT CStunSocketThread::Start()
 
     ChkIfA(_socks.size() <= 0, E_FAIL);
 
-
     err = ::pthread_create(&_pthread, NULL, CStunSocketThread::ThreadFunction, this);
 
     ChkIfA(err != 0, ERRNO_TO_HRESULT(err));
@@ -127,7 +169,7 @@ Cleanup:
 
 HRESULT CStunSocketThread::SignalForStop(bool fPostMessages)
 {
-    size_t size = _socks.size();
+
     HRESULT hr = S_OK;
 
     _fNeedToExit = true;
@@ -137,9 +179,12 @@ HRESULT CStunSocketThread::SignalForStop(bool fPostMessages)
     // but all the threads should be started and shutdown together
     if (fPostMessages)
     {
-        for (size_t index = 0; index < size; index++)
+        for (size_t index = 0; index < _socks.size(); index++)
         {
             char data = 'x';
+            
+            ASSERT(_socks[index] != NULL);
+            
             ::CSocketAddress addr(_socks[index]->GetLocalAddress());
             ::sendto(_socks[index]->GetSocketHandle(), &data, 1, 0, addr.GetSockAddr(), addr.GetSockAddrLength());
         }
@@ -160,7 +205,8 @@ HRESULT CStunSocketThread::WaitForStopAndClose()
 
     _fThreadIsValid = false;
     _pthread = (pthread_t)-1;
-    _socks.clear();
+    
+    ClearSocketArray(); // set all the sockets back to -1
     
     UninitThreadBuffers();
 
@@ -174,15 +220,16 @@ void* CStunSocketThread::ThreadFunction(void* pThis)
     return NULL;
 }
 
-int CStunSocketThread::WaitForSocketData()
+// returns an index into _socks, not _arrSockets
+CStunSocket* CStunSocketThread::WaitForSocketData()
 {
     fd_set set = {};
     int nHighestSockValue = 0;
-    size_t nSocketCount = _socks.size();
     int ret;
-    CRefCountedStunSocket spSocket;
-    int result = -1;
+    CStunSocket* pReadySocket = NULL;
     UNREFERENCED_VARIABLE(ret); // only referenced in ASSERT
+    size_t nSocketCount = _socks.size();
+    
     
     // rotation gives another socket priority in the next loop
     _rotation = (_rotation + 1) % nSocketCount;
@@ -192,7 +239,9 @@ int CStunSocketThread::WaitForSocketData()
 
     for (size_t index = 0; index < nSocketCount; index++)
     {
+        ASSERT(_socks[index] != NULL);
         int sock = _socks[index]->GetSocketHandle();
+        ASSERT(sock != -1);
         FD_SET(sock, &set);
         nHighestSockValue = (sock > nHighestSockValue) ? sock : nHighestSockValue;
     }
@@ -203,20 +252,23 @@ int CStunSocketThread::WaitForSocketData()
     ASSERT(ret > 0); // This will be a benign assert, and should never happen.  But I will want to know if it does
 
     // now figure out which socket just got data on it
-    spSocket.reset();
     for (size_t index = 0; index < nSocketCount; index++)
     {
         int indexconverted = (index + _rotation) % nSocketCount;
-
         int sock = _socks[indexconverted]->GetSocketHandle();
+        
+        ASSERT(sock != -1);
+        
         if (FD_ISSET(sock, &set))
         {
-            result = indexconverted;
+            pReadySocket = _socks[indexconverted];
             break;
         }
     }
     
-    return result;
+    ASSERT(pReadySocket != NULL);
+    
+    return pReadySocket;
 }
 
 
@@ -225,44 +277,43 @@ void CStunSocketThread::Run()
     size_t nSocketCount = _socks.size();
     bool fMultiSocketMode = (nSocketCount > 1);
     int recvflags = fMultiSocketMode ? MSG_DONTWAIT : 0;
-    CRefCountedStunSocket spSocket = _socks[0];
-    
-    
+    CStunSocket* pSocket = _socks[0];
     int ret;
-    int socketindex = 0;
-
-    Logging::LogMsg(LL_DEBUG, "Starting listener thread");
     
+    int sendsocketcount = 0;
+    sendsocketcount += (int)(_tsa.set[RolePP].fValid);
+    sendsocketcount += (int)(_tsa.set[RolePA].fValid);
+    sendsocketcount += (int)(_tsa.set[RoleAP].fValid);
+    sendsocketcount += (int)(_tsa.set[RoleAA].fValid);
+    Logging::LogMsg(LL_DEBUG, "Starting listener thread (%d recv sockets, %d send sockets)", _socks.size(), sendsocketcount);
 
     while (_fNeedToExit == false)
     {
 
         if (fMultiSocketMode)
         {
-            spSocket.reset();
-            socketindex = WaitForSocketData();
+            pSocket = WaitForSocketData();
             
             if (_fNeedToExit)
             {
                 break;
             }
 
-            ASSERT(socketindex >= 0);
+            ASSERT(pSocket != NULL);
             
-            if (socketindex < 0)
+            if (pSocket == NULL)
             {
                 // just go back to waiting;
                 continue;
             }
-            
-            spSocket = _socks[socketindex];
-            ASSERT(spSocket != NULL);
         }
+        
+        ASSERT(pSocket != NULL);
 
         // now receive the data
         _spBufferIn->SetSize(0);
 
-        ret = ::recvfromex(spSocket->GetSocketHandle(), _spBufferIn->GetData(), _spBufferIn->GetAllocatedSize(), recvflags, &_msgIn.addrRemote, &_msgIn.addrLocal);
+        ret = ::recvfromex(pSocket->GetSocketHandle(), _spBufferIn->GetData(), _spBufferIn->GetAllocatedSize(), recvflags, &_msgIn.addrRemote, &_msgIn.addrLocal);
 
         if (Logging::GetLogLevel() >= LL_VERBOSE)
         {
@@ -271,7 +322,7 @@ void CStunSocketThread::Run()
             _msgIn.addrRemote.ToStringBuffer(szIPRemote, 100);
             _msgIn.addrLocal.ToStringBuffer(szIPLocal, 100);
             Logging::LogMsg(LL_VERBOSE, "recvfrom returns %d from %s on local interface %s", ret, szIPRemote, szIPLocal);
-        }
+        } 
 
         if (ret < 0)
         {
@@ -286,7 +337,7 @@ void CStunSocketThread::Run()
 
         _spBufferIn->SetSize(ret);
         
-        _msgIn.socketrole = spSocket->GetRole();
+        _msgIn.socketrole = pSocket->GetRole();
         
         
         // --------------------------------------------------------------------
@@ -319,9 +370,10 @@ HRESULT CStunSocketThread::ProcessRequestAndSendResponse()
     Chk(CStunRequestHandler::ProcessRequest(_msgIn, _msgOut, &_tsa, _spAuth));
 
     ASSERT(_tsa.set[_msgOut.socketrole].fValid);
-    sockout = GetSocketForRole(_msgOut.socketrole);
-    
+    ASSERT(_arrSendSockets[_msgOut.socketrole]);
+    sockout = _arrSendSockets[_msgOut.socketrole]->GetSocketHandle();
     ASSERT(sockout != -1);
+    
     // find the socket that matches the role specified by msgOut
     sendret = ::sendto(sockout, _spBufferOut->GetData(), _spBufferOut->GetSize(), 0, _msgOut.addrDest.GetSockAddr(), _msgOut.addrDest.GetSockAddrLength());
     
@@ -336,24 +388,6 @@ Cleanup:
     return hr;
 }
 
-int CStunSocketThread::GetSocketForRole(SocketRole role)
-{
-    int sock = -1;
-    size_t len = _socks.size();
-    
-    ASSERT(::IsValidSocketRole(role));
-    ASSERT(_tsa.set[role].fValid);
-    
-    for (size_t i = 0; i < len; i++)
-    {
-        if (_socks[i]->GetRole() == role)
-        {
-            sock = _socks[i]->GetSocketHandle();
-        }
-    }
-    
-    return sock;
-}
 
 
 

@@ -43,6 +43,11 @@ void CStunMessageReader::Reset()
     _fMessageIsLegacyFormat = false;
     _state = HeaderNotRead;
     _mapAttributes.Reset();
+    
+    _indexFingerprint = -1;
+    _indexMessageIntegrity = -1;
+    _countAttributes = 0;
+    
     memset(&_transactionid, '\0', sizeof(_transactionid));
     _msgTypeNormalized = 0xffff;
     _msgClass = StunMsgClassInvalidMessageClass;
@@ -134,7 +139,7 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
 {
     HRESULT hr = S_OK;
     
-    int lastAttributeIndex = ((int)_mapAttributes.Size()) - 1;
+    int lastAttributeIndex = _countAttributes - 1;
     bool fFingerprintAdjustment = false;
     bool fNoOtherAttributesAfterIntegrity = false;
     const size_t c_hmacsize = 20;
@@ -147,8 +152,6 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
     CDataStream stream;
     CRefCountedBuffer spBuffer;
     StunAttribute* pAttribIntegrity=NULL;
-    int indexMessageIntegrity = 0;
-    int indexFingerprint = -1;
     
     int cmp = 0;
     bool fContextInit = false;
@@ -156,25 +159,24 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
     
     ChkIf(_state != BodyValidated, E_FAIL);
     
+    ChkIf(_countAttributes == 0, E_FAIL); // if there's not attributes, there's definitely not a message integrity attribute
+    ChkIf(_indexMessageIntegrity == -1, E_FAIL);
+    
     // can a key be empty?
     ChkIfA(key==NULL, E_INVALIDARG);
     ChkIfA(keylength==0, E_INVALIDARG);
     
-    pAttribIntegrity = _mapAttributes.Lookup(::STUN_ATTRIBUTE_MESSAGEINTEGRITY, &indexMessageIntegrity);
+    pAttribIntegrity = _mapAttributes.Lookup(::STUN_ATTRIBUTE_MESSAGEINTEGRITY);
     
     ChkIf(pAttribIntegrity == NULL, E_FAIL);
 
-    _mapAttributes.Lookup(::STUN_ATTRIBUTE_FINGERPRINT, &indexFingerprint);
-    
     ChkIf(pAttribIntegrity->size != c_hmacsize, E_FAIL);
     
-    ChkIfA(lastAttributeIndex < 0, E_FAIL);
-    
     // first, check to make sure that no other attributes (other than fingerprint) follow the message integrity
-    fNoOtherAttributesAfterIntegrity = (indexMessageIntegrity == lastAttributeIndex) || ((indexMessageIntegrity == (lastAttributeIndex-1)) && (indexFingerprint == lastAttributeIndex));
+    fNoOtherAttributesAfterIntegrity = (_indexMessageIntegrity == lastAttributeIndex) || ((_indexMessageIntegrity == (lastAttributeIndex-1)) && (_indexFingerprint == lastAttributeIndex));
     ChkIf(fNoOtherAttributesAfterIntegrity==false, E_FAIL);
     
-    fFingerprintAdjustment = (indexMessageIntegrity == (lastAttributeIndex-1));
+    fFingerprintAdjustment = (_indexMessageIntegrity == (lastAttributeIndex-1));
 
     Chk(GetBuffer(&spBuffer));
     stream.Attach(spBuffer, false);
@@ -196,8 +198,10 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
         // fingerprint attribute is 8 bytes long including it's own header
         // and to do this, we have to fix the network byte ordering issue
         uint16_t lengthHeader = ntohs(chunk16);
-        lengthHeader -= 8;
-        chunk16 = htons(lengthHeader);
+        uint16_t adjustedlengthHeader = lengthHeader - 8;
+        
+        
+        chunk16 = htons(adjustedlengthHeader);
     }
     HMAC_Update(&ctx, (unsigned char*)&chunk16, sizeof(chunk16));
     
@@ -298,7 +302,7 @@ Cleanup:
 
 HRESULT CStunMessageReader::GetAttributeByType(uint16_t attributeType, StunAttribute* pAttribute)
 {
-    StunAttribute* pFound = _mapAttributes.Lookup(attributeType, NULL);
+    StunAttribute* pFound = _mapAttributes.Lookup(attributeType);
         
     if (pFound == NULL)
     {
@@ -312,26 +316,10 @@ HRESULT CStunMessageReader::GetAttributeByType(uint16_t attributeType, StunAttri
     return S_OK;
 }
 
-HRESULT CStunMessageReader::GetAttributeByIndex(int index, StunAttribute* pAttribute)
-{
-    StunAttribute* pFound = _mapAttributes.GetItemByIndex(index);
-        
-    if (pFound == NULL)
-    {
-        return E_FAIL;
-    }
-    
-    if (pAttribute)
-    {
-        *pAttribute = *pFound;
-    }
-    
-    return S_OK;
-}
 
 int CStunMessageReader::GetAttributeCount()
 {
-    return (int)(_mapAttributes.Size());
+    return (int)(this->_mapAttributes.Size());
 }
 
 HRESULT CStunMessageReader::GetResponsePort(uint16_t* pPort)
@@ -628,16 +616,34 @@ HRESULT CStunMessageReader::ReadBody()
 
         if (SUCCEEDED(hr))
         {
-            int resultindex;
+            int result;
             StunAttribute attrib;
             attrib.attributeType = attributeType;
             attrib.size = attributeLength;
             attrib.offset = attributeOffset;
 
             // if we have already read in more attributes than MAX_NUM_ATTRIBUTES, then Insert call will fail (this is how we gate too many attributes)
-            resultindex = _mapAttributes.Insert(attributeType, attrib);
-            hr = (resultindex >= 0) ? S_OK : E_FAIL;
+            result = _mapAttributes.Insert(attributeType, attrib);
+            hr = (result >= 0) ? S_OK : E_FAIL;
         }
+        
+        if (SUCCEEDED(hr))
+        {
+            
+            if (attributeType == ::STUN_ATTRIBUTE_FINGERPRINT)
+            {
+                _indexFingerprint = _countAttributes;
+            }
+            
+            if (attributeType == ::STUN_ATTRIBUTE_MESSAGEINTEGRITY)
+            {
+                _indexMessageIntegrity = _countAttributes;
+            }
+            
+            _countAttributes++;
+        }
+        
+
         
         if (SUCCEEDED(hr))
         {

@@ -54,6 +54,8 @@ HRESULT CTestRecvFromEx::DoTest(bool fIPV6)
     CSocketAddress addrAny(0,0); // INADDR_ANY, random port
     sockaddr_in6 addrAnyIPV6 = {};
     uint16_t portRecv = 0;
+    CStunSocket* pSocketSend = NULL;
+    CStunSocket* pSocketRecv = NULL;
     CRefCountedStunSocket spSocketSend, spSocketRecv;
     fd_set set = {};
     CSocketAddress addrDestForSend;
@@ -78,8 +80,11 @@ HRESULT CTestRecvFromEx::DoTest(bool fIPV6)
     
     
     // create two sockets listening on INADDR_ANY.  One for sending and one for receiving
-    ChkA(CStunSocket::Create(addrAny, RolePP, &spSocketSend));
-    ChkA(CStunSocket::Create(addrAny, RolePP, &spSocketRecv));
+    ChkA(CStunSocket::CreateUDP(addrAny, RolePP, &pSocketSend));
+    spSocketSend = CRefCountedStunSocket(pSocketSend);
+
+    ChkA(CStunSocket::CreateUDP(addrAny, RolePP, &pSocketRecv));
+    spSocketRecv = CRefCountedStunSocket(pSocketRecv);
     
     spSocketRecv->EnablePktInfoOption(true);
     

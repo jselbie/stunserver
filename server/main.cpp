@@ -46,6 +46,43 @@ void PrintUsage(bool fSummaryUsage)
     PrettyPrint(psz, width);
 }
 
+void LogHR(uint16_t level, HRESULT hr)
+{
+    uint32_t facility = HRESULT_FACILITY(hr);
+    char msg[400];
+    const char* pMsg = NULL;
+    bool fGotMsg = false;
+    
+    if (facility == FACILITY_ERRNO)
+    {
+        msg[0] = '\0';
+        int err = (int)(HRESULT_CODE(hr));
+        
+        pMsg = strerror_r(err, msg, ARRAYSIZE(msg));
+
+        if (pMsg)
+        {
+            Logging::LogMsg(level, "Error: %s", pMsg);
+            fGotMsg = true;
+        }
+        
+        if (err == EADDRINUSE)
+        {
+            Logging::LogMsg(level, 
+                "This error likely means another application is listening on one\n"
+                "or more of the same ports you are attempting to configure this\n"
+                "server to listen on.  Run \"netstat -a -p -t -u\" to see a list\n"
+                "of all ports in use and associated process id for each");
+        }
+        
+    }
+    
+    if (fGotMsg == false)
+    {
+        Logging::LogMsg(level, "Error: %x", hr);
+    }
+}
+
 
 
 struct StartupArgs
@@ -350,6 +387,7 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
         config.addrAA = addrAlternate;
         config.addrAA.SetPort(portAlternate);
         config.fHasAA = true;
+
     }
 
     *pConfigOut = config;
@@ -487,6 +525,7 @@ int main(int argc, char** argv)
     if (FAILED(hr))
     {
         Logging::LogMsg(LL_ALWAYS, "Unable to initialize server (error code = x%x)", hr);
+        LogHR(LL_ALWAYS, hr);
         return -4;
     }
 
@@ -494,6 +533,7 @@ int main(int argc, char** argv)
     if (FAILED(hr))
     {
         Logging::LogMsg(LL_ALWAYS, "Unable to start server (error code = x%x)", hr);
+        LogHR(LL_ALWAYS, hr);
         return -5;
     }
 

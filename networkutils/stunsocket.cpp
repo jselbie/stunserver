@@ -18,9 +18,24 @@
 #include "stuncore.h"
 #include "stunsocket.h"
 
+CStunSocket::CStunSocket() :
+_sock(-1),
+_role(RolePP)
+{
+    
+}
+
 CStunSocket::~CStunSocket()
 {
     Close();
+}
+
+void CStunSocket::Reset()
+{
+    _sock = -1;
+    _addrlocal = CSocketAddress(0,0);
+    _addrremote = CSocketAddress(0,0);
+    _role = RolePP;
 }
 
 void CStunSocket::Close()
@@ -28,8 +43,35 @@ void CStunSocket::Close()
     if (_sock != -1)
     {
         close(_sock);
-        _addrlocal = CSocketAddress(0,0);
+        _sock = -1;
     }
+    Reset();
+}
+
+HRESULT CStunSocket::Attach(int sock)
+{
+    if (sock == -1)
+    {
+        ASSERT(false);
+        return E_INVALIDARG;
+    }
+    
+    if (sock != _sock)
+    {
+        // close any existing socket
+        Close(); // this will also call "Reset"
+        _sock = sock;
+    }
+    
+    UpdateAddresses();
+    return S_OK;
+}
+
+int CStunSocket::Detach()
+{
+    int sock = _sock;
+    Reset();
+    return sock;
 }
 
 int CStunSocket::GetSocketHandle() const
@@ -42,11 +84,21 @@ const CSocketAddress& CStunSocket::GetLocalAddress() const
     return _addrlocal;
 }
 
+const CSocketAddress& CStunSocket::GetRemoteAddress() const
+{
+    return _addrremote;
+}
+
+
 SocketRole CStunSocket::GetRole() const
 {
     ASSERT(_sock != -1);
-    
     return _role;
+}
+
+void CStunSocket::SetRole(SocketRole role)
+{
+    _role = role;
 }
 
 HRESULT CStunSocket::EnablePktInfoOption(bool fEnable)
@@ -77,50 +129,121 @@ HRESULT CStunSocket::EnablePktInfoOption(bool fEnable)
     return (ret == 0) ? S_OK : ERRNOHR;
 }
 
+HRESULT CStunSocket::SetNonBlocking(bool fEnable)
+{
+    HRESULT hr = S_OK;
+    int result;
+    int flags;
+    
+    flags = ::fcntl(_sock, F_GETFL, 0);
+    
+    ChkIf(flags == -1, ERRNOHR);
+    
+    flags |= O_NONBLOCK;
+    
+    result = fcntl(_sock , F_SETFL , flags);
+    
+    ChkIf(result == -1, ERRNOHR);
+    
+Cleanup:
+    return hr;
+}
+
+void CStunSocket::UpdateAddresses()
+{
+    sockaddr_storage addrLocal = {};
+    sockaddr_storage addrRemote = {};
+    socklen_t len;
+    int ret;
+    
+    ASSERT(_sock != -1);
+    if (_sock == -1)
+    {
+        return;
+    }
+    
+    
+    len = sizeof(addrLocal);
+    ret = ::getsockname(_sock, (sockaddr*)&addrLocal, &len);
+    if (ret != -1)
+    {
+        _addrlocal = addrLocal;
+    }
+    
+    len = sizeof(addrRemote);
+    ret = ::getpeername(_sock, (sockaddr*)&addrRemote, &len);
+    if (ret != -1)
+    {
+        _addrremote = addrRemote;
+    }
+}
+
+
 //static
-HRESULT CStunSocket::Create(const CSocketAddress& addrlocal, SocketRole role, boost::shared_ptr<CStunSocket>* pStunSocketShared)
+HRESULT CStunSocket::CreateCommon(int socktype, const CSocketAddress& addrlocal, SocketRole role, CStunSocket** ppSocket)
 {
     int sock = -1;
     int ret;
-    CStunSocket* pSocket = NULL;
-    sockaddr_storage addrBind = {};
-    socklen_t sizeaddrBind;
     HRESULT hr = S_OK;
     
-    ChkIfA(pStunSocketShared == NULL, E_INVALIDARG);
+    ChkIfA(ppSocket == NULL, E_INVALIDARG);
+    *ppSocket = NULL;
     
-    sock = socket(addrlocal.GetFamily(), SOCK_DGRAM, 0);
+    ASSERT((socktype == SOCK_DGRAM)||(socktype==SOCK_STREAM));
+    
+    sock = socket(addrlocal.GetFamily(), socktype, 0);
     ChkIf(sock < 0, ERRNOHR);
     
     ret = bind(sock, addrlocal.GetSockAddr(), addrlocal.GetSockAddrLength());
     ChkIf(ret < 0, ERRNOHR);
     
-    // call get sockname to find out what port we just binded to.  (Useful for when addrLocal.port is 0)
-    sizeaddrBind = sizeof(addrBind);
-    ret = ::getsockname(sock, (sockaddr*)&addrBind, &sizeaddrBind);
-    ChkIf(ret < 0, ERRNOHR);
+    Chk(CreateCommonFromSockHandle(sock, role, ppSocket));
     
-    pSocket = new CStunSocket();
-    pSocket->_sock = sock;
-    pSocket->_addrlocal = CSocketAddress(*(sockaddr*)&addrBind);
-    pSocket->_role = role;
     sock = -1;
     
-    {
-        boost::shared_ptr<CStunSocket> spTmp(pSocket);
-        pStunSocketShared->swap(spTmp);
-    }
-    
-    
 Cleanup:
-
     if (sock != -1)
     {
         close(sock);
         sock = -1;
     }
-
     return hr;
 }
 
+HRESULT CStunSocket::CreateCommonFromSockHandle(int sock, SocketRole role, CStunSocket** ppSocket)
+{
+    HRESULT hr = S_OK;
+    CStunSocket* pSocket = NULL;
+    
+    ChkIfA(ppSocket == NULL, E_INVALIDARG);
+    *ppSocket = NULL;
+    
+    pSocket = new CStunSocket();
+    ChkIf(pSocket == NULL, E_OUTOFMEMORY);
+    
+    pSocket->Attach(sock);  // this will call UpdateAddresses
+    pSocket->SetRole(role);
+    
+    *ppSocket = pSocket;
+    
+Cleanup:
+    return hr;
+    
+}
+
+
+HRESULT CStunSocket::CreateUDP(const CSocketAddress& local, SocketRole role, CStunSocket** ppSocket)
+{
+    return CreateCommon(SOCK_DGRAM, local, role, ppSocket);
+}
+
+HRESULT CStunSocket::CreateTCP(const CSocketAddress& local, SocketRole role, CStunSocket** ppSocket)
+{
+    return CreateCommon(SOCK_STREAM, local, role, ppSocket);
+}
+
+HRESULT CStunSocket::CreateFromConnectedSockHandle(int sock, SocketRole role, CStunSocket** ppSocket)
+{
+    return CreateCommonFromSockHandle(sock, role, ppSocket);
+}
 

@@ -54,7 +54,7 @@ public CObjectFactory<CStunServer>,
 public IRefCounted
 {
 private:
-    CRefCountedStunSocket _arrSockets[4];
+    CStunSocket* _arrSockets[4];
 
     // when we support multithreaded servers, this will change to a list
 
@@ -65,9 +65,7 @@ private:
 
     friend class CObjectFactory<CStunServer>;
 
-    
     CRefCountedPtr<IStunAuth> _spAuth;
-
 
 public:
 

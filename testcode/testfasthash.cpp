@@ -21,7 +21,13 @@
 
 HRESULT CTestFastHash::Run()
 {
-    return TestFastHash();
+    HRESULT hr = S_OK;
+    
+    ChkA(TestFastHash());
+    ChkA(TestRemove());
+    
+Cleanup:
+    return hr;
 }
 
 HRESULT CTestFastHash::TestFastHash()
@@ -29,34 +35,42 @@ HRESULT CTestFastHash::TestFastHash()
     HRESULT hr = S_OK;
     
     const size_t c_maxsize = 500;
-    FastHash<int, Item, c_maxsize> hash;
+    const size_t c_tablesize = 91;
+    FastHash<int, Item, c_maxsize, c_tablesize> hash;
+    int result;
+    size_t testindex;
     
     for (int index = 0; index < (int)c_maxsize; index++)
     {
         Item item;
         item.key = index;
         
-        int result = hash.Insert(index, item);
+        result = hash.Insert(index, item);
         ChkIfA(result < 0,E_FAIL);
     }
+    
+    // now make sure that we can't insert one past the limit
+    {
+        Item item;
+        item.key = c_maxsize;
+        result = hash.Insert(item.key, item);
+        ChkIfA(result >= 0, E_FAIL);
+    }
+    
+    // check that the size is what's expected
+    ChkIfA(hash.Size() != c_maxsize, E_FAIL);
     
     // validate that all the items are in the table
     for (int index = 0; index < (int)c_maxsize; index++)
     {
         Item* pItem = NULL;
-        Item* pItemDirect = NULL;
-        int insertindex = -1;
         
         ChkIfA(hash.Exists(index)==false, E_FAIL);
         
-        pItem = hash.Lookup(index, &insertindex);
+        pItem = hash.Lookup(index);
         
         ChkIfA(pItem == NULL, E_FAIL);
         ChkIfA(pItem->key != index, E_FAIL);
-        ChkIfA(index != insertindex, E_FAIL);
-        
-        pItemDirect = hash.GetItemByIndex((int)index);
-        ChkIfA(pItemDirect != pItem, E_FAIL);
     }
     
     // validate that items aren't in the table don't get returned
@@ -64,10 +78,69 @@ HRESULT CTestFastHash::TestFastHash()
     {
         ChkIfA(hash.Exists(index), E_FAIL);
         ChkIfA(hash.Lookup(index)!=NULL, E_FAIL);
-        ChkIfA(hash.GetItemByIndex(index)!=NULL, E_FAIL);
+    }
+    
+    // test a basic remove
+    testindex = c_maxsize/2;
+    result = hash.Remove(testindex);
+    ChkIfA(result < 0, E_FAIL);
+    
+    // now add another item
+    {
+        Item item;
+        item.key = c_maxsize;
+        result = hash.Insert(item.key, item);
+        ChkIfA(result < 0, E_FAIL);
     }
     
 Cleanup:
     return hr;
     
+}
+
+HRESULT CTestFastHash::TestRemove()
+{
+    HRESULT hr = S_OK;
+    int result;
+    const size_t c_maxsize = 500;
+    const size_t c_tablesize = 91;
+    FastHash<int, Item, c_maxsize, c_tablesize> hash;
+
+    // add 500 items
+    for (int index = 0; index < (int)c_maxsize; index++)
+    {
+        Item item;
+        item.key = index;
+        
+        result = hash.Insert(index, item);
+        ChkIfA(result < 0,E_FAIL);
+    }
+    
+    // now remove them all
+    for (int index = 0; index < (int)c_maxsize; index++)
+    {
+        result = hash.Remove(index);
+        ChkIfA(result < 0,E_FAIL);
+    }
+    
+    ChkIfA(hash.Size() != 0, E_FAIL);
+    
+    // Now add all the items back
+    for (int index = 0; index < (int)c_maxsize; index++)
+    {
+        Item item;
+        item.key = index;
+        
+        result = hash.Insert(index, item);
+        ChkIfA(result < 0,E_FAIL);
+    }
+    
+    ChkIfA(hash.Size() != c_maxsize, E_FAIL);
+    
+    
+    
+   
+Cleanup:
+    return hr;
+
 }

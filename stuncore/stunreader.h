@@ -52,6 +52,11 @@ private:
     
     AttributeHashTable _mapAttributes;
     
+    // special index values for message integrity attribute validation
+    int _indexFingerprint;
+    int _indexMessageIntegrity;
+    int _countAttributes;
+    
 
     StunTransactionId _transactionid;
     uint16_t _msgTypeNormalized;
@@ -86,7 +91,7 @@ public:
     HRESULT ValidateMessageIntegrityLong(const char* pszUser, const char* pszRealm, const char* pszPassword);
     
     HRESULT GetAttributeByType(uint16_t attributeType, StunAttribute* pAttribute);
-    HRESULT GetAttributeByIndex(int index, StunAttribute* pAttribute);
+    //HRESULT GetAttributeByIndex(int index, StunAttribute* pAttribute);
     int GetAttributeCount();
 
     void GetTransactionId(StunTransactionId* pTransId );

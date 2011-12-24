@@ -318,6 +318,7 @@ HRESULT ClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& sock
 {
     HRESULT hr = S_OK;
     CRefCountedStunSocket spStunSocket;
+    CStunSocket* pStunSocket = NULL;
     CRefCountedBuffer spMsg(new CBuffer(1500));
     int sock = -1;
     CSocketAddress addrDest;   // who we send to
@@ -341,12 +342,14 @@ HRESULT ClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& sock
         Chk(hr);
     }
 
-    hr = CStunSocket::Create(socketconfig.addrLocal, RolePP, &spStunSocket);
+    hr = CStunSocket::CreateUDP(socketconfig.addrLocal, RolePP, &pStunSocket);
     if (FAILED(hr))
     {
         Logging::LogMsg(LL_ALWAYS, "Unable to create local socket: (error = x%x)", hr);
         Chk(hr);
     }
+    
+    spStunSocket = CRefCountedStunSocket(pStunSocket);
 
     spStunSocket->EnablePktInfoOption(true);
 

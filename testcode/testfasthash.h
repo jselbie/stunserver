@@ -26,6 +26,8 @@ class CTestFastHash : public IUnitTest
 {
 private:
     HRESULT TestFastHash();
+    HRESULT TestRemove();
+    HRESULT TestStress();
     
     struct Item
     {
