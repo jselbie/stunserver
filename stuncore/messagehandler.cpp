@@ -169,7 +169,7 @@ void CStunThreadMessageHandler::SendErrorResponse()
 
     builder.AddHeader((StunMessageType)_error.msgtype, _error.msgclass);
     builder.AddTransactionId(_transid);
-    builder.AddErrorCode(_error.errorcode, "FAILED");
+    builder.AddErrorCode(_error.errorcode, "FAILED  "); // quick fix.  "two spaces" added for rfc 3478. A better fix will exist in version 1.1
     if ((_error.errorcode == ::STUN_ERROR_UNKNOWNATTRIB) && (_error.attribUnknown != 0))
     {
         builder.AddUnknownAttributes(&_error.attribUnknown, 1);
