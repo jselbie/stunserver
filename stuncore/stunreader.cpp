@@ -298,7 +298,21 @@ Cleanup:
 
 
 
-
+HRESULT CStunMessageReader::GetAttributeByIndex(int index, StunAttribute* pAttribute)
+{
+    StunAttribute* pFound = _mapAttributes.LookupValueByIndex((size_t)index);
+    
+    if (pFound == NULL)
+    {
+        return E_FAIL;
+    }
+    
+    if (pAttribute)
+    {
+        *pAttribute = *pFound;
+    }
+    return S_OK;
+}
 
 HRESULT CStunMessageReader::GetAttributeByType(uint16_t attributeType, StunAttribute* pAttribute)
 {

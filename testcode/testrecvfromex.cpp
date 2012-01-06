@@ -54,9 +54,7 @@ HRESULT CTestRecvFromEx::DoTest(bool fIPV6)
     CSocketAddress addrAny(0,0); // INADDR_ANY, random port
     sockaddr_in6 addrAnyIPV6 = {};
     uint16_t portRecv = 0;
-    CStunSocket* pSocketSend = NULL;
-    CStunSocket* pSocketRecv = NULL;
-    CRefCountedStunSocket spSocketSend, spSocketRecv;
+    CStunSocket socketSend, socketRecv;
     fd_set set = {};
     CSocketAddress addrDestForSend;
     CSocketAddress addrDestOnRecv;
@@ -80,15 +78,13 @@ HRESULT CTestRecvFromEx::DoTest(bool fIPV6)
     
     
     // create two sockets listening on INADDR_ANY.  One for sending and one for receiving
-    ChkA(CStunSocket::CreateUDP(addrAny, RolePP, &pSocketSend));
-    spSocketSend = CRefCountedStunSocket(pSocketSend);
+    ChkA(socketSend.UDPInit(addrAny, RolePP));
 
-    ChkA(CStunSocket::CreateUDP(addrAny, RolePP, &pSocketRecv));
-    spSocketRecv = CRefCountedStunSocket(pSocketRecv);
+    ChkA(socketRecv.UDPInit(addrAny, RolePP));
     
-    spSocketRecv->EnablePktInfoOption(true);
+    socketRecv.EnablePktInfoOption(true);
     
-    portRecv = spSocketRecv->GetLocalAddress().GetPort();
+    portRecv = socketRecv.GetLocalAddress().GetPort();
     
     // now send to localhost
     if (fIPV6)
@@ -112,23 +108,23 @@ HRESULT CTestRecvFromEx::DoTest(bool fIPV6)
     do
     {
         addrlength = sizeof(addrDummy);
-        ret = ::recvfrom(spSocketRecv->GetSocketHandle(), &ch, sizeof(ch), MSG_DONTWAIT, (sockaddr*)&addrDummy, &addrlength);
+        ret = ::recvfrom(socketRecv.GetSocketHandle(), &ch, sizeof(ch), MSG_DONTWAIT, (sockaddr*)&addrDummy, &addrlength);
     } while (ret >= 0);
     
     // now send some data to ourselves
-    ret = sendto(spSocketSend->GetSocketHandle(), &ch, sizeof(ch), 0, addrDestForSend.GetSockAddr(), addrDestForSend.GetSockAddrLength());
+    ret = sendto(socketSend.GetSocketHandle(), &ch, sizeof(ch), 0, addrDestForSend.GetSockAddr(), addrDestForSend.GetSockAddrLength());
     ChkIfA(ret <= 0, E_UNEXPECTED);
     
     // now wait for the data to arrive
     FD_ZERO(&set);
-    FD_SET(spSocketRecv->GetSocketHandle(), &set);
+    FD_SET(socketRecv.GetSocketHandle(), &set);
     tv.tv_sec = 3;
     
-    ret = select(spSocketRecv->GetSocketHandle()+1, &set, NULL, NULL, &tv);
+    ret = select(socketRecv.GetSocketHandle()+1, &set, NULL, NULL, &tv);
     
     ChkIfA(ret <= 0, E_UNEXPECTED);
     
-    ret = ::recvfromex(spSocketRecv->GetSocketHandle(), &ch, 1, MSG_DONTWAIT, &addrSrcOnRecv, &addrDestOnRecv);
+    ret = ::recvfromex(socketRecv.GetSocketHandle(), &ch, 1, MSG_DONTWAIT, &addrSrcOnRecv, &addrDestOnRecv);
     
     ChkIfA(ret <= 0, E_UNEXPECTED);    
     

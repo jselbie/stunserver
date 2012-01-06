@@ -32,14 +32,12 @@ public:
     CStunSocketThread();
     ~CStunSocketThread();
     
-    HRESULT Init(CStunSocket* arrayOfFourSockets[], IStunAuth* pAuth, SocketRole rolePrimaryRecv);
+    HRESULT Init(CStunSocket* arrayOfFourSockets, IStunAuth* pAuth, SocketRole rolePrimaryRecv);
     HRESULT Start();
 
     HRESULT SignalForStop(bool fPostMessages);
     HRESULT WaitForStopAndClose();
     
-    /// returns back the index of the socket _socks that is ready for data, otherwise, -1
-    CStunSocket* WaitForSocketData();
     
     void ClearSocketArray();
     
@@ -50,7 +48,9 @@ private:
     
     static void* ThreadFunction(void* pThis);
     
-    CStunSocket* _arrSendSockets[4];  // matches CStunServer::_arrSockets
+    CStunSocket* WaitForSocketData();
+    
+    CStunSocket* _arrSendSockets;  // matches CStunServer::_arrSockets
     std::vector<CStunSocket*> _socks; // sockets for receiving on
     
     

@@ -30,8 +30,7 @@ private:
     CStunSocket(const CStunSocket&) {;}
     void operator=(const CStunSocket&) {;}
     
-    static HRESULT CreateCommonFromSockHandle(int sock, SocketRole role, CStunSocket** ppSocket);
-    static HRESULT CreateCommon(int socktype, const CSocketAddress& addrlocal, SocketRole role, CStunSocket** ppSocket);
+    HRESULT InitCommon(int socktype, const CSocketAddress& addrlocal, SocketRole role);
     
     void Reset();
     
@@ -41,6 +40,8 @@ public:
     ~CStunSocket();
     
     void Close();
+    
+    bool IsValid();
     
     HRESULT Attach(int sock);
     int Detach();
@@ -57,9 +58,8 @@ public:
     
     void UpdateAddresses();
     
-    static HRESULT CreateUDP(const CSocketAddress& local, SocketRole role, CStunSocket** ppSocket);
-    static HRESULT CreateTCP(const CSocketAddress& local, SocketRole role, CStunSocket** ppSocket);
-    static HRESULT CreateFromConnectedSockHandle(int sock, SocketRole role, CStunSocket** ppSocket);
+    HRESULT UDPInit(const CSocketAddress& local, SocketRole role);
+    HRESULT TCPInit(const CSocketAddress& local, SocketRole role);
 };
 
 typedef boost::shared_ptr<CStunSocket> CRefCountedStunSocket;

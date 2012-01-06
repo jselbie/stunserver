@@ -20,150 +20,846 @@
 #include "stunsocket.h"
 
 
-class CStunConnectionBufferPool
-{
-protected:
-    
-    size_t _maxCount;  // the max number of buffers that can be instantiated at once (aka, "max number of connections")
-    std::list<CRefCountedBuffer> _listBuffers;
-    std::list<CRefCountedBuffer> _listFree;
-public:
-    CStunConnectionBufferPool(size_t initialCount, size_t maxCount);
-    HRESULT Grow(size_t newcount);
-    void ReturnToPool(CRefCountedBuffer& spBuffer);
-    HRESULT GetBuffer(CRefCountedBuffer* pspBuffer);
-};
 
-CStunConnectionBufferPool::CStunConnectionBufferPool(size_t initialCount, size_t maxCount)
+#include "stunsocketthread.h"
+
+
+
+
+#define IS_DIVISIBLE_BY(x, y)  ((x % y)==0)
+
+static unsigned int IsPrime(unsigned int val)
 {
-    if (initialCount > maxCount)
+    unsigned int stop;
+    unsigned int quicklook[] = {false, false, true, true, false, true, false, true, false, false, false, true};
+    
+    if (val < sizeof(quicklook))
     {
-        maxCount = initialCount;
+        return quicklook[val];
     }
     
-    _maxCount = maxCount;
-    Grow(initialCount);
+    if (val % 2)
+    {
+        return false;
+    }
+    
+    stop = ((unsigned int)sqrt(val)) + 1;
+    
+    for (unsigned int i = 3; i <= stop; i+=2)
+    {
+        if (IS_DIVISIBLE_BY(val, i))
+        {
+            return false;        
+        }
+    }
+    
+    return true;
 }
 
-HRESULT CStunConnectionBufferPool::Grow(size_t newcount)
+static size_t GetHashTableWidth(unsigned int maxConnections)
 {
-    size_t total = _listBuffers.size();
-    size_t inc = 0;
+    size_t width;
     
-    if (newcount <= total)
+    if (maxConnections >= 10007)
     {
-        return S_OK;
+        return 10007;
     }
     
-    while (total < newcount)
+    width = maxConnections;
+    
+    while (IsPrime(width) == false)
     {
-        if (total >= _maxCount)
+        width++;
+    }
+    return width;
+}
+
+// client sockets are edge triggered
+const uint32_t EPOLL_CLIENT_READ_EVENT_SET = EPOLLET | EPOLLIN | EPOLLRDHUP;
+const uint32_t EPOLL_CLIENT_WRITE_EVENT_SET = EPOLLET | EPOLLOUT;
+
+// listen socket is level triggered
+const uint32_t EPOLL_LISTEN_SOCKET_EVENT_SET = EPOLLIN;
+
+// notification pipe could go either way
+const uint32_t EPOLL_PIPE_EVENT_SET = EPOLLIN;
+
+const int c_MaxNumberOfConnectionsDefault = 10000;
+
+
+CTCPStunThread::CTCPStunThread()
+{
+    _epoll = -1;
+    _pipe[0] = _pipe[1] = -1;
+    _pthread = (pthread_t)-1;
+    Reset();
+}
+
+void CTCPStunThread::Reset()
+{
+    CloseEpoll();
+    CloseListenSocket();
+    ClosePipes();
+    
+    _fListenSocketOnEpoll = false;
+    _fNeedToExit = false;
+    _spAuth.ReleaseAndClear();
+    _role = RolePP;
+    
+    memset(&_tsa, '\0', sizeof(_tsa));
+    _maxConnections = c_MaxNumberOfConnectionsDefault;
+
+    _pthread = (pthread_t)-1;
+    _fThreadIsValid = false;
+
+    // the thread should have closed all the connections
+    ASSERT(_hashConnections1.Size() == 0);
+    ASSERT(_hashConnections2.Size() == 0);
+    _hashConnections1.ResetTable();
+    _hashConnections2.ResetTable();
+    
+    _pNewConnList = &_hashConnections1;
+    _pOldConnList = &_hashConnections2;
+    
+    _timeLastSweep = time(NULL);
+}
+
+
+
+CTCPStunThread::~CTCPStunThread()
+{
+    Stop(); // calls Reset
+    ASSERT(_pipe[0] == -1); // quick assert to make sure reset was called
+}
+
+
+HRESULT CTCPStunThread::CreatePipes()
+{
+    HRESULT hr = S_OK;
+    int ret;
+    
+    ASSERT(_pipe[0] == -1);
+    ASSERT(_pipe[1] == -1);
+    
+    ret = ::pipe(_pipe);
+    
+    ChkIf(ret == -1, ERRNOHR);
+    
+Cleanup:
+    return hr;
+}
+
+void CTCPStunThread::ClosePipes()
+{
+    if (_pipe[0] != -1)
+    {
+        close(_pipe[0]);
+        _pipe[0] = -1;
+    }
+    
+    if (_pipe[1] != -1)
+    {
+        close(_pipe[1]);
+        _pipe[1] = -1;
+    }
+}
+
+HRESULT CTCPStunThread::NotifyThreadViaPipe()
+{
+    ASSERT(_pipe[1] != -1);
+    int ret;
+    
+    // _pipe[1] is the write end of the pipe
+    char ch = 'x';
+    ret = write(_pipe[1], &ch, 1);
+    return (ret > 0) ? S_OK : S_FALSE;
+}
+
+
+HRESULT CTCPStunThread::CreateEpoll()
+{
+    ASSERT(_epoll == -1);
+    _epoll = epoll_create(1000); // todo change this parameter to "max connections" (although it's likely an ignored parameter)
+    if (_epoll == -1)
+    {
+        return ERRNOHR;
+    }
+    return S_OK;
+}
+
+void CTCPStunThread::CloseEpoll()
+{
+    if (_epoll != -1)
+    {
+        close(_epoll);
+        _epoll = -1;
+    }
+}
+
+HRESULT CTCPStunThread::AddSocketToEpoll(int sock, uint32_t events)
+{
+    HRESULT hr = S_OK;
+    epoll_event ev = {};
+    
+    ASSERT(sock != -1);
+    
+    ev.data.fd = sock;
+    ev.events = events;
+    ChkIfA(epoll_ctl(_epoll, EPOLL_CTL_ADD, sock, &ev) == -1, ERRNOHR);
+Cleanup:
+    return hr;
+}
+
+HRESULT CTCPStunThread::AddClientSocketToEpoll(int sock)
+{
+    return AddSocketToEpoll(sock, EPOLL_CLIENT_READ_EVENT_SET);
+}
+
+HRESULT CTCPStunThread::DetachFromEpoll(int sock)
+{
+    HRESULT hr = S_OK;
+    epoll_event ev={}; // pass empty ev, because some implementations of epoll_ctl can't handle a NULL event struct
+    
+    if (sock == -1)
+    {
+        return S_FALSE;
+    }
+    
+    ChkIfA(epoll_ctl(_epoll, EPOLL_CTL_DEL, sock, &ev) == -1, ERRNOHR);
+Cleanup:
+    return hr;
+}
+
+
+HRESULT CTCPStunThread::EpollCtrl(int sock, uint32_t events)
+{
+    HRESULT hr = S_OK;
+    
+    ASSERT(sock != -1);
+    
+    epoll_event ev = {};
+    ev.data.fd = sock;
+    ev.events = events;
+    
+    ChkIfA(epoll_ctl(_epoll, EPOLL_CTL_MOD, sock, &ev) == -1, ERRNOHR);
+Cleanup:
+    return hr;
+}
+
+HRESULT CTCPStunThread::SetListenSocketOnEpoll(bool fEnable)
+{
+    HRESULT hr = S_OK;
+    int sock = _socketListen.GetSocketHandle();
+    
+    ChkIfA(sock == -1, E_UNEXPECTED);
+    
+    if (fEnable != _fListenSocketOnEpoll)
+    {
+        if (fEnable)
+        {
+            ChkA(AddSocketToEpoll(sock, EPOLL_LISTEN_SOCKET_EVENT_SET));
+        }
+        else
+        {
+            ChkA(DetachFromEpoll(sock));
+        }
+        
+        _fListenSocketOnEpoll = fEnable;
+    }
+    
+Cleanup:
+    return hr;
+}
+
+
+HRESULT CTCPStunThread::CreateListenSocket()
+{
+    HRESULT hr = S_OK;
+    int ret;
+    
+    Chk(_socketListen.TCPInit(_addrListen, _role));
+    
+    // make the socket non-blocking just in case we accidently call accept() before it's time
+    // this shouldn't happen, but non-blocking mode will help me find bugs if they exist
+    ChkA(_socketListen.SetNonBlocking(true));
+    
+    ret = listen(_socketListen.GetSocketHandle(), 128); // todo - figure out the right value to pass to listen
+    ChkIf(ret == -1, ERRNOHR);
+    
+Cleanup:
+    return hr;
+}
+
+void CTCPStunThread::CloseListenSocket()
+{
+    _socketListen.Close();
+}
+
+
+
+
+
+HRESULT CTCPStunThread::Init(const CSocketAddress& addrListen, IStunAuth* pAuth, SocketRole role, int maxConnections)
+{
+    HRESULT hr = S_OK;
+    int ret;
+    size_t hashTableWidth;
+    
+    // we shouldn't be initialized at this point
+    ChkIfA(_socketListen.IsValid(), E_UNEXPECTED);
+    ChkIfA(_fThreadIsValid, E_UNEXPECTED);
+
+    // Max sure we didn't accidently pass in anything crazy
+    ChkIfA(_maxConnections >= 100000, E_INVALIDARG);
+    
+    _addrListen = addrListen;
+    _spAuth.Attach(pAuth);
+    _role = role;
+
+    ChkA(CreateListenSocket());
+    
+    ChkA(CreatePipes());
+    
+    ChkA(CreateEpoll()); 
+    
+    // add listen socket to epoll
+    ASSERT(_fListenSocketOnEpoll == false);
+    ChkA(SetListenSocketOnEpoll(true));
+    
+    
+    // add read end of pipe to epoll so we can get notified of when a signal to exit has occurred
+    ChkA(AddSocketToEpoll(_pipe[0], EPOLL_PIPE_EVENT_SET));
+    
+    _maxConnections = (maxConnections > 0) ? maxConnections : c_MaxNumberOfConnectionsDefault;
+    
+    // todo - get "max connections" from an init param
+    
+    hashTableWidth = GetHashTableWidth(_maxConnections);
+    ret = _hashConnections1.InitTable(_maxConnections, hashTableWidth);
+    ChkIfA(ret == -1, E_FAIL);
+    
+    ret = _hashConnections2.InitTable(_maxConnections, hashTableWidth);
+    ChkIfA(ret == -1, E_FAIL);
+    
+    _pNewConnList = &_hashConnections1;
+    _pOldConnList = &_hashConnections2;
+    
+    
+    // todo - figure out how this thing gets fully initialized for full mode
+    // this influences attributes in response
+    for (int sr = (int)RolePP; sr <= (int)RoleAA; sr++)
+    {
+        _tsa.set[sr].fValid = false;
+    }
+    
+    ASSERT(::IsValidSocketRole(_role));
+    _tsa.set[_role].fValid = true;
+    _tsa.set[_role].addr = _socketListen.GetLocalAddress();
+    
+    
+    _fNeedToExit = false;
+Cleanup:
+    if (FAILED(hr))
+    {
+        Reset();
+    }
+    return hr;
+}
+
+
+HRESULT CTCPStunThread::Start()
+{
+    int ret;
+    HRESULT hr = S_OK;
+    
+    ChkIfA(_fThreadIsValid, E_FAIL);
+    
+    ChkIf(_socketListen.IsValid() == false, E_UNEXPECTED); // Init hasn't been called
+    
+    _fNeedToExit = false;
+    ret = ::pthread_create(&_pthread, NULL, ThreadFunction, this);
+    ChkIfA(ret != 0, ERRNO_TO_HRESULT(ret));
+    
+    _fThreadIsValid = true;
+    
+Cleanup:
+    return hr;
+}
+
+
+HRESULT CTCPStunThread::Stop()
+{
+    void* pRetValueFromThread = NULL;
+    
+    if (_fThreadIsValid)
+    {
+        _fNeedToExit = true;
+        
+        // signal the thread to exit
+        NotifyThreadViaPipe();
+
+        // wait for the thread to exit
+        ::pthread_join(_pthread, &pRetValueFromThread);
+        
+        _fThreadIsValid = false;
+    }
+    
+    // we don't support restarting a thread (as that would require flushing _pipe)
+    // so go ahead and make it impossible for that to happen
+    Reset();
+    return S_OK;
+}
+
+void* CTCPStunThread::ThreadFunction(void* pThis)
+{
+    ((CTCPStunThread*)pThis)->Run();
+    return NULL;
+}
+
+bool CTCPStunThread::IsTimeoutNeeded()
+{
+    return ((_pNewConnList->Size() > 0) || (_pOldConnList->Size() > 0));
+}
+
+bool CTCPStunThread::IsConnectionCountAtMax()
+{
+    size_t size1 = _pNewConnList->Size();
+    size_t size2 = _pOldConnList->Size();
+    
+    return ((size1 + size2) >= (size_t)_maxConnections);
+}
+
+
+void CTCPStunThread::Run()
+{
+    int listensocket = _socketListen.GetSocketHandle();
+    
+    _timeLastSweep = time(NULL);
+    
+    while (_fNeedToExit == false)
+    {
+        // wait for a notification
+        epoll_event ev = {};
+        int timeout = -1; // wait forever
+
+        int ret;
+
+        if (IsTimeoutNeeded())
+        {
+            timeout = CTCPStunThread::c_sweepTimeoutMilliseconds;
+        }
+        
+        // turn off epoll eventing from the listen socket if we are at max connections
+        // otherwise, make sure it is enabled.
+        SetListenSocketOnEpoll(IsConnectionCountAtMax() == false);
+        
+        ret = ::epoll_wait(_epoll, &ev, 1, timeout);
+        
+        if ( _fNeedToExit || (ev.data.fd == _pipe[0]) )
         {
             break;
         }
         
-        CBuffer* pBuffer = new CBuffer(1500);
-        if (pBuffer == NULL)
+        if (ret > 0)
         {
-            return E_OUTOFMEMORY;
+            if (ev.data.fd == listensocket)
+            {
+                StunConnection* pConn = AcceptConnection();
+                
+                // as an optimization - see if we can do a read on the new connection
+                if (pConn)
+                {
+                    ReceiveBytesForConnection(pConn);
+                }
+            }
+            else
+            {
+                ProcessConnectionEvent(ev.data.fd, ev.events);
+            }
         }
         
-        CRefCountedBuffer spBuffer(pBuffer);
+        // close any connection that we haven't heard from in a while
+        SweepDeadConnections();
+    }
+    
+    ThreadCleanup();
+}
+
+void CTCPStunThread::ProcessConnectionEvent(int sock, uint32_t eventflags)
+{
+    StunConnection** ppConn = NULL;
+    StunConnection* pConn = NULL;
+    
+    ppConn = _pNewConnList->Lookup(sock);
+    if (ppConn == NULL)
+    {
+        ppConn = _pOldConnList->Lookup(sock);
+    }
+    
+    if ((ppConn == NULL) || (*ppConn == NULL))
+    {
+        Logging::LogMsg(LL_DEBUG, "Warning - ProcessConnectionEvent could not resolve socket into connection (socket == %d)", sock);
+        return;
+    }
+    
+    pConn = *ppConn;
+    
+    // if event flags is an error or a hangup, that's ok, the subsequent call below will consume the error and close the connection as appropriate
+    
+    if (pConn->_state == ConnectionState_Receiving)
+    {
+        ReceiveBytesForConnection(pConn);
+    }
+    else if (pConn->_state == ConnectionState_Transmitting)
+    {
+        WriteBytesForConnection(pConn);
+    }
+    else if (pConn->_state == ConnectionState_Closing)
+    {
+        ConsumeRemoteClose(pConn);
+    }
         
-        _listBuffers.push_back(spBuffer);
-        _listFree.push_back(spBuffer);
-        inc++;
-    }
     
-    if (inc == 0)
+}
+
+
+// todo - figure out return code strategy for AcceptConnection
+StunConnection* CTCPStunThread::AcceptConnection()
+{
+    int listensock = _socketListen.GetSocketHandle();
+    int clientsock = -1;
+    int socktmp = -1;
+    sockaddr_storage addrClient;
+    socklen_t socklen = sizeof(addrClient);
+    StunConnection* pConn = NULL;
+    HRESULT hr = S_OK;
+    int insertresult;
+
+    socktmp = ::accept(listensock, (sockaddr*)&addrClient, &socklen);
+    
+    if (socktmp == -1)
     {
-        return E_OUTOFMEMORY;
+        int err = errno;
+        Logging::LogMsg(LL_DEBUG, "%s - accept failed (errno == %d)\n", __FUNCTION__, err);
+        ChkIfA(socktmp == -1, E_FAIL);
     }
-    return S_OK;
-}
-
-HRESULT CStunConnectionBufferPool::GetBuffer(CRefCountedBuffer* pspBuffer)
-{
-    CRefCountedBuffer spBuffer;
-    size_t total = _listBuffers.size();
+    clientsock = socktmp;
     
-    if (_listFree.size() == 0)
+    pConn = CreateNewConnection(clientsock);
+    ChkIf(pConn == NULL, E_FAIL); // Our connection pool has nothing left to give, only thing to do is abort this connection and close the socket
+    socktmp = -1;
+    
+    ChkA(pConn->_stunsocket.SetNonBlocking(true));
+    ChkA(AddClientSocketToEpoll(clientsock));
+    
+    // add connection to our tracking tables
+    pConn->_idHashTable = (_pNewConnList == &_hashConnections1) ? 1 : 2;
+    insertresult = _pNewConnList->Insert(clientsock, pConn);
+    
+    // out of space in the lookup tables?
+    ChkIfA(insertresult == -1, E_FAIL);
+    
+Cleanup:
+    
+    if (FAILED(hr))
     {
-        Grow(total*2 + 1);
+        CloseConnection(pConn);
+        pConn = NULL;
+        if (socktmp != -1)
+        {
+            close(socktmp);
+        }
     }
+
+    return pConn;
+}
+
+HRESULT CTCPStunThread::ReceiveBytesForConnection(StunConnection* pConn)
+{
+    uint8_t buffer[1500];
+    size_t bytesneeded;
+    int bytesread;
+    HRESULT hr = S_OK;
+    CStunMessageReader::ReaderParseState readerstate;
     
-    if (_listFree.size() == 0)
+    int sock = pConn->_stunsocket.GetSocketHandle();
+    
+    while (true)
     {
-        return E_OUTOFMEMORY;
+        ASSERT(pConn->_state == ConnectionState_Receiving);
+        ASSERT(pConn->_reader.GetState() != CStunMessageReader::ParseError);
+        ASSERT(pConn->_reader.GetState() != CStunMessageReader::BodyValidated);
+        
+        bytesneeded = pConn->_reader.HowManyBytesNeeded();
+        
+        ChkIfA(bytesneeded == 0, E_UNEXPECTED);
+        
+        bytesread = recv(sock, buffer, bytesneeded, 0);
+        
+        if ((bytesread < 0) && ((errno == EWOULDBLOCK) || (errno==EAGAIN)) )
+        {
+            // no more bytes to be consumed - bail out of here and return success
+            break;
+        }
+        
+
+        // any other error (or an EOF/shutdown notification) means the connection is dead
+        ChkIf(bytesread <= 0, E_FAIL);
+        
+        // we got data, now let's feed it into the reader
+        readerstate = pConn->_reader.AddBytes(buffer, bytesread);
+        
+        ChkIf(readerstate == CStunMessageReader::ParseError, E_FAIL);
+        
+        if (readerstate == CStunMessageReader::BodyValidated)
+        {
+
+            
+            StunMessageIn msgIn;
+            StunMessageOut msgOut;
+            
+            msgIn.addrLocal = pConn->_stunsocket.GetLocalAddress();
+            msgIn.addrRemote = pConn->_stunsocket.GetRemoteAddress();
+            msgIn.fConnectionOriented = true;
+            msgIn.pReader = &pConn->_reader;
+            msgIn.socketrole = pConn->_stunsocket.GetRole();
+            
+            msgOut.spBufferOut = pConn->_spOutputBuffer;
+            
+            Chk(CStunRequestHandler::ProcessRequest(msgIn, msgOut, &_tsa, _spAuth));
+            
+            // success - transition to the response state
+            pConn->_state = ConnectionState_Transmitting;
+            
+            // change the socket such that we only listen for "write events"
+            Chk(EpollCtrl(sock, EPOLL_CLIENT_WRITE_EVENT_SET));
+            
+            // optimization - go ahead and try to send the response
+            WriteBytesForConnection(pConn);
+            // WriteBytesForConnection will close the connection on error
+            // And it might call ConsumeRemoteClose, which will also null it out
+            
+            // so we can't assume the connection is still alive.  And if it's not alive, pConn likely got deleted
+            // either refetch from the hash tables, or invent an out parameter on WriteBytesForConnection and ConsumeRemoteClose to better propagate the close state of the connection
+            pConn = NULL;
+            
+            break;
+        }
+        
+        // keep trying to read more bytes
+    }
+        
+Cleanup:
+    if (FAILED(hr))
+    {
+        CloseConnection(pConn);
+    }
+
+    return hr;
+}
+
+HRESULT CTCPStunThread::WriteBytesForConnection(StunConnection* pConn)
+{
+    HRESULT hr = S_OK;
+    int sock = pConn->_stunsocket.GetSocketHandle();
+    int sent = -1;
+    uint8_t* pData = NULL;
+    size_t bytestotal, bytesremaining;
+    bool fForceClose = false;
+    HRESULT hrRet;
+    
+    
+    ASSERT(pConn != NULL);    
+    
+    pData = pConn->_spOutputBuffer->GetData();
+    bytestotal = pConn->_spOutputBuffer->GetSize();
+    
+    
+    while (true)
+    {
+        ASSERT(pConn->_state == ConnectionState_Transmitting);
+        ASSERT(bytestotal > pConn->_txCount);
+        
+        bytesremaining = bytestotal - pConn->_txCount;
+        
+        sent = ::send(sock, pData + pConn->_txCount, bytesremaining, 0);
+        
+        // Can't send any more bytes, come back again later
+        ChkIf( ((sent == -1) && ((errno == EAGAIN) || (errno == EWOULDBLOCK))), S_OK);
+
+        // general connection error
+        ChkIf(sent == -1, E_FAIL);
+        
+        // can "send" ever return 0?
+        ChkIfA(sent == 0, E_UNEXPECTED);
+        
+        pConn->_txCount += sent;
+        
+        // txCount should never exceed the total output message size, right?
+        ASSERT(pConn->_txCount <= bytestotal);
+        
+        if (pConn->_txCount >= bytestotal)
+        {
+            pConn->_state = ConnectionState_Closing;
+            
+            shutdown(sock, SHUT_WR);
+            // go back to listening for read events
+            ChkA(EpollCtrl(sock, EPOLL_CLIENT_READ_EVENT_SET));
+
+            ConsumeRemoteClose(pConn);
+            
+            // so we can't assume the connection is still alive.  And if it's not alive, pConn likely got deleted
+            // either refetch from the hash tables, or invent an out parameter on WriteBytesForConnection and ConsumeRemoteClose to better propagate the close state of the connection
+            pConn = NULL;
+
+            
+            break;
+        }
+        // loop back and try to send the remaining bytes
     }
     
-    spBuffer = _listFree.pop_back();
+Cleanup:    
+    if ((FAILED(hr) || fForceClose))
+    {
+        CloseConnection(pConn);
+    }
     
-    *pspBuffer = spBuffer;
-    return S_OK;
+    return hr;
 }
 
-void CStunConnectionBufferPool::ReturnToPool(CRefCountedBuffer& spBuffer)
+HRESULT CTCPStunThread::ConsumeRemoteClose(StunConnection* pConn)
 {
-    ASSERT(spBuffer.get() != NULL);
-    ASSERT(spBuffer->GetData() != NULL);
+    uint8_t buffer[1500];
+    HRESULT hr = S_OK;
+    int ret;
     
-    _listFree.push_back(spBuffer);
-}
-
-enum StunConnectionState
-{
-    ConnectionState_Idle,
-    ConnectionState_Receiving,
-    ConnectionState_Transmitting,
-};
-
-
-struct StunConnection
-{
-    StunConnectionState _state;
+    ASSERT(pConn != NULL);
+    int sock = pConn->_stunsocket.GetSocketHandle();
     
-    time_t _expireTime;
+    ASSERT(sock != -1);
     
-    CRefCountedStunSocket spSocket;
+    while (true)
+    {
+        ret = ::recv(sock, buffer, sizeof(buffer), 0);
+        
+        if ((ret < 0) && ((errno == EWOULDBLOCK) || (errno == EAGAIN)))
+        {
+            // still waiting
+            hr = S_FALSE;
+            break;
+        }
+        
+        if (ret <= 0)
+        {
+            // whether it was a clean error (0) or some other error, we are done
+            // that's it, we're done
+            CloseConnection(pConn);
+            pConn = NULL;
+            break;
+        }
+    }
     
-    CStunMessageReader reader;
-    CRefCountedBuffer spReaderBuffer;
-    
-    CRefCountedBuffer spOutputBuffer;
-    size_t txCount;  // number of bytes transmitted thus far
-    
-    void ResetToIdle(CStunConnectionBufferPool* pPool);
-};
-
-void StunConnection::ResetToIdle(CStunConnectionBufferPool* pPool)
-{
-    pPool->ReturnToPool(spReaderBuffer);
-    pPool->ReturnToPool(spOutputBuffer);
-    spReaderBuffer.reset();
-    spOutputBuffer.reset();
-    
-    spSocket
+    return hr;
 }
 
 
 
-class CTCPStunServer
+void CTCPStunThread::CloseConnection(StunConnection* pConn)
 {
-private:
-    CRefCountedStunSocket _spListenSocket;
+    if (pConn)
+    {
+        int sock = pConn->_stunsocket.GetSocketHandle();
+        
+        DetachFromEpoll(pConn->_stunsocket.GetSocketHandle());
+        pConn->_stunsocket.Close();
+        
+        // now figure out which hash table we were in
+        if (pConn->_idHashTable == 1)
+        {
+            _hashConnections1.Remove(sock);
+        }
+        else if (pConn->_idHashTable == 2)
+        {
+            _hashConnections2.Remove(sock);
+        }
+        else
+        {
+            ASSERT(pConn->_idHashTable == -1);
+        }
+        
+        ReleaseConnection(pConn);
+    }
+}
+
+
+void CTCPStunThread::CloseAllConnections(StunThreadConnectionMap* pConnMap)
+{
+    StunThreadConnectionMap::Item* pItem = pConnMap->LookupByIndex(0);
+    while (pItem)
+    {
+        CloseConnection(pItem->value);
+        pItem = pConnMap->LookupByIndex(0);
+    }
+}
+
+void CTCPStunThread::SweepDeadConnections()
+{
+    time_t timeCurrent = time(NULL);
+    StunThreadConnectionMap* pSwap = NULL;
+
+    // if it's been more than a minute
+    // all connections on the old list get closed
+    // the new list becomes the old list
+    return;
+
+    // todo - make the timeout scale to the number of active connections
+    if ((timeCurrent - _timeLastSweep) >= c_sweepTimeoutSeconds)
+    {
+        CloseAllConnections(_pOldConnList);
+        
+        _timeLastSweep = time(NULL);
+        
+        
+        pSwap = _pOldConnList;
+        _pOldConnList = _pNewConnList;
+        _pNewConnList = pSwap;
+    }
+}
+
+
+void CTCPStunThread::ThreadCleanup()
+{
+    CloseAllConnections(_pOldConnList);
+    CloseAllConnections(_pNewConnList);
+}
+
+
+
+StunConnection* CTCPStunThread::CreateNewConnection(int sock)
+{
+    StunConnection* pConnection = new StunConnection;
     
+    pConnection->_spOutputBuffer = CRefCountedBuffer(new CBuffer(1500));
+    pConnection->_spReaderBuffer = CRefCountedBuffer(new CBuffer(1500));
+    pConnection->_reader.GetStream().Attach(pConnection->_spReaderBuffer, true);
+    pConnection->_state = ConnectionState_Receiving;
+    pConnection->_stunsocket.Attach(sock);
+    pConnection->_stunsocket.SetRole(_role);
+    pConnection->_txCount = 0;
+    pConnection->_timeStart = time(NULL);
+    pConnection->_idHashTable = -1;
     
-    
-public:
-    HRESULT Initialize(const CStunServerConfig& config);
-    HRESULT Shutdown();
+    return pConnection;
 
-    HRESULT Start();
-    HRESULT Stop();
-};
+}
+
+void CTCPStunThread::ReleaseConnection(StunConnection* pConn)
+{
+    delete pConn;
+}
 
 
 
-#endif	/* SERVER_H */
+
+
 

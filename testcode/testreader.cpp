@@ -22,6 +22,7 @@
 #include "testreader.h"
 
 
+// the following request block is from RFC 5769, section 2.1
 // static
 const unsigned char c_requestbytes[] =
  "\x00\x01\x00\x58"
@@ -40,6 +41,10 @@ const unsigned char c_requestbytes[] =
    "\xb2\xd3\xf2\x49\xc1\xb5\x71\xa2"
  "\x80\x28\x00\x04"
    "\xe5\x7a\x3b\xcf";
+
+const char c_password[] = "VOkJxbRl1RmTxUk/WvJxBt";
+const char c_username[] = "evtj:h6vY";
+const char c_software[] = "STUN test client";
 
 
 HRESULT CTestReader::Run()
@@ -80,25 +85,29 @@ HRESULT CTestReader::Test1()
 
     ChkIfA(reader.GetMessageType() != StunMsgTypeBinding, E_FAIL);
 
-    Chk(reader.GetAttributeByType(STUN_ATTRIBUTE_SOFTWARE, &attrib));
+    ChkA(reader.GetAttributeByType(STUN_ATTRIBUTE_SOFTWARE, &attrib));
 
-    ChkIf(attrib.attributeType != STUN_ATTRIBUTE_SOFTWARE, E_FAIL);
+    ChkIfA(attrib.attributeType != STUN_ATTRIBUTE_SOFTWARE, E_FAIL);
 
-    ChkIf(0 != ::strncmp(pszExpectedSoftwareAttribute, (const char*)(spBuffer->GetData() + attrib.offset), attrib.size), E_FAIL);
+    ChkIfA(0 != ::strncmp(pszExpectedSoftwareAttribute, (const char*)(spBuffer->GetData() + attrib.offset), attrib.size), E_FAIL);
 
-    Chk(reader.GetAttributeByType(STUN_ATTRIBUTE_USERNAME, &attrib));
+    ChkA(reader.GetAttributeByType(STUN_ATTRIBUTE_USERNAME, &attrib));
 
-    ChkIf(attrib.attributeType != STUN_ATTRIBUTE_USERNAME, E_FAIL);
+    ChkIfA(attrib.attributeType != STUN_ATTRIBUTE_USERNAME, E_FAIL);
 
-    ChkIf(0 != ::strncmp(pszExpectedUserName, (const char*)(spBuffer->GetData() + attrib.offset), attrib.size), E_FAIL);
+    ChkIfA(0 != ::strncmp(pszExpectedUserName, (const char*)(spBuffer->GetData() + attrib.offset), attrib.size), E_FAIL);
     
     
-    Chk(reader.GetStringAttributeByType(STUN_ATTRIBUTE_SOFTWARE, szStringValue, ARRAYSIZE(szStringValue)));
-    ChkIf(0 != ::strcmp(pszExpectedSoftwareAttribute, szStringValue), E_FAIL);
+    ChkA(reader.GetStringAttributeByType(STUN_ATTRIBUTE_SOFTWARE, szStringValue, ARRAYSIZE(szStringValue)));
+    ChkIfA(0 != ::strcmp(pszExpectedSoftwareAttribute, szStringValue), E_FAIL);
 
-    ChkIf(reader.HasFingerprintAttribute() == false, E_FAIL);
+    ChkIfA(reader.HasFingerprintAttribute() == false, E_FAIL);
 
-    ChkIf(reader.IsFingerprintAttributeValid() == false, E_FAIL);
+    ChkIfA(reader.IsFingerprintAttributeValid() == false, E_FAIL);
+    
+    ChkIfA(reader.HasMessageIntegrityAttribute() == false, E_FAIL);
+    
+    ChkA(reader.ValidateMessageIntegrityShort(c_password));
 
 Cleanup:
     return hr;

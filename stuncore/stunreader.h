@@ -91,7 +91,7 @@ public:
     HRESULT ValidateMessageIntegrityLong(const char* pszUser, const char* pszRealm, const char* pszPassword);
     
     HRESULT GetAttributeByType(uint16_t attributeType, StunAttribute* pAttribute);
-    //HRESULT GetAttributeByIndex(int index, StunAttribute* pAttribute);
+    HRESULT GetAttributeByIndex(int index, StunAttribute* pAttribute);
     int GetAttributeCount();
 
     void GetTransactionId(StunTransactionId* pTransId );

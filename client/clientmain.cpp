@@ -318,7 +318,7 @@ HRESULT ClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& sock
 {
     HRESULT hr = S_OK;
     CRefCountedStunSocket spStunSocket;
-    CStunSocket* pStunSocket = NULL;
+    CStunSocket stunSocket;;
     CRefCountedBuffer spMsg(new CBuffer(1500));
     int sock = -1;
     CSocketAddress addrDest;   // who we send to
@@ -342,18 +342,17 @@ HRESULT ClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& sock
         Chk(hr);
     }
 
-    hr = CStunSocket::CreateUDP(socketconfig.addrLocal, RolePP, &pStunSocket);
+    hr = stunSocket.UDPInit(socketconfig.addrLocal, RolePP);
     if (FAILED(hr))
     {
         Logging::LogMsg(LL_ALWAYS, "Unable to create local socket: (error = x%x)", hr);
         Chk(hr);
     }
     
-    spStunSocket = CRefCountedStunSocket(pStunSocket);
 
-    spStunSocket->EnablePktInfoOption(true);
+    stunSocket.EnablePktInfoOption(true);
 
-    sock = spStunSocket->GetSocketHandle();
+    sock = stunSocket.GetSocketHandle();
 
     // let's get a loop going!
 

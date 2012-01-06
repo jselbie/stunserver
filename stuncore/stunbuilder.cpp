@@ -198,12 +198,21 @@ HRESULT CStunMessageBuilder::AddErrorCode(uint16_t errorNumber, const char* pszR
     HRESULT hr = S_OK;
     size_t strsize = (pszReason==NULL) ? 0 : strlen(pszReason);
     size_t size = strsize + 4;
+    size_t padding = 0;
     uint8_t cl = 0;
     uint8_t ernum = 0;
 
     ChkIf(strsize >= 128, E_INVALIDARG);
     ChkIf(errorNumber < 300, E_INVALIDARG);
     ChkIf(errorNumber > 600, E_INVALIDARG);
+
+    // fix for RFC 3489 clients - explicitly do the 4-byte padding alignment on the string with spaces instead of
+    // padding the message with zeros. Adjust the length field to always be a multiple of 4.
+    if (size % 4)
+    {
+        padding = 4 - (size % 4);
+        size = size + padding;
+    }
 
     Chk(AddAttributeHeader(STUN_ATTRIBUTE_ERRORCODE, size));
 
@@ -219,11 +228,10 @@ HRESULT CStunMessageBuilder::AddErrorCode(uint16_t errorNumber, const char* pszR
     {
         _stream.Write(pszReason, strsize);
 
-        if (strsize % 4)
+        if (padding > 0)
         {
-            const uint32_t c_zero = 0;
-            uint16_t paddingSize = 4 - (strsize % 4);
-            _stream.Write(&c_zero, paddingSize);
+            const uint32_t spaces = 0x20202020; // four spaces
+            Chk(_stream.Write(&spaces, padding));
         }
     }
 
@@ -235,10 +243,36 @@ Cleanup:
 HRESULT CStunMessageBuilder::AddUnknownAttributes(const uint16_t* arr, size_t count)
 {
     HRESULT hr = S_OK;
+    uint16_t size = count * sizeof(uint16_t);
+    uint16_t unpaddedsize = size;
+    bool fPad = false;
     
     ChkIfA(arr == NULL, E_INVALIDARG);
-    ChkIfA(count <= 0, E_INVALIDARG)
-    Chk(AddAttribute(STUN_ATTRIBUTE_UNKNOWNATTRIBUTES, arr, count*sizeof(arr[0])));
+    ChkIfA(count <= 0, E_INVALIDARG);
+    
+    // fix for RFC 3489. Since legacy clients can't understand implicit padding rules
+    // of rfc 5389, then we do what rfc 3489 suggests.  If there are an odd number of attributes
+    // that would make the length of the attribute not a multiple of 4, then repeat one
+    // attribute.
+    
+    fPad = !!(count % 2);
+    
+    if (fPad)
+    {
+        size += sizeof(uint16_t);
+    }
+    
+    Chk(AddAttributeHeader(STUN_ATTRIBUTE_UNKNOWNATTRIBUTES, size));
+    
+    Chk(_stream.Write(arr, unpaddedsize));
+    
+    if (fPad)
+    {
+        // repeat the last attribute in the array to get an even alignment of 4 bytes
+        _stream.Write(&arr[count-1], sizeof(arr[0]));
+    }
+    
+    
 Cleanup:
     return hr;
 }
@@ -439,7 +473,7 @@ HRESULT CStunMessageBuilder::AddMessageIntegrityImpl(uint8_t* key, size_t keysiz
     length = length-24;
     
     
-    // now do a little so that HMAC can write exactly to where the hash bytes will appear
+    // now do a little pointer math so that HMAC can write exactly to where the hash bytes will appear
     pDstBuf = ((uint8_t*)pData) + length + 4;
     pHashResult = HMAC(EVP_sha1(), key, keysize, (uint8_t*)pData, length, pDstBuf, &resultlength);
     

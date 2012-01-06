@@ -18,21 +18,41 @@
 #define TEST_FAST_HASH_H
 
 #include "commonincludes.h"
+#include "fasthash.h"
 #include "unittest.h"
+
 
 
 
 class CTestFastHash : public IUnitTest
 {
 private:
-    HRESULT TestFastHash();
-    HRESULT TestRemove();
-    HRESULT TestStress();
-    
+
     struct Item
     {
         int key;
     };
+    
+    static const size_t c_maxsize = 500;
+    static const size_t c_tablesize = 91;
+    
+    FastHash<int, Item, c_maxsize, c_tablesize> _hashtable;
+    
+    HRESULT AddRangeToSet(int first, int last);
+    HRESULT RemoveRangeFromSet(int first, int last);
+    HRESULT ValidateRangeInSet(int first, int last);
+    HRESULT ValidateRangeNotInSet(int first, int last);
+    HRESULT AddOne(int val);
+    HRESULT RemoveOne(int val);
+    HRESULT ValidateRangeInIndex(int first, int last);
+    
+    
+    
+    HRESULT TestFastHash();
+    HRESULT TestRemove();
+    
+    HRESULT TestIndexing();
+    
 
 public:
     virtual HRESULT Run();

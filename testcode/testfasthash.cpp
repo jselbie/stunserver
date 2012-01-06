@@ -30,68 +30,190 @@ Cleanup:
     return hr;
 }
 
-HRESULT CTestFastHash::TestFastHash()
+
+
+HRESULT CTestFastHash::AddOne(int val)
+{
+    HRESULT hr = S_OK;
+    Item item;
+    item.key = val;
+    int ret;
+    Item* pValue = NULL;
+
+    ret = _hashtable.Insert(val, item);
+    ChkIf(ret < 0, E_FAIL);
+    
+    ChkIf(_hashtable.Exists(val)==false, E_FAIL);
+    
+    pValue = _hashtable.Lookup(val);
+    ChkIf(pValue == NULL, E_FAIL);
+    ChkIf(pValue->key != val, E_FAIL);
+    
+    
+    
+Cleanup:
+    return hr;
+}
+
+HRESULT CTestFastHash::RemoveOne(int val)
+{
+    HRESULT hr = S_OK;
+    int ret;
+    
+    ret = _hashtable.Remove(val);
+    ChkIf(ret < 0, E_FAIL);
+    
+    ChkIf(_hashtable.Exists(val), E_FAIL);
+    
+    ChkIf(_hashtable.Lookup(val) != NULL, E_FAIL);
+    
+Cleanup:
+    return hr;
+    
+}
+
+
+HRESULT CTestFastHash::AddRangeToSet(int first, int last)
 {
     HRESULT hr = S_OK;
     
-    const size_t c_maxsize = 500;
-    const size_t c_tablesize = 91;
-    FastHash<int, Item, c_maxsize, c_tablesize> hash;
-    int result;
-    size_t testindex;
-    
-    for (int index = 0; index < (int)c_maxsize; index++)
+    for (int x = first; x <= last; x++)   
     {
-        Item item;
-        item.key = index;
-        
-        result = hash.Insert(index, item);
-        ChkIfA(result < 0,E_FAIL);
+        Chk(AddOne(x));
     }
+    
+Cleanup:
+    return hr;
+}
+
+HRESULT CTestFastHash::RemoveRangeFromSet(int first, int last)
+{
+    HRESULT hr = S_OK;
+    
+    for (int x = first; x <= last; x++)   
+    {
+        Chk(RemoveOne(x));
+    }
+    
+Cleanup:
+    return hr;
+}
+
+HRESULT CTestFastHash::ValidateRangeInSet(int first, int last)
+{
+    HRESULT hr = S_OK;
+    
+    for (int x = first; x <= last; x++)   
+    {
+        Item* pValue = NULL;
+        
+        ChkIf(_hashtable.Exists(x)==false, E_FAIL);
+        
+        pValue = _hashtable.Lookup(x);
+        ChkIf(pValue == NULL, E_FAIL);
+        ChkIf(pValue->key != x, E_FAIL);
+    }
+    
+Cleanup:
+    return hr;
+}
+
+HRESULT CTestFastHash::ValidateRangeNotInSet(int first, int last)
+{
+    HRESULT hr = S_OK;
+    
+    for (int x = first; x <= last; x++)   
+    {
+        ChkIf(_hashtable.Lookup(x) != NULL, E_FAIL);
+        ChkIf(_hashtable.Exists(x), E_FAIL);
+    }
+    
+Cleanup:
+    return hr;
+}
+
+HRESULT CTestFastHash::ValidateRangeInIndex(int first, int last)
+{
+    HRESULT hr = S_OK;
+    const int length = last - first + 1;
+    bool* arr = new bool[length];
+    size_t size = _hashtable.Size();
+    
+    memset(arr, '\0', length);
+    
+    for (int x = 0; x < (int)size; x++)
+    {
+        Item* pItem = _hashtable.LookupValueByIndex(x);
+        
+        if (pItem == NULL)
+        {
+            continue;
+        }
+        
+        int val = pItem->key;
+        
+        if ((val >= first) && (val <= last))
+        {
+            int index = val - first;
+            ChkIfA(arr[index] != false, E_FAIL);
+            arr[index] = true;
+        }
+    }
+    
+    for (int i = 0; i < length; i++)
+    {
+        ChkIfA(arr[i] == false, E_FAIL);
+    }
+
+    
+Cleanup:
+    delete [] arr;
+    return hr;
+}
+
+
+
+HRESULT CTestFastHash::TestFastHash()
+{
+    HRESULT hr = S_OK;
+    HRESULT hrRet = S_OK;
+
+    _hashtable.Reset();
+    
+    ChkA(AddRangeToSet(1, c_maxsize));
     
     // now make sure that we can't insert one past the limit
     {
-        Item item;
-        item.key = c_maxsize;
-        result = hash.Insert(item.key, item);
-        ChkIfA(result >= 0, E_FAIL);
+        hrRet = AddOne(c_maxsize+1);
+        ChkIfA(SUCCEEDED(hrRet), E_FAIL);
     }
     
     // check that the size is what's expected
-    ChkIfA(hash.Size() != c_maxsize, E_FAIL);
+    ChkIfA(_hashtable.Size() != c_maxsize, E_FAIL);
     
     // validate that all the items are in the table
-    for (int index = 0; index < (int)c_maxsize; index++)
-    {
-        Item* pItem = NULL;
-        
-        ChkIfA(hash.Exists(index)==false, E_FAIL);
-        
-        pItem = hash.Lookup(index);
-        
-        ChkIfA(pItem == NULL, E_FAIL);
-        ChkIfA(pItem->key != index, E_FAIL);
-    }
+    ChkA(ValidateRangeInSet(1, c_maxsize));
     
-    // validate that items aren't in the table don't get returned
-    for (int index = c_maxsize; index < (int)(c_maxsize*2); index++)
-    {
-        ChkIfA(hash.Exists(index), E_FAIL);
-        ChkIfA(hash.Lookup(index)!=NULL, E_FAIL);
-    }
+    // validate items not inserted don't get returned
+    ChkA(ValidateRangeNotInSet(c_maxsize+1, c_maxsize*2));
+    
+    ChkA(ValidateRangeInIndex(1, c_maxsize));
     
     // test a basic remove
-    testindex = c_maxsize/2;
-    result = hash.Remove(testindex);
-    ChkIfA(result < 0, E_FAIL);
+    ChkA(RemoveOne(c_maxsize/2));
+    
+    // revalidate that the index is ok
+    ChkA(ValidateRangeInIndex(1, c_maxsize/2-1));    
+    ChkA(ValidateRangeInIndex(c_maxsize/2+1, c_maxsize));    
     
     // now add another item
-    {
-        Item item;
-        item.key = c_maxsize;
-        result = hash.Insert(item.key, item);
-        ChkIfA(result < 0, E_FAIL);
-    }
+    ChkA(AddOne(c_maxsize+1));
+    
+    // check that the size is what's expected
+    ChkIfA(_hashtable.Size() != c_maxsize, E_FAIL);
+    
+    
+    
     
 Cleanup:
     return hr;
@@ -101,46 +223,88 @@ Cleanup:
 HRESULT CTestFastHash::TestRemove()
 {
     HRESULT hr = S_OK;
-    int result;
-    const size_t c_maxsize = 500;
-    const size_t c_tablesize = 91;
-    FastHash<int, Item, c_maxsize, c_tablesize> hash;
+    int tracking[c_maxsize] = {};
+    size_t expected;
+    FastHashBase<int, Item>::Item* pItem;
+    
+    for (size_t x = 0; x < c_maxsize; x++)
+    {
+        tracking[x] = (int)x;
+    }
+    
+    // shuffle our array - this is the order in which we'll do removes
+    srand(99);
+    for (size_t x = 0; x < c_maxsize; x++)
+    {
+        int firstindex = rand() % c_maxsize;
+        int secondindex = rand() % c_maxsize;
+        
+        int val1 = tracking[firstindex];
+        int val2 = tracking[secondindex];
+        int tmp;
+        
+        tmp = val1;
+        val1 = val2;
+        val2 = tmp;
+        
+        tracking[firstindex] = val1;
+        tracking[secondindex] = val2;
+    }
+        
+    
+    _hashtable.Reset();
+    ChkIfA(_hashtable.Size() != 0, E_FAIL);
+    
+    ChkA(AddRangeToSet(0, c_maxsize-1));
 
-    // add 500 items
-    for (int index = 0; index < (int)c_maxsize; index++)
+    // now start removing items randomly 
+    for (size_t x = 0; x < (c_maxsize/2); x++)
     {
-        Item item;
-        item.key = index;
+        ChkA(RemoveOne(tracking[x]));
+    }
+    
+    // now validate that the first half of the list is gone and that the other half of the list is present
+    for (size_t x = 0; x < (c_maxsize/2); x++)
+    {
+        ChkA(ValidateRangeNotInSet(tracking[x], tracking[x]));
+    }
+    
+    for (size_t x = (c_maxsize/2); x < c_maxsize; x++)
+    {
+        ChkA(ValidateRangeInSet(tracking[x], tracking[x]));
+    }
+    
+    
+    
+    expected = c_maxsize - c_maxsize/2;
+    ChkIfA(_hashtable.Size() != expected, E_FAIL);
+    
+    // now add them all back
+    for (size_t x = 0; x < (c_maxsize/2); x++)
+    {
+        ChkA(AddOne(tracking[x]));
+    }
+    
+    ChkIfA(_hashtable.Size() != c_maxsize, E_FAIL);
+    ChkA(ValidateRangeInSet(0, c_maxsize-1));
+    
+    ChkA(ValidateRangeInIndex(0, c_maxsize-1));
+    
+    pItem = _hashtable.LookupByIndex(0);
+    ChkA(RemoveOne(pItem->key));
+    
+    for (size_t x = 0; x < c_maxsize; x++)
+    {
+        if (x == (size_t)(pItem->key))
+            continue;
         
-        result = hash.Insert(index, item);
-        ChkIfA(result < 0,E_FAIL);
+        ChkA(ValidateRangeInIndex(x,x));
     }
-    
-    // now remove them all
-    for (int index = 0; index < (int)c_maxsize; index++)
-    {
-        result = hash.Remove(index);
-        ChkIfA(result < 0,E_FAIL);
-    }
-    
-    ChkIfA(hash.Size() != 0, E_FAIL);
-    
-    // Now add all the items back
-    for (int index = 0; index < (int)c_maxsize; index++)
-    {
-        Item item;
-        item.key = index;
-        
-        result = hash.Insert(index, item);
-        ChkIfA(result < 0,E_FAIL);
-    }
-    
-    ChkIfA(hash.Size() != c_maxsize, E_FAIL);
-    
-    
     
    
 Cleanup:
     return hr;
-
 }
+
+
+

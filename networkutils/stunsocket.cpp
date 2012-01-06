@@ -48,6 +48,11 @@ void CStunSocket::Close()
     Reset();
 }
 
+bool CStunSocket::IsValid()
+{
+    return (_sock != -1);
+}
+
 HRESULT CStunSocket::Attach(int sock)
 {
     if (sock == -1)
@@ -179,27 +184,27 @@ void CStunSocket::UpdateAddresses()
 }
 
 
-//static
-HRESULT CStunSocket::CreateCommon(int socktype, const CSocketAddress& addrlocal, SocketRole role, CStunSocket** ppSocket)
+
+HRESULT CStunSocket::InitCommon(int socktype, const CSocketAddress& addrlocal, SocketRole role)
 {
     int sock = -1;
     int ret;
     HRESULT hr = S_OK;
-    
-    ChkIfA(ppSocket == NULL, E_INVALIDARG);
-    *ppSocket = NULL;
     
     ASSERT((socktype == SOCK_DGRAM)||(socktype==SOCK_STREAM));
     
     sock = socket(addrlocal.GetFamily(), socktype, 0);
     ChkIf(sock < 0, ERRNOHR);
     
+    
+    
     ret = bind(sock, addrlocal.GetSockAddr(), addrlocal.GetSockAddrLength());
     ChkIf(ret < 0, ERRNOHR);
     
-    Chk(CreateCommonFromSockHandle(sock, role, ppSocket));
-    
+    Attach(sock);
     sock = -1;
+    
+    SetRole(role);
     
 Cleanup:
     if (sock != -1)
@@ -210,40 +215,16 @@ Cleanup:
     return hr;
 }
 
-HRESULT CStunSocket::CreateCommonFromSockHandle(int sock, SocketRole role, CStunSocket** ppSocket)
-{
-    HRESULT hr = S_OK;
-    CStunSocket* pSocket = NULL;
-    
-    ChkIfA(ppSocket == NULL, E_INVALIDARG);
-    *ppSocket = NULL;
-    
-    pSocket = new CStunSocket();
-    ChkIf(pSocket == NULL, E_OUTOFMEMORY);
-    
-    pSocket->Attach(sock);  // this will call UpdateAddresses
-    pSocket->SetRole(role);
-    
-    *ppSocket = pSocket;
-    
-Cleanup:
-    return hr;
-    
-}
 
 
-HRESULT CStunSocket::CreateUDP(const CSocketAddress& local, SocketRole role, CStunSocket** ppSocket)
+HRESULT CStunSocket::UDPInit(const CSocketAddress& local, SocketRole role)
 {
-    return CreateCommon(SOCK_DGRAM, local, role, ppSocket);
+    return InitCommon(SOCK_DGRAM, local, role);
 }
 
-HRESULT CStunSocket::CreateTCP(const CSocketAddress& local, SocketRole role, CStunSocket** ppSocket)
+HRESULT CStunSocket::TCPInit(const CSocketAddress& local, SocketRole role)
 {
-    return CreateCommon(SOCK_STREAM, local, role, ppSocket);
+    return InitCommon(SOCK_STREAM, local, role);
 }
 
-HRESULT CStunSocket::CreateFromConnectedSockHandle(int sock, SocketRole role, CStunSocket** ppSocket)
-{
-    return CreateCommonFromSockHandle(sock, role, ppSocket);
-}
 

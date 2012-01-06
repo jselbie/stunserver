@@ -37,6 +37,7 @@
 #include <ifaddrs.h>
 #include <net/if.h>
 #include <stdarg.h>
+#include <math.h>
 
 #include <boost/shared_ptr.hpp>
 #include <boost/scoped_array.hpp>
@@ -46,6 +47,11 @@
 #include <vector>
 #include <list>
 #include <string>
+
+#ifndef _bsd
+#include <sys/epoll.h>
+#endif
+
 
 #include <pthread.h>
 

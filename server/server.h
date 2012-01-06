@@ -54,9 +54,7 @@ public CObjectFactory<CStunServer>,
 public IRefCounted
 {
 private:
-    CStunSocket* _arrSockets[4];
-
-    // when we support multithreaded servers, this will change to a list
+    CStunSocket _arrSockets[4];
 
     std::vector<CStunSocketThread*> _threads;
 

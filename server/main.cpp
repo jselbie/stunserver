@@ -17,6 +17,7 @@
 #include "commonincludes.h"
 #include "stuncore.h"
 #include "server.h"
+#include "tcpserver.h"
 #include "adapters.h"
 #include "cmdlineparser.h"
 
@@ -471,6 +472,8 @@ int main(int argc, char** argv)
     StartupArgs args;
     CStunServerConfig config;
     CRefCountedPtr<CStunServer> spServer;
+    CTCPStunThread* pTCPServer;
+    
 
 #ifdef DEBUG
     Logging::SetLogLevel(LL_DEBUG);
@@ -536,6 +539,15 @@ int main(int argc, char** argv)
         LogHR(LL_ALWAYS, hr);
         return -5;
     }
+    
+    {
+        CSocketAddress localAddr;
+        localAddr.SetPort(3478);
+
+        pTCPServer = new CTCPStunThread();
+        pTCPServer->Init(localAddr, NULL, RolePP, 1000);
+        pTCPServer->Start();
+    }
 
     Logging::LogMsg(LL_DEBUG, "Successfully started server.");
 
@@ -545,6 +557,8 @@ int main(int argc, char** argv)
 
     spServer->Stop();
     spServer.ReleaseAndClear();
+    
+    pTCPServer->Stop();
 
     return 0;
 }

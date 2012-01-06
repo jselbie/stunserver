@@ -63,29 +63,29 @@ HRESULT CStunServer::Initialize(const CStunServerConfig& config)
     // Create the sockets
     if (config.fHasPP)
     {
-        Chk(CStunSocket::CreateUDP(config.addrPP, RolePP, &_arrSockets[RolePP]));
-        _arrSockets[RolePP]->EnablePktInfoOption(true);
+        Chk(_arrSockets[RolePP].UDPInit(config.addrPP, RolePP));
+        ChkA(_arrSockets[RolePP].EnablePktInfoOption(true));
         socketcount++;
     }
 
     if (config.fHasPA)
     {
-        Chk(CStunSocket::CreateUDP(config.addrPA, RolePA, &_arrSockets[RolePA]));
-        _arrSockets[RolePA]->EnablePktInfoOption(true);
+        Chk(_arrSockets[RolePA].UDPInit(config.addrPP, RolePA));
+        ChkA(_arrSockets[RolePA].EnablePktInfoOption(true));
         socketcount++;
     }
 
     if (config.fHasAP)
     {
-        Chk(CStunSocket::CreateUDP(config.addrAP, RoleAP, &_arrSockets[RoleAP]));
-        _arrSockets[RoleAP]->EnablePktInfoOption(true);
+        Chk(_arrSockets[RoleAP].UDPInit(config.addrPP, RoleAP));
+        ChkA(_arrSockets[RoleAP].EnablePktInfoOption(true));
         socketcount++;
     }
 
     if (config.fHasAA)
     {
-        Chk(CStunSocket::CreateUDP(config.addrAA, RoleAA, &_arrSockets[RoleAA]));
-        _arrSockets[RoleAA]->EnablePktInfoOption(true);
+        Chk(_arrSockets[RoleAA].UDPInit(config.addrPP, RoleAA));
+        ChkA(_arrSockets[RoleAA].EnablePktInfoOption(true));
         socketcount++;
     }
 
@@ -112,9 +112,9 @@ HRESULT CStunServer::Initialize(const CStunServerConfig& config)
         CStunSocketThread* pThread = NULL;
         for (size_t index = 0; index < ARRAYSIZE(_arrSockets); index++)
         {
-            if (_arrSockets[index] != NULL)
+            if (_arrSockets[index].IsValid())
             {
-                SocketRole rolePrimaryRecv = _arrSockets[index]->GetRole();
+                SocketRole rolePrimaryRecv = _arrSockets[index].GetRole();
                 ASSERT(rolePrimaryRecv == (SocketRole)index);
                 pThread = new CStunSocketThread();
                 ChkIf(pThread==NULL, E_OUTOFMEMORY);
@@ -146,8 +146,7 @@ HRESULT CStunServer::Shutdown()
 
     for (size_t index = 0; index < ARRAYSIZE(_arrSockets); index++)
     {
-        delete _arrSockets[index];
-        _arrSockets[index] = NULL;
+        _arrSockets[index].Close();
     }
 
     len = _threads.size();

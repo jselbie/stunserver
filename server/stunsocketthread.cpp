@@ -42,15 +42,11 @@ CStunSocketThread::~CStunSocketThread()
 
 void CStunSocketThread::ClearSocketArray()
 {
-    _arrSendSockets[RolePP] = NULL;
-    _arrSendSockets[RolePA] = NULL;
-    _arrSendSockets[RoleAP] = NULL;
-    _arrSendSockets[RoleAA] = NULL;
-    
+    _arrSendSockets = NULL;
     _socks.clear();
 }
 
-HRESULT CStunSocketThread::Init(CStunSocket* arrayOfFourSockets[], IStunAuth* pAuth, SocketRole rolePrimaryRecv)
+HRESULT CStunSocketThread::Init(CStunSocket* arrayOfFourSockets, IStunAuth* pAuth, SocketRole rolePrimaryRecv)
 {
     HRESULT hr = S_OK;
     
@@ -64,38 +60,37 @@ HRESULT CStunSocketThread::Init(CStunSocket* arrayOfFourSockets[], IStunAuth* pA
     // validate that it exists
     if (fSingleSocketRecv)
     {
-        ChkIfA(arrayOfFourSockets[rolePrimaryRecv] == NULL, E_UNEXPECTED);
+        ChkIfA(arrayOfFourSockets[rolePrimaryRecv].IsValid()==false, E_UNEXPECTED);
     }
     
-    memcpy(_arrSendSockets, arrayOfFourSockets, sizeof(_arrSendSockets));
+    _arrSendSockets = arrayOfFourSockets;
     
     // initialize the TSA thing
     memset(&_tsa, '\0', sizeof(_tsa));
-    for (size_t i = 0; i < ARRAYSIZE(_arrSendSockets); i++)
+    for (size_t i = 0; i < 4; i++)
     {
-        if (_arrSendSockets[i] == NULL)
+        if (_arrSendSockets[i].IsValid())
         {
-            continue;
-        }
         
-        SocketRole role = _arrSendSockets[i]->GetRole();
-        ASSERT(role == (SocketRole)i);
-        _tsa.set[role].fValid = true;
-        _tsa.set[role].addr = _arrSendSockets[i]->GetLocalAddress();
+            SocketRole role = _arrSendSockets[i].GetRole();
+            ASSERT(role == (SocketRole)i);
+            _tsa.set[role].fValid = true;
+            _tsa.set[role].addr = _arrSendSockets[i].GetLocalAddress();
+        }
     }
     
     if (fSingleSocketRecv)
     {
         // only one socket to listen on
-        _socks.push_back(_arrSendSockets[rolePrimaryRecv]);
+        _socks.push_back(&_arrSendSockets[rolePrimaryRecv]);
     }
     else
     {
-        for (size_t i = 0; i < ARRAYSIZE(_arrSendSockets); i++)
+        for (size_t i = 0; i < 4; i++)
         {
-            if (_arrSendSockets[i] != NULL)
+            if (_arrSendSockets[i].IsValid())
             {
-                _socks.push_back(_arrSendSockets[i]);
+                _socks.push_back(&_arrSendSockets[i]);
             }
         }
     }
@@ -143,7 +138,6 @@ void CStunSocketThread::UninitThreadBuffers()
     _msgIn.pReader = NULL;
     _msgOut.spBufferOut.reset();
 }
-
 
 
 HRESULT CStunSocketThread::Start()
@@ -206,7 +200,7 @@ HRESULT CStunSocketThread::WaitForStopAndClose()
     _fThreadIsValid = false;
     _pthread = (pthread_t)-1;
     
-    ClearSocketArray(); // set all the sockets back to -1
+    ClearSocketArray();
     
     UninitThreadBuffers();
 
@@ -370,8 +364,8 @@ HRESULT CStunSocketThread::ProcessRequestAndSendResponse()
     Chk(CStunRequestHandler::ProcessRequest(_msgIn, _msgOut, &_tsa, _spAuth));
 
     ASSERT(_tsa.set[_msgOut.socketrole].fValid);
-    ASSERT(_arrSendSockets[_msgOut.socketrole]);
-    sockout = _arrSendSockets[_msgOut.socketrole]->GetSocketHandle();
+    ASSERT(_arrSendSockets[_msgOut.socketrole].IsValid());
+    sockout = _arrSendSockets[_msgOut.socketrole].GetSocketHandle();
     ASSERT(sockout != -1);
     
     // find the socket that matches the role specified by msgOut

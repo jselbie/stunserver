@@ -310,12 +310,16 @@ HRESULT CStunRequestHandler::ProcessBindingRequest()
 
     builder.AddHeader(StunMsgTypeBinding, StunMsgClassSuccessResponse);
     builder.AddTransactionId(_transid);
+    
+    // paranoia - just to be consistent with Vovida, send the attributes back in the same order it does
+    // I suspect there are clients out there that might be hardcoded to the ordering
+    
+    // MAPPED-ADDRESS
+    // SOURCE-ADDRESS (RESPONSE-ORIGIN)
+    // CHANGED-ADDRESS (OTHER-ADDRESS)
+    // XOR-MAPPED-ADDRESS
+    
     builder.AddMappedAddress(_pMsgIn->addrRemote);
-
-    if (fLegacyFormat == false)
-    {
-        builder.AddXorMappedAddress(_pMsgIn->addrRemote);
-    }
 
     if (fSendOriginAddress)
     {
@@ -326,6 +330,10 @@ HRESULT CStunRequestHandler::ProcessBindingRequest()
     {
         builder.AddOtherAddress(addrOther, fLegacyFormat); // pass true to send back CHANGED-ADDRESS, otherwise, pass false to send back OTHER-ADDRESS
     }
+
+    // even if this is a legacy client request, we can send back XOR-MAPPED-ADDRESS since it's an optional-understanding attribute
+    builder.AddXorMappedAddress(_pMsgIn->addrRemote);
+    
     
     // finally - if we're supposed to have a message integrity attribute as a result of authorization, add it at the very end
     if (_integrity.fSendWithIntegrity)

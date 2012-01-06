@@ -1,7 +1,7 @@
 include ../common.inc
 
 PROJECT_TARGET := stunserver
-PROJECT_OBJS := main.o server.o stunsocketthread.o
+PROJECT_OBJS := main.o server.o stunsocketthread.o tcpserver.o
 
 PROJECT_INTERMEDIATES := usage.txtcode usagelite.txtcode
 
