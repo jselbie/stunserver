@@ -144,6 +144,8 @@ void DumpConfig(CStunServerConfig &config)
         Logging::LogMsg(LL_DEBUG, "AA = %s", strSocket.c_str());
     }
     
+    Logging::LogMsg(LL_DEBUG, "Protocol = %s", config.fTCP ? "TCP" : "UDP");
+    
 }
 
 
@@ -262,11 +264,13 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
     // ---- PROTOCOL --------------------------------------------------------
     if (args.strProtocol.length() > 0)
     {
-        if (args.strProtocol != "udp")
+        if ((args.strProtocol != "udp") && (args.strProtocol != "tcp"))
         {
-            Logging::LogMsg(LL_ALWAYS, "Protocol argument must be 'udp' .  'tcp' and 'tls' are not supported yet");
+            Logging::LogMsg(LL_ALWAYS, "Protocol argument must be 'udp' or 'tcp'. 'tls' is not supported yet");
             Chk(E_INVALIDARG);
         }
+        
+        config.fTCP = (args.strProtocol == "tcp");
     }
 
     // ---- PRIMARY PORT --------------------------------------------------------
@@ -388,6 +392,7 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
         config.addrAA = addrAlternate;
         config.addrAA.SetPort(portAlternate);
         config.fHasAA = true;
+        
 
     }
 
@@ -465,6 +470,55 @@ void WaitForAppExitSignal()
 
 
 
+HRESULT StartUDP(CRefCountedPtr<CStunServer>& spServer, CStunServerConfig& config)
+{
+    HRESULT hr;
+    
+    hr = CStunServer::CreateInstance(config, spServer.GetPointerPointer());
+    if (FAILED(hr))
+    {
+        Logging::LogMsg(LL_ALWAYS, "Unable to initialize server (error code = x%x)", hr);
+        LogHR(LL_ALWAYS, hr);
+        return hr;
+    }
+
+    hr = spServer->Start();
+    if (FAILED(hr))
+    {
+        Logging::LogMsg(LL_ALWAYS, "Unable to start server (error code = x%x)", hr);
+        LogHR(LL_ALWAYS, hr);
+        return hr;
+    }
+    
+    return S_OK;
+}
+
+HRESULT StartTCP(CRefCountedPtr<CTCPServer>& spTCPServer, CStunServerConfig& config)
+{
+    HRESULT hr;
+    
+    hr = CTCPServer::CreateInstance(config, spTCPServer.GetPointerPointer());
+    if (FAILED(hr))
+    {
+        Logging::LogMsg(LL_ALWAYS, "Unable to initialize TCP server (error code = x%x)", hr);
+        LogHR(LL_ALWAYS, hr);
+        return hr;
+    }
+    
+    hr = spTCPServer->Start();
+    if (FAILED(hr))
+    {
+        Logging::LogMsg(LL_ALWAYS, "Unable to start TCP server (error code = x%x)", hr);
+        LogHR(LL_ALWAYS, hr);
+        return hr;
+    }
+    
+    return S_OK;
+    
+}
+
+
+
 
 int main(int argc, char** argv)
 {
@@ -472,7 +526,7 @@ int main(int argc, char** argv)
     StartupArgs args;
     CStunServerConfig config;
     CRefCountedPtr<CStunServer> spServer;
-    CTCPStunThread* pTCPServer;
+    CRefCountedPtr<CTCPServer> spTCPServer;
     
 
 #ifdef DEBUG
@@ -523,30 +577,22 @@ int main(int argc, char** argv)
     DumpConfig(config);
 
     InitAppExitListener();
-
-    hr = CStunServer::CreateInstance(config, spServer.GetPointerPointer());
-    if (FAILED(hr))
-    {
-        Logging::LogMsg(LL_ALWAYS, "Unable to initialize server (error code = x%x)", hr);
-        LogHR(LL_ALWAYS, hr);
-        return -4;
-    }
-
-    hr = spServer->Start();
-    if (FAILED(hr))
-    {
-        Logging::LogMsg(LL_ALWAYS, "Unable to start server (error code = x%x)", hr);
-        LogHR(LL_ALWAYS, hr);
-        return -5;
-    }
     
+    if (config.fTCP == false)
     {
-        CSocketAddress localAddr;
-        localAddr.SetPort(3478);
-
-        pTCPServer = new CTCPStunThread();
-        pTCPServer->Init(localAddr, NULL, RolePP, 1000);
-        pTCPServer->Start();
+        hr = StartUDP(spServer, config);
+        if (FAILED(hr))
+        {
+            return -4;
+        }
+    }
+    else
+    {
+        hr = StartTCP(spTCPServer, config);
+        if (FAILED(hr))
+        {
+            return -5;
+        }
     }
 
     Logging::LogMsg(LL_DEBUG, "Successfully started server.");
@@ -555,10 +601,18 @@ int main(int argc, char** argv)
 
     Logging::LogMsg(LL_DEBUG, "Server is exiting");
 
-    spServer->Stop();
-    spServer.ReleaseAndClear();
+    if (spServer != NULL)
+    {
+        spServer->Stop();
+        spServer.ReleaseAndClear();
+    }
     
-    pTCPServer->Stop();
+    if (spTCPServer != NULL)
+    {
+        spTCPServer->Stop();
+        spTCPServer.ReleaseAndClear();
+    }
+    
 
     return 0;
 }

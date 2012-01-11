@@ -20,7 +20,6 @@ copybin: everything
 debug: T := debug
 debug: all
 
-
 clean:	T := clean
 clean: everything
 	rm -f stunserver stunclient stuntestcode

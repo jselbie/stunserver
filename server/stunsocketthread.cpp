@@ -115,9 +115,9 @@ HRESULT CStunSocketThread::InitThreadBuffers()
     
     _reader.Reset();
     
-    _spBufferReader = CRefCountedBuffer(new CBuffer(1500));
-    _spBufferIn = CRefCountedBuffer(new CBuffer(1500));
-    _spBufferOut = CRefCountedBuffer(new CBuffer(1500));
+    _spBufferReader = CRefCountedBuffer(new CBuffer(MAX_STUN_MESSAGE_SIZE));
+    _spBufferIn = CRefCountedBuffer(new CBuffer(MAX_STUN_MESSAGE_SIZE));
+    _spBufferOut = CRefCountedBuffer(new CBuffer(MAX_STUN_MESSAGE_SIZE));
     
     _reader.GetStream().Attach(_spBufferReader, true);
     

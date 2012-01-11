@@ -701,6 +701,9 @@ CStunMessageReader::ReaderParseState CStunMessageReader::AddBytes(const uint8_t*
     {
         return _state;
     }
+    
+    // seek to the end of the stream
+    _stream.SeekDirect(_stream.GetSize());
 
     if (FAILED(_stream.Write(pData, size)))
     {

@@ -29,7 +29,8 @@ fHasPP(false),
 fHasPA(false),
 fHasAP(false),
 fHasAA(false),
-fMultiThreadedMode(false)
+fMultiThreadedMode(false),
+fTCP(false)
 {
     ;
 }
@@ -70,21 +71,21 @@ HRESULT CStunServer::Initialize(const CStunServerConfig& config)
 
     if (config.fHasPA)
     {
-        Chk(_arrSockets[RolePA].UDPInit(config.addrPP, RolePA));
+        Chk(_arrSockets[RolePA].UDPInit(config.addrPA, RolePA));
         ChkA(_arrSockets[RolePA].EnablePktInfoOption(true));
         socketcount++;
     }
 
     if (config.fHasAP)
     {
-        Chk(_arrSockets[RoleAP].UDPInit(config.addrPP, RoleAP));
+        Chk(_arrSockets[RoleAP].UDPInit(config.addrAP, RoleAP));
         ChkA(_arrSockets[RoleAP].EnablePktInfoOption(true));
         socketcount++;
     }
 
     if (config.fHasAA)
     {
-        Chk(_arrSockets[RoleAA].UDPInit(config.addrPP, RoleAA));
+        Chk(_arrSockets[RoleAA].UDPInit(config.addrAA, RoleAA));
         ChkA(_arrSockets[RoleAA].EnablePktInfoOption(true));
         socketcount++;
     }

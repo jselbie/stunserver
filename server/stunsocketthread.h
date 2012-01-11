@@ -39,7 +39,6 @@ public:
     HRESULT WaitForStopAndClose();
     
     
-    void ClearSocketArray();
     
 private:
     
@@ -79,6 +78,9 @@ private:
     void UninitThreadBuffers();
     
     HRESULT ProcessRequestAndSendResponse();
+    
+    void ClearSocketArray();
+    
 };
 
 

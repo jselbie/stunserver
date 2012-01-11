@@ -34,6 +34,8 @@ public:
     bool fHasAA; // AA: Alternate ip, Alternate port
 
     bool fMultiThreadedMode;  // if true, one thread for each socket
+    
+    bool fTCP; // if true, then use TCP instead of UDP
 
     CSocketAddress addrPP; // address for PP
     CSocketAddress addrPA; // address for PA

@@ -154,8 +154,7 @@ inline bool operator==(const StunTransactionId &id1, const StunTransactionId &id
 }
 
 
-// stun header
-// todo - unit test to validate packing isn't broken between windows and linux
+
 
 const uint32_t STUN_COOKIE = 0x2112A442;
 const uint8_t STUN_COOKIE_B1 = 0x21;
@@ -170,8 +169,8 @@ const uint16_t STUN_XOR_PORT_COOKIE = 0x2112;
 
 const uint32_t STUN_HEADER_SIZE = 20;
 
-const uint32_t MAX_STUN_MESSAGE_SIZE = 2000; // some reasonable length
-const uint32_t MAX_STUN_ATTRIBUTE_SIZE = 1980; // more than reasonable
+const uint32_t MAX_STUN_MESSAGE_SIZE = 800; // some reasonable length
+const uint32_t MAX_STUN_ATTRIBUTE_SIZE = 780; // more than reasonable
 
 
 #endif

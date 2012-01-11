@@ -142,8 +142,8 @@ HRESULT CStunClientLogic::GetNextMessage(CRefCountedBuffer& spMsg, CSocketAddres
     ChkIfA(spMsg->GetAllocatedSize() == 0, E_INVALIDARG);
     ChkIfA(pAddrDest == NULL, E_INVALIDARG);
 
-    // clients should pass in at least 1000 bytes
-    ChkIfA(spMsg->GetAllocatedSize() < 1000, E_INVALIDARG);
+    // clients should pass in the expected size
+    ChkIfA(spMsg->GetAllocatedSize() < MAX_STUN_MESSAGE_SIZE, E_INVALIDARG);
 
 
     while (fReadyToReturn==false)

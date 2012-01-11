@@ -23,28 +23,8 @@
 #include "server.h"
 #include "fasthash.h"
 #include "messagehandler.h"
+#include "stunconnection.h"
 
-
-enum StunConnectionState
-{
-    ConnectionState_Idle,
-    ConnectionState_Receiving,
-    ConnectionState_Transmitting,
-    ConnectionState_Closing,     // shutdown has been called, waiting for close notification on other end
-};
-
-
-struct StunConnection
-{
-    time_t _timeStart;
-    StunConnectionState _state;
-    CStunSocket _stunsocket;
-    CStunMessageReader _reader;
-    CRefCountedBuffer _spReaderBuffer;
-    CRefCountedBuffer _spOutputBuffer;  // contains the response
-    size_t _txCount;     // number of bytes of response transmitted thus far
-    int _idHashTable; // hints at which hash table the connection got inserted into
-};
 
 
 
@@ -54,44 +34,42 @@ class CTCPStunThread
     static const int c_sweepTimeoutMilliseconds = c_sweepTimeoutSeconds * 1000;
     
     int _pipe[2];
-    
     HRESULT CreatePipes();
     HRESULT NotifyThreadViaPipe();
     void ClosePipes();
     
     int _epoll;
-    bool _fListenSocketOnEpoll;
+    bool _fListenSocketsOnEpoll;
     HRESULT CreateEpoll();
     void CloseEpoll();
     
-    enum ClientEpollMode
-    {
-        WantReadEvents =  1,  
-        WantWriteEvents = 2,
-    };
-
     // epoll helpers
     HRESULT AddSocketToEpoll(int sock, uint32_t events);
     HRESULT AddClientSocketToEpoll(int sock);
     HRESULT DetachFromEpoll(int sock);
     HRESULT EpollCtrl(int sock, uint32_t events);
-    HRESULT SetListenSocketOnEpoll(bool fEnable);
+    HRESULT SetListenSocketsOnEpoll(bool fEnable);
 
-    CSocketAddress _addrListen;
-    CStunSocket _socketListen;
-    HRESULT CreateListenSocket();
-    void CloseListenSocket();
+    TransportAddressSet _tsaListen;  // this is not what gets passed to CStunRequestHandler, see _tsa below
+    CStunSocket _socketListenArray[4];
+    int _socketTable[4]; // same as _socketListenArray,but for quick lookup
+    int _countSocks;
+    HRESULT CreateListenSockets();
+    void CloseListenSockets();
+    CStunSocket* GetListenSocket(int sock);
     
     
     bool _fNeedToExit;
     CRefCountedPtr<IStunAuth> _spAuth;
     SocketRole _role;
     
-    TransportAddressSet _tsa;
+    TransportAddressSet _tsa;  // this
     int _maxConnections;
     
     pthread_t _pthread;
     bool _fThreadIsValid;
+    
+    CConnectionPool _connectionpool;
     
     // this is the function that runs in a thread
     void Run();
@@ -114,12 +92,8 @@ class CTCPStunThread
     time_t _timeLastSweep;
     
     
-    // buffer pool helpers
-    StunConnection* CreateNewConnection(int sock);
-    void ReleaseConnection(StunConnection* pConn);
     
-    
-    StunConnection* AcceptConnection();
+    StunConnection* AcceptConnection(CStunSocket* pListenSocket);
 
     void ProcessConnectionEvent(int sock, uint32_t eventflags);
     
@@ -142,9 +116,36 @@ public:
     CTCPStunThread();
     ~CTCPStunThread();
     
-    HRESULT Init(const CSocketAddress& addrListen, IStunAuth* pAuth, SocketRole role, int maxConnections);
+    // tsaListen are the set of addresses we listen to connections on (either 1 address or 4 addresses)
+    // tsaHandler is what gets passed to the CStunRequestHandler for formation of the "other-address" attribute
+    HRESULT Init(const TransportAddressSet& tsaListen, const TransportAddressSet& tsaHandler, IStunAuth* pAuth, int maxConnections);
     HRESULT Start();
     HRESULT Stop();
+};
+
+class CTCPServer :
+    public CBasicRefCount,
+    public CObjectFactory<CTCPServer>,
+    public IRefCounted
+{
+private:
+    
+    CTCPStunThread* _threads[4];
+
+    
+public:
+    
+    CTCPServer();
+    virtual ~CTCPServer();
+    
+    
+    HRESULT Initialize(const CStunServerConfig& config);
+    HRESULT Shutdown();
+    HRESULT Start();
+    HRESULT Stop();
+    
+    ADDREF_AND_RELEASE_IMPL();    
+    
 };
 
 

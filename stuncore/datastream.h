@@ -24,6 +24,7 @@
 class CDataStream
 {
     CRefCountedBuffer _spBuffer;
+    CBuffer* _pBuffer; // direct pointer for better performance
     size_t _pos;
     bool _fNoGrow;
     

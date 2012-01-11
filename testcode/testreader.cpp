@@ -49,7 +49,11 @@ const char c_software[] = "STUN test client";
 
 HRESULT CTestReader::Run()
 {
-    return Test1();
+    HRESULT hr = S_OK;
+    Chk(Test1());
+    Chk(Test2());
+Cleanup:
+    return hr;
 }
 
 
@@ -68,7 +72,6 @@ HRESULT CTestReader::Test1()
 
     CStunMessageReader reader;
     CStunMessageReader::ReaderParseState state;
-
 
     // reader is expecting at least enough bytes to fill the header
     ChkIfA(reader.AddBytes(NULL, 0) != CStunMessageReader::HeaderNotRead, E_FAIL);
@@ -112,4 +115,81 @@ HRESULT CTestReader::Test1()
 Cleanup:
     return hr;
  }
+
+HRESULT CTestReader::Test2()
+{
+    HRESULT hr = S_OK;
+
+   // this test is to validate an extreme case for TCP scenarios.
+   // what if the bytes only arrived "one at a time"? 
+   // or if the byte chunks straddled across logical parse segments (i.e. the header and the body)
+   // Can CStunMessageReader::AddBytes handle and parse out the correct result
+
+    for (size_t chunksize = 1; chunksize <= 30; chunksize++)
+    {
+        Chk(TestFixedReadSizes(chunksize));
+    }
+
+    srand(888);
+    for (size_t i = 0; i < 200; i++)
+    {
+        Chk(TestFixedReadSizes(0));
+    }
+Cleanup:
+    return hr;
+}
+
+HRESULT CTestReader::TestFixedReadSizes(size_t chunksize)
+{
+
+    HRESULT hr = S_OK;
+    CStunMessageReader reader;
+    CStunMessageReader::ReaderParseState prevState, state;
+    size_t bytesread = 0;
+    bool fRandomChunkSizing = (chunksize==0);
+    
+    
+    prevState = CStunMessageReader::HeaderNotRead;
+    state = prevState;
+    size_t msgSize = sizeof(c_requestbytes)-1; // c_requestbytes is a string, hence the -1
+    while (bytesread < msgSize)
+    {
+        size_t remaining, toread;
+        
+        if (fRandomChunkSizing)
+        {
+            chunksize = (rand() % 17) + 1;
+        }
+        
+        remaining = msgSize - bytesread;
+        toread = (remaining > chunksize) ? chunksize : remaining;
+        
+        state = reader.AddBytes(&c_requestbytes[bytesread], toread);
+        bytesread += toread;
+        
+        ChkIfA(state == CStunMessageReader::ParseError, E_UNEXPECTED);
+        
+        if ((state == CStunMessageReader::HeaderValidated) && (prevState != CStunMessageReader::HeaderValidated))
+        {
+            ChkIfA(bytesread < STUN_HEADER_SIZE, E_UNEXPECTED);
+        }
+        
+        if ((state == CStunMessageReader::BodyValidated) && (prevState != CStunMessageReader::BodyValidated))
+        {
+            ChkIfA(prevState != CStunMessageReader::HeaderValidated, E_UNEXPECTED);
+            ChkIfA(bytesread != msgSize, E_UNEXPECTED);
+        }
+        
+        prevState = state;
+    }
+    
+    ChkIfA(reader.GetState() != CStunMessageReader::BodyValidated, E_UNEXPECTED);
+    
+    // just validate the integrity and fingerprint, that should cover all the attributes
+    ChkA(reader.ValidateMessageIntegrityShort(c_password));
+    ChkIfA(reader.IsFingerprintAttributeValid() == false, E_FAIL);
+    
+Cleanup:
+    return hr;
+}
 

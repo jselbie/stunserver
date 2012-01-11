@@ -46,7 +46,7 @@ HRESULT CStunRequestHandler::ProcessRequest(const StunMessageIn& msgIn, StunMess
     ChkIfA(IsValidSocketRole(msgIn.socketrole)==false, E_INVALIDARG);
     
     ChkIfA(msgOut.spBufferOut==NULL, E_INVALIDARG);
-    ChkIfA(msgOut.spBufferOut->GetAllocatedSize() < 1000, E_INVALIDARG);
+    ChkIfA(msgOut.spBufferOut->GetAllocatedSize() < MAX_STUN_MESSAGE_SIZE, E_INVALIDARG);
     
     ChkIf(pAddressSet == NULL, E_INVALIDARG);
 

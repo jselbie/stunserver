@@ -319,7 +319,7 @@ HRESULT ClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& sock
     HRESULT hr = S_OK;
     CRefCountedStunSocket spStunSocket;
     CStunSocket stunSocket;;
-    CRefCountedBuffer spMsg(new CBuffer(1500));
+    CRefCountedBuffer spMsg(new CBuffer(MAX_STUN_MESSAGE_SIZE));
     int sock = -1;
     CSocketAddress addrDest;   // who we send to
     CSocketAddress addrRemote; // who we

@@ -107,7 +107,7 @@ CTestMessageHandler::CTestMessageHandler()
 HRESULT CTestMessageHandler::SendHelper(CStunMessageBuilder& builderRequest, CStunMessageReader* pReaderResponse, IStunAuth* pAuth)
 {
     CRefCountedBuffer spBufferRequest;
-    CRefCountedBuffer spBufferResponse(new CBuffer(1500));
+    CRefCountedBuffer spBufferResponse(new CBuffer(MAX_STUN_MESSAGE_SIZE));
     StunMessageIn msgIn;
     StunMessageOut msgOut;
     CStunMessageReader reader;
@@ -242,7 +242,7 @@ HRESULT CTestMessageHandler::Test1()
 {
     HRESULT hr = S_OK;
     CStunMessageBuilder builder;
-    CRefCountedBuffer spBuffer, spBufferOut(new CBuffer(1500));
+    CRefCountedBuffer spBuffer, spBufferOut(new CBuffer(MAX_STUN_MESSAGE_SIZE));
     CStunMessageReader reader;
     StunMessageIn msgIn;
     StunMessageOut msgOut;
@@ -301,7 +301,7 @@ HRESULT CTestMessageHandler::Test2()
 {
     HRESULT hr = S_OK;
     CStunMessageBuilder builder;
-    CRefCountedBuffer spBuffer, spBufferOut(new CBuffer(1500));
+    CRefCountedBuffer spBuffer, spBufferOut(new CBuffer(MAX_STUN_MESSAGE_SIZE));
     CStunMessageReader reader;
     StunMessageIn msgIn;
     StunMessageOut msgOut;

@@ -252,8 +252,8 @@ HRESULT CTestClientLogic::TestBehaviorAndFiltering(bool fBehaviorTest, NatBehavi
     StunClientLogicConfig config;
     HRESULT hrRet;
     uint32_t time = 0;
-    CRefCountedBuffer spMsgOut(new CBuffer(1500));
-    CRefCountedBuffer spMsgResponse(new CBuffer(1500));
+    CRefCountedBuffer spMsgOut(new CBuffer(MAX_STUN_MESSAGE_SIZE));
+    CRefCountedBuffer spMsgResponse(new CBuffer(MAX_STUN_MESSAGE_SIZE));
     SocketRole outputRole;
     CSocketAddress addrDummy;
     
@@ -399,8 +399,8 @@ HRESULT CTestClientLogic::Test1()
     HRESULT hrTmp = 0;
     CStunClientLogic clientlogic;    
     ::StunClientLogicConfig config;
-    CRefCountedBuffer spMsgOut(new CBuffer(1500));
-    CRefCountedBuffer spMsgIn(new CBuffer(1500));
+    CRefCountedBuffer spMsgOut(new CBuffer(MAX_STUN_MESSAGE_SIZE));
+    CRefCountedBuffer spMsgIn(new CBuffer(MAX_STUN_MESSAGE_SIZE));
     StunClientResults results;
     StunTransactionId transid;
     
