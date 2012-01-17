@@ -30,7 +30,8 @@ fHasPA(false),
 fHasAP(false),
 fHasAA(false),
 fMultiThreadedMode(false),
-fTCP(false)
+fTCP(false),
+nMaxConnections(0) // zero means default
 {
     ;
 }

@@ -24,7 +24,7 @@
 #include "fasthash.h"
 #include "messagehandler.h"
 #include "stunconnection.h"
-
+#include "polling.h"
 
 
 
@@ -37,17 +37,11 @@ class CTCPStunThread
     HRESULT CreatePipes();
     HRESULT NotifyThreadViaPipe();
     void ClosePipes();
-    
-    int _epoll;
+
+    CRefCountedPtr<IPolling> _spPolling;
     bool _fListenSocketsOnEpoll;
-    HRESULT CreateEpoll();
-    void CloseEpoll();
     
     // epoll helpers
-    HRESULT AddSocketToEpoll(int sock, uint32_t events);
-    HRESULT AddClientSocketToEpoll(int sock);
-    HRESULT DetachFromEpoll(int sock);
-    HRESULT EpollCtrl(int sock, uint32_t events);
     HRESULT SetListenSocketsOnEpoll(bool fEnable);
 
     TransportAddressSet _tsaListen;  // this is not what gets passed to CStunRequestHandler, see _tsa below
@@ -131,7 +125,8 @@ class CTCPServer :
 private:
     
     CTCPStunThread* _threads[4];
-
+    
+    CRefCountedPtr<IStunAuth> _spAuth;    
     
 public:
     

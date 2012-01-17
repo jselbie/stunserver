@@ -21,13 +21,16 @@ Available options:
   --family=IPVERSION
      IPVERSION is either "4" or "6" to specify the usage of IPV4 or IPV6. If not specified, the default value is "4".
 
-   --protocol=PROTO
-     PROTO is either "udp", "tcp", or "tls".  Where "udp" is the default.  "tcp" and "tls" modes are only available when the --mode option is "basic".  (Note: tcp and tls are not yet available in this version)
+  --protocol=PROTO
+     PROTO is either "udp" or "tcp".  "udp" is the default.
 
-   --verbosity=LOGLEVEL
+  --maxconn=MAXCONN
+     MAXCONN is a value between 1 and 100000.  The default is 1000. This value specifies the maximum number of simultaneous TCP connections allowed (per thread). It's an ignored parameter when the PROTOCOL option is UDP.
+
+  --verbosity=LOGLEVEL
      Sets the verbosity of the logging level.  0 is the default (minimal output and logging).  1 shows slightly more.  2 and higher shows even more.
 
-   --help
+  --help
      Prints this help page
 
 Examples:

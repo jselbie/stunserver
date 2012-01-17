@@ -28,6 +28,7 @@
 class CStunServerConfig
 {
 public:
+    
     bool fHasPP; // PP: Primary ip,   Primary port
     bool fHasPA; // PA: Primary ip,   Alternate port
     bool fHasAP; // AP: Alternate ip, Primary port
@@ -36,6 +37,7 @@ public:
     bool fMultiThreadedMode;  // if true, one thread for each socket
     
     bool fTCP; // if true, then use TCP instead of UDP
+    uint32_t nMaxConnections; // only valid for TCP (on a per-thread basis)
 
     CSocketAddress addrPP; // address for PP
     CSocketAddress addrPA; // address for PA

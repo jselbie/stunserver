@@ -257,6 +257,16 @@ public:
         return _size;
     }
     
+    size_t GetMaxCapacity()
+    {
+        return _fsize;
+    }
+    
+    size_t GetTableWidth()
+    {
+        return _tsize;
+    }
+    
     int Insert(const K& key, V& value)
     {
         size_t hashindex = FastHash_Hash(key) % _tsize;

@@ -185,7 +185,7 @@ void CStunSocket::UpdateAddresses()
 
 
 
-HRESULT CStunSocket::InitCommon(int socktype, const CSocketAddress& addrlocal, SocketRole role)
+HRESULT CStunSocket::InitCommon(int socktype, const CSocketAddress& addrlocal, SocketRole role, bool fSetReuseFlag)
 {
     int sock = -1;
     int ret;
@@ -196,10 +196,15 @@ HRESULT CStunSocket::InitCommon(int socktype, const CSocketAddress& addrlocal, S
     sock = socket(addrlocal.GetFamily(), socktype, 0);
     ChkIf(sock < 0, ERRNOHR);
     
-    
+    if (fSetReuseFlag)
+    {
+        int fAllow = 1;
+        ret = ::setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &fAllow, sizeof(fAllow));
+        ChkIf(ret == -1, ERRNOHR);
+    }
     
     ret = bind(sock, addrlocal.GetSockAddr(), addrlocal.GetSockAddrLength());
-    ChkIf(ret < 0, ERRNOHR);
+    ChkIf(ret == -1, ERRNOHR);
     
     Attach(sock);
     sock = -1;
@@ -219,12 +224,12 @@ Cleanup:
 
 HRESULT CStunSocket::UDPInit(const CSocketAddress& local, SocketRole role)
 {
-    return InitCommon(SOCK_DGRAM, local, role);
+    return InitCommon(SOCK_DGRAM, local, role, false);
 }
 
-HRESULT CStunSocket::TCPInit(const CSocketAddress& local, SocketRole role)
+HRESULT CStunSocket::TCPInit(const CSocketAddress& local, SocketRole role, bool fSetReuseFlag)
 {
-    return InitCommon(SOCK_STREAM, local, role);
+    return InitCommon(SOCK_STREAM, local, role, fSetReuseFlag);
 }
 
 

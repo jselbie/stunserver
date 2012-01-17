@@ -75,8 +75,8 @@ uint16_t CStunMessageReader::HowManyBytesNeeded()
         BOOST_ASSERT(STUN_HEADER_SIZE > currentSize);
         return STUN_HEADER_SIZE - currentSize;
     case HeaderValidated:
-        BOOST_ASSERT(_msgLength > currentSize);
-        return _msgLength - currentSize;
+        BOOST_ASSERT((_msgLength+STUN_HEADER_SIZE) > currentSize);
+        return (_msgLength+STUN_HEADER_SIZE) - currentSize;
     default:
     	return 0;
     }

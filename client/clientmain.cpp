@@ -97,12 +97,14 @@ HRESULT CreateConfigFromCommandLine(ClientCmdLineArgs& args, StunClientLogicConf
     uint16_t remoteport = 0;
     int nPort = 0;
     char szIP[100];
+    bool fTCP = false;
 
 
     config.fBehaviorTest = false;
     config.fFilteringTest = false;
-    config.timeoutSeconds = 5;
-    config.uMaxAttempts = 3;
+    config.fTimeoutIsInstant = false;
+    config.timeoutSeconds = 0; // use default
+    config.uMaxAttempts = 0;
 
     socketconfig.family = AF_INET;
     socketconfig.socktype = SOCK_DGRAM;
@@ -132,10 +134,17 @@ HRESULT CreateConfigFromCommandLine(ClientCmdLineArgs& args, StunClientLogicConf
     StringHelper::ToLower(args.strProtocol);
     if (StringHelper::IsNullOrEmpty(args.strProtocol.c_str()) == false)
     {
-        if (args.strProtocol != "udp")
+        if ((args.strProtocol != "udp") && (args.strProtocol != "tcp"))
         {
-            Logging::LogMsg(LL_ALWAYS, "Only udp is supported as a protocol option in this version");
+            Logging::LogMsg(LL_ALWAYS, "Only udp and tcp are supported protocol versions");
             Chk(E_INVALIDARG);
+        }
+        
+        if (args.strProtocol == "tcp")
+        {
+            fTCP = true;
+            socketconfig.socktype = SOCK_STREAM;
+            config.uMaxAttempts = 1;
         }
     }
 
@@ -224,7 +233,7 @@ HRESULT CreateConfigFromCommandLine(ClientCmdLineArgs& args, StunClientLogicConf
         else if (args.strMode == "full")
         {
             config.fBehaviorTest = true;
-            config.fFilteringTest = true;
+            config.fFilteringTest = (fTCP == false); // impossible to to a filtering test in TCP
         }
         else
         {
@@ -237,7 +246,6 @@ HRESULT CreateConfigFromCommandLine(ClientCmdLineArgs& args, StunClientLogicConf
 Cleanup:
     return hr;
 }
-
 
 
 
@@ -308,13 +316,161 @@ void DumpResults(StunClientLogicConfig& config, StunClientResults& results)
             Logging::LogMsg(LL_ALWAYS, "Nat filtering: %s", strResult.c_str());
         }
     }
-
 }
 
 
+void TcpClientLoop(StunClientLogicConfig& config, ClientSocketConfig& socketconfig)
+{
+    
+    HRESULT hr = S_OK;
+    CStunSocket stunsocket;
+    CStunClientLogic clientlogic;
+    int sock;
+    CRefCountedBuffer spMsg(new CBuffer(1500));
+    CRefCountedBuffer spMsgReader(new CBuffer(1500));
+    CSocketAddress addrDest, addrLocal;
+    HRESULT hrRet, hrResult;
+    int ret;
+    size_t bytes_sent, bytes_recv;
+    size_t bytes_to_send, max_bytes_recv, remaining;
+    uint8_t* pData=NULL;
+    size_t readsize;
+    CStunMessageReader reader;
+    StunClientResults results;
+    
+   
+    hr= clientlogic.Initialize(config);
+    if (FAILED(hr))
+    {
+        Logging::LogMsg(LL_ALWAYS, "clientlogic.Initialize failed (hr == %x)", hr);
+        Chk(hr);
+    }
+    
+    
+    while (true)
+    {
+    
+        stunsocket.Close();
+        hr = stunsocket.TCPInit(socketconfig.addrLocal, RolePP, true);
+        if (FAILED(hr))
+        {
+            Logging::LogMsg(LL_ALWAYS, "Unable to create local socket for TCP connection (hr == %x)", hr);
+            Chk(hr);
+        }
+        
+        hrRet = clientlogic.GetNextMessage(spMsg, &addrDest, ::GetMillisecondCounter());
+        
+        if (hrRet == E_STUNCLIENT_RESULTS_READY)
+        {
+            // clean exit
+            break;
+        }
+
+        // we should never get a "still waiting" return with TCP, because config.timeout is 0
+        ASSERT(hrRet != E_STUNCLIENT_STILL_WAITING);
+        
+        if (FAILED(hrRet))
+        {
+            Chk(hrRet);
+        }
+        
+        // connect to server
+        sock = stunsocket.GetSocketHandle();
+        
+        ret = ::connect(sock, addrDest.GetSockAddr(), addrDest.GetSockAddrLength());
+        
+        if (ret == -1)
+        {
+            hrResult = ERRNOHR;
+            Logging::LogMsg(LL_ALWAYS, "Can't connect to server (hr == %x)", hrResult);
+            Chk(hrResult);
+        }
+        
+        Logging::LogMsg(LL_DEBUG, "Connected to server");
+        
+        bytes_to_send = (int)(spMsg->GetSize());
+        
+        bytes_sent = 0;
+        pData = spMsg->GetData();
+        while (bytes_sent < bytes_to_send)
+        {
+            ret = ::send(sock, pData+bytes_sent, bytes_to_send-bytes_sent, 0);
+            if (ret < 0)
+            {
+                hrResult = ERRNOHR;
+                Logging::LogMsg(LL_ALWAYS, "Send failed (hr == %x)", hrResult);
+                Chk(hrResult);
+            }
+            bytes_sent += ret;
+        }
+        
+        Logging::LogMsg(LL_DEBUG, "Request sent - waiting for response");
+        
+        
+        // consume the response
+        reader.Reset();
+        reader.GetStream().Attach(spMsgReader, true);
+        pData = spMsg->GetData();
+        bytes_recv = 0;
+        max_bytes_recv = spMsg->GetAllocatedSize();
+        remaining = max_bytes_recv;
+        
+        while (remaining > 0)
+        {
+            readsize = reader.HowManyBytesNeeded();
+            
+            if (readsize == 0)
+            {
+                break;
+            }
+            
+            if (readsize > remaining)
+            {
+                // technically an error, but the client logic will figure it out
+                ASSERT(false);
+                break;
+            }
+            
+            ret = ::recv(sock, pData+bytes_recv, readsize, 0);
+            if (ret == 0)
+            {
+                // server cut us off before we got all the bytes we thought we were supposed to get?
+                ASSERT(false);
+                break;
+            }
+            if (ret < 0)
+            {
+                hrResult = ERRNOHR;
+                Logging::LogMsg(LL_ALWAYS, "Recv failed (hr == %x)", hrResult);
+                Chk(hrResult);
+            }
+            
+            reader.AddBytes(pData+bytes_recv, ret);
+            bytes_recv += ret;
+            remaining = max_bytes_recv - bytes_recv;
+            spMsg->SetSize(bytes_recv);
+        }
+        
+        
+        // now feed the response into the client logic
+        stunsocket.UpdateAddresses();
+        addrLocal = stunsocket.GetLocalAddress();
+        clientlogic.ProcessResponse(spMsg, addrDest, addrLocal);
+    }
+    
+    stunsocket.Close();
+
+    results.Init();
+    clientlogic.GetResults(&results);
+    ::DumpResults(config, results);
+    
+Cleanup:
+    return;
+    
+}
 
 
-HRESULT ClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& socketconfig)
+HRESULT UdpClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& socketconfig)
 {
     HRESULT hr = S_OK;
     CRefCountedStunSocket spStunSocket;
@@ -431,6 +587,11 @@ Cleanup:
 }
 
 
+
+
+
+
+
 int main(int argc, char** argv)
 {
     CCmdLineParser cmdline;
@@ -495,7 +656,15 @@ int main(int argc, char** argv)
     }
 
     DumpConfig(config, socketconfig);
-    ClientLoop(config, socketconfig);
+    
+    if (socketconfig.socktype == SOCK_STREAM)
+    {
+        TcpClientLoop(config, socketconfig);
+    }
+    else
+    {
+        UdpClientLoop(config, socketconfig);
+    }
 
     return 0;
 }

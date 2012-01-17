@@ -4,6 +4,7 @@ nbproject/
 *.gch
 *.a
 *.txtcode
+callgrind.out.*
 
 stunclient
 stunserver

@@ -26,6 +26,8 @@
 
 
 
+
+
 #define IS_DIVISIBLE_BY(x, y)  ((x % y)==0)
 
 static bool IsPrime(unsigned int val)
@@ -79,23 +81,23 @@ static size_t GetHashTableWidth(unsigned int maxConnections)
 }
 
 // client sockets are edge triggered
-const uint32_t EPOLL_CLIENT_READ_EVENT_SET = EPOLLET | EPOLLIN | EPOLLRDHUP;
-const uint32_t EPOLL_CLIENT_WRITE_EVENT_SET = EPOLLET | EPOLLOUT;
+const uint32_t EPOLL_CLIENT_READ_EVENT_SET = IPOLLING_EDGETRIGGER | IPOLLING_READ | IPOLLING_RDHUP;
+
+const uint32_t EPOLL_CLIENT_WRITE_EVENT_SET = IPOLLING_EDGETRIGGER | IPOLLING_WRITE;
 
 // listen sockets are always level triggered (that way, when we recover from
 //    hitting a max connections condition, we don't have to worry about
 //    missing a notification
-const uint32_t EPOLL_LISTEN_SOCKET_EVENT_SET = EPOLLIN;
+const uint32_t EPOLL_LISTEN_SOCKET_EVENT_SET = IPOLLING_READ;
 
 // notification pipe could go either way
-const uint32_t EPOLL_PIPE_EVENT_SET = EPOLLIN;
+const uint32_t EPOLL_PIPE_EVENT_SET = IPOLLING_READ;
 
-const int c_MaxNumberOfConnectionsDefault = 10000;
+const int c_MaxNumberOfConnectionsDefault = 1000;
 
 
 CTCPStunThread::CTCPStunThread()
 {
-    _epoll = -1;
     _pipe[0] = _pipe[1] = -1;
     _pthread = (pthread_t)-1;
     Reset();
@@ -103,7 +105,8 @@ CTCPStunThread::CTCPStunThread()
 
 void CTCPStunThread::Reset()
 {
-    CloseEpoll();
+    _spPolling.ReleaseAndClear();
+    
     CloseListenSockets();
     ClosePipes();
     
@@ -189,75 +192,7 @@ HRESULT CTCPStunThread::NotifyThreadViaPipe()
 }
 
 
-HRESULT CTCPStunThread::CreateEpoll()
-{
-    ASSERT(_epoll == -1);
-    _epoll = epoll_create(1000); // todo change this parameter to "max connections" (although it's likely an ignored parameter)
-    if (_epoll == -1)
-    {
-        return ERRNOHR;
-    }
-    return S_OK;
-}
 
-void CTCPStunThread::CloseEpoll()
-{
-    if (_epoll != -1)
-    {
-        close(_epoll);
-        _epoll = -1;
-    }
-}
-
-HRESULT CTCPStunThread::AddSocketToEpoll(int sock, uint32_t events)
-{
-    HRESULT hr = S_OK;
-    epoll_event ev = {};
-    
-    ASSERT(sock != -1);
-    
-    ev.data.fd = sock;
-    ev.events = events;
-    ChkIfA(epoll_ctl(_epoll, EPOLL_CTL_ADD, sock, &ev) == -1, ERRNOHR);
-Cleanup:
-    return hr;
-}
-
-HRESULT CTCPStunThread::AddClientSocketToEpoll(int sock)
-{
-    return AddSocketToEpoll(sock, EPOLL_CLIENT_READ_EVENT_SET);
-}
-
-HRESULT CTCPStunThread::DetachFromEpoll(int sock)
-{
-    HRESULT hr = S_OK;
-    epoll_event ev={}; // pass empty ev, because some implementations of epoll_ctl can't handle a NULL event struct
-    
-    if (sock == -1)
-    {
-        return S_FALSE;
-    }
-    
-    ChkIfA(epoll_ctl(_epoll, EPOLL_CTL_DEL, sock, &ev) == -1, ERRNOHR);
-Cleanup:
-    return hr;
-}
-
-
-HRESULT CTCPStunThread::EpollCtrl(int sock, uint32_t events)
-{
-    HRESULT hr = S_OK;
-    
-    ASSERT(sock != -1);
-    
-    epoll_event ev = {};
-    ev.data.fd = sock;
-    ev.events = events;
-    
-    ChkIfA(epoll_ctl(_epoll, EPOLL_CTL_MOD, sock, &ev) == -1, ERRNOHR);
-Cleanup:
-    return hr;
-}
 
 HRESULT CTCPStunThread::SetListenSocketsOnEpoll(bool fEnable)
 {
@@ -276,11 +211,11 @@ HRESULT CTCPStunThread::SetListenSocketsOnEpoll(bool fEnable)
             
             if (fEnable)
             {
-                ChkA(AddSocketToEpoll(sock, EPOLL_LISTEN_SOCKET_EVENT_SET));
+                ChkA(_spPolling->Add(sock, EPOLL_LISTEN_SOCKET_EVENT_SET));
             }
             else
             {
-                ChkA(DetachFromEpoll(sock));
+                ChkA(_spPolling->Remove(sock));
             }
         }
         
@@ -302,7 +237,7 @@ HRESULT CTCPStunThread::CreateListenSockets()
     {
         if (_tsaListen.set[r].fValid)
         {
-            ChkA(_socketListenArray[r].TCPInit(_tsaListen.set[r].addr, (SocketRole)r));
+            ChkA(_socketListenArray[r].TCPInit(_tsaListen.set[r].addr, (SocketRole)r, true));
             _socketTable[r] = _socketListenArray[r].GetSocketHandle();
             ChkA(_socketListenArray[r].SetNonBlocking(true));
             ret = listen(_socketTable[r], 128); // todo - figure out the right value to pass to listen
@@ -385,7 +320,7 @@ HRESULT CTCPStunThread::Init(const TransportAddressSet& tsaListen, const Transpo
     
     ChkA(CreatePipes());
     
-    ChkA(CreateEpoll()); 
+    ChkA(CreatePollingInstance(IPOLLING_TYPE_BEST, _spPolling.GetPointerPointer()));
     
     // add listen socket to epoll
     ASSERT(_fListenSocketsOnEpoll == false);
@@ -393,7 +328,7 @@ HRESULT CTCPStunThread::Init(const TransportAddressSet& tsaListen, const Transpo
     
     
     // add read end of pipe to epoll so we can get notified of when a signal to exit has occurred
-    ChkA(AddSocketToEpoll(_pipe[0], EPOLL_PIPE_EVENT_SET));
+    ChkA(_spPolling->Add(_pipe[0], EPOLL_PIPE_EVENT_SET));
     
     _maxConnections = (maxConnections > 0) ? maxConnections : c_MaxNumberOfConnectionsDefault;
     
@@ -485,6 +420,7 @@ bool CTCPStunThread::IsConnectionCountAtMax()
 
 void CTCPStunThread::Run()
 {
+    HRESULT hrPoll;
     
     Logging::LogMsg(LL_DEBUG, "Starting TCP listening thread (%d sockets)\n", _countSocks);
     
@@ -492,12 +428,10 @@ void CTCPStunThread::Run()
     
     while (_fNeedToExit == false)
     {
+        PollEvent pollevent = {};
         // wait for a notification
-        epoll_event ev = {};
         int timeout = -1; // wait forever
         CStunSocket* pListenSocket = NULL;
-
-        int ret;
 
         if (IsTimeoutNeeded())
         {
@@ -508,27 +442,30 @@ void CTCPStunThread::Run()
         // otherwise, make sure it is enabled.
         SetListenSocketsOnEpoll(IsConnectionCountAtMax() == false);
         
-        ret = ::epoll_wait(_epoll, &ev, 1, timeout);
+        hrPoll = _spPolling->WaitForNextEvent(&pollevent, timeout);
         
-        if ( _fNeedToExit || (ev.data.fd == _pipe[0]) )
+        if ( _fNeedToExit || (pollevent.fd == _pipe[0]) )
         {
             break;
         }
         
-        if (ret > 0)
+        // hrPoll will be S_OK if there was an event.  S_FALSE otherwise
+        ASSERT(SUCCEEDED(hrPoll));
+        
+        if (hrPoll == S_OK)
         {
             if (Logging::GetLogLevel() >= LL_VERBOSE)
             {
-                Logging::LogMsg(LL_VERBOSE, "socket %d: %x (%s%s%s%s%s%s)", ev.data.fd, ev.events,
-                    (ev.events&EPOLLIN) ? " EPOLLIN " : "",
-                    (ev.events&EPOLLOUT) ? " EPOLLOUT " : "",
-                    (ev.events&EPOLLRDHUP) ? " EPOLLRDHUP " : "",
-                    (ev.events&EPOLLHUP) ? " EPOLLHUP " : "",
-                    (ev.events&EPOLLERR) ? " EPOLLERR " : "",
-                    (ev.events&EPOLLPRI) ? " EPOLLPRI " : "");
+                Logging::LogMsg(LL_VERBOSE, "socket %d: %x (%s%s%s%s%s%s)", pollevent.fd, pollevent.eventflags,
+                    (pollevent.eventflags&IPOLLING_READ) ? " IPOLLING_READ " : "",
+                    (pollevent.eventflags&IPOLLING_WRITE) ? " IPOLLING_WRITE " : "",
+                    (pollevent.eventflags&IPOLLING_RDHUP) ? " IPOLLING_RDHUP " : "",
+                    (pollevent.eventflags&IPOLLING_HUP) ? " IPOLLING_HUP " : "",
+                    (pollevent.eventflags&IPOLLING_ERROR) ? " IPOLLING_ERROR " : "",
+                    (pollevent.eventflags&IPOLLING_PRI) ? " IPOLLING_PRI " : "");
             }
             
-            pListenSocket = GetListenSocket(ev.data.fd);
+            pListenSocket = GetListenSocket(pollevent.fd);
             if (pListenSocket)
             {
                 StunConnection* pConn = AcceptConnection(pListenSocket);
@@ -541,7 +478,7 @@ void CTCPStunThread::Run()
             }
             else
             {
-                ProcessConnectionEvent(ev.data.fd, ev.events);
+                ProcessConnectionEvent(pollevent.fd, pollevent.eventflags);
             }
         }
         
@@ -623,7 +560,8 @@ StunConnection* CTCPStunThread::AcceptConnection(CStunSocket* pListenSocket)
     socktmp = -1;
     
     ChkA(pConn->_stunsocket.SetNonBlocking(true));
-    ChkA(AddClientSocketToEpoll(clientsock));
+    
+    ChkA(_spPolling->Add(clientsock, EPOLL_CLIENT_READ_EVENT_SET));
     
     // add connection to our tracking tables
     pConn->_idHashTable = (_pNewConnList == &_hashConnections1) ? 1 : 2;
@@ -718,7 +656,7 @@ HRESULT CTCPStunThread::ReceiveBytesForConnection(StunConnection* pConn)
             pConn->_state = ConnectionState_Transmitting;
             
             // change the socket such that we only listen for "write events"
-            Chk(EpollCtrl(sock, EPOLL_CLIENT_WRITE_EVENT_SET));
+            Chk(_spPolling->ChangeEventSet(sock, EPOLL_CLIENT_WRITE_EVENT_SET));
             
             // optimization - go ahead and try to send the response
             WriteBytesForConnection(pConn);
@@ -795,7 +733,8 @@ HRESULT CTCPStunThread::WriteBytesForConnection(StunConnection* pConn)
             
             shutdown(sock, SHUT_WR);
             // go back to listening for read events
-            ChkA(EpollCtrl(sock, EPOLL_CLIENT_READ_EVENT_SET));
+            ChkA(_spPolling->ChangeEventSet(sock, EPOLL_CLIENT_READ_EVENT_SET));
+            
 
             ConsumeRemoteClose(pConn);
             
@@ -867,7 +806,7 @@ void CTCPStunThread::CloseConnection(StunConnection* pConn)
         
         Logging::LogMsg(LL_VERBOSE, "Closing socket %d\n", sock);
         
-        DetachFromEpoll(pConn->_stunsocket.GetSocketHandle());
+        _spPolling->Remove(pConn->_stunsocket.GetSocketHandle());
         pConn->_stunsocket.Close();
         
         // now figure out which hash table we were in
@@ -960,6 +899,9 @@ HRESULT CTCPServer::Initialize(const CStunServerConfig& config)
     
     ChkIfA(_threads[0] != NULL, E_UNEXPECTED); // we can't already be initialized, right?
     
+    // optional code: create an authentication provider and initialize it here (if you want authentication)
+    // set the _spAuth member to reference it
+    // Chk(CYourAuthProvider::CreateInstanceNoInit(&_spAuth));    
 
     // tsaHandler is sort of a hack for TCP.  It's really just a glorified indication to the the
     // CStunRequestHandler code to figure out if can offer a CHANGED-ADDRESS attribute.
@@ -983,7 +925,7 @@ HRESULT CTCPServer::Initialize(const CStunServerConfig& config)
         
         // todo - max connections needs to be a config param!        
         // todo - create auth
-        ChkA(_threads[0]->Init(tsaListen, tsaHandler, NULL, 1000));
+        ChkA(_threads[0]->Init(tsaListen, tsaHandler, _spAuth, config.nMaxConnections));
     }
     else
     {
@@ -999,7 +941,7 @@ HRESULT CTCPServer::Initialize(const CStunServerConfig& config)
                 
                 // todo - max connections needs to be a config param!        
                 // todo - create auth
-                Chk(_threads[threadindex]->Init(tsaListen, tsaHandler, NULL, 1000));
+                Chk(_threads[threadindex]->Init(tsaListen, tsaHandler, NULL, config.nMaxConnections));
             }
         }
     }
@@ -1016,9 +958,13 @@ HRESULT CTCPServer::Shutdown()
 {
     for (int role = (int)RolePP; role <= (int)RoleAA; role++)
     {
+        // destructor of each TCP thread will stop the thread before returning
         delete _threads[role];
         _threads[role] = NULL;
     }
+    
+    _spAuth.ReleaseAndClear();
+    
     return S_OK;
 }
 

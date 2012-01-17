@@ -83,15 +83,20 @@ HRESULT CStunClientLogic::Initialize(StunClientLogicConfig& config)
 
 
     _fInitialized = true;
-
-    if (config.timeoutSeconds == 0)
+    
+    if (_config.fTimeoutIsInstant)
     {
-        config.timeoutSeconds = 5;
+        _config.timeoutSeconds = 0;
     }
-
-    if (config.uMaxAttempts <= 0)
+    else if (_config.timeoutSeconds == 0)
     {
-        config.uMaxAttempts = 2;
+        _config.timeoutSeconds = 3; // default to waiting for 3 seconds
+    }
+    
+
+    if (_config.uMaxAttempts <= 0)
+    {
+        _config.uMaxAttempts = 2;
     }
 
     _nTestIndex = 0;
@@ -183,7 +188,7 @@ HRESULT CStunClientLogic::GetNextMessage(CRefCountedBuffer& spMsg, CSocketAddres
             break;
         }
 
-        // have we exceed the retry count
+        // have we exceeded the retry count
         if (_sendCount >= _config.uMaxAttempts)
         {
             // notify the test that it has timed out

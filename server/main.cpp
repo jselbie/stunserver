@@ -97,6 +97,7 @@ struct StartupArgs
     std::string strProtocol;
     std::string strHelp;
     std::string strVerbosity;
+    std::string strMaxConnections;
 };
 
 #define PRINTARG(member) Logging::LogMsg(LL_DEBUG, "%s = %s", #member, args.member.length() ? args.member.c_str() : "<empty>");
@@ -113,6 +114,7 @@ void DumpStartupArgs(StartupArgs& args)
     PRINTARG(strProtocol);
     PRINTARG(strHelp);
     PRINTARG(strVerbosity);
+    PRINTARG(strMaxConnections);
     Logging::LogMsg(LL_DEBUG, "--------------------------\n");
 }
 
@@ -145,7 +147,10 @@ void DumpConfig(CStunServerConfig &config)
     }
     
     Logging::LogMsg(LL_DEBUG, "Protocol = %s", config.fTCP ? "TCP" : "UDP");
-    
+    if (config.fTCP && (config.nMaxConnections>0))
+    {
+        Logging::LogMsg(LL_DEBUG, "Max TCP Connections per thread: %d", config.nMaxConnections);
+    }
 }
 
 
@@ -189,6 +194,7 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
     int nAltPort = DEFAULT_STUN_PORT + 1;
     bool fHasAtLeastTwoAdapters = false;
     CStunServerConfig config;
+    int nMaxConnections = 0;
 
     enum ServerMode
     {
@@ -272,6 +278,28 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
         
         config.fTCP = (args.strProtocol == "tcp");
     }
+    
+    
+    // ---- MAX Connections -----------------------------------------------------
+    nMaxConnections = 0;
+    if (args.strMaxConnections.length() > 0)
+    {
+        if (config.fTCP == false)
+        {
+            Logging::LogMsg(LL_ALWAYS, "Max connections parameter has no meaning in UDP mode. Did you mean to specify \"--protocol=tcp ?\"");
+        }
+        else
+        {
+            hr = StringHelper::ValidateNumberString(args.strMaxConnections.c_str(), 1, 100000, &nMaxConnections);
+            if (FAILED(hr))
+            {
+                Logging::LogMsg(LL_ALWAYS, "Max connections must be between 1-100000");
+                Chk(hr);
+            }
+        }
+        config.nMaxConnections = nMaxConnections;
+    }
+
 
     // ---- PRIMARY PORT --------------------------------------------------------
     nPrimaryPort = DEFAULT_STUN_PORT;
@@ -376,6 +404,7 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
             Logging::LogMsg(LL_ALWAYS, "Error - Primary interface and Alternate Interface appear to have the same IP address. Full mode requires two IP addresses that are unique");
             Chk(E_INVALIDARG);
         }
+        
 
         config.addrPP = addrPrimary;
         config.addrPP.SetPort(portPrimary);
@@ -392,7 +421,6 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
         config.addrAA = addrAlternate;
         config.addrAA.SetPort(portAlternate);
         config.fHasAA = true;
-        
 
     }
 
@@ -417,6 +445,7 @@ HRESULT ParseCommandLineArgs(int argc, char** argv, int startindex, StartupArgs*
     cmdline.AddOption("altport", required_argument, &pStartupArgs->strAltPort);
     cmdline.AddOption("family", required_argument, &pStartupArgs->strFamily);
     cmdline.AddOption("protocol", required_argument, &pStartupArgs->strProtocol);
+    cmdline.AddOption("maxconn", required_argument, &pStartupArgs->strMaxConnections);
     cmdline.AddOption("help", no_argument, &pStartupArgs->strHelp);
     cmdline.AddOption("verbosity", required_argument, &pStartupArgs->strVerbosity);
 

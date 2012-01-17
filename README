@@ -1,21 +1,22 @@
-StunServer version 1.0.0
-September 7, 2011
+StunServer version 1.1.0
+January 22, 2012
 ---------------------------------------------------------
+
 
 Features:
 
   Compliant with the latest RFCs including 5389, 5769, and 5780. Also includes
   backwards compatibility for RFC 3489.
 
-  IPv4 and IPv6 support
+  Supports both UDP and TCP on both IPv4 and IPv6.
 
-  Client test app provided
+  Client test app provided.
 
   Stun server can operate in "full" mode as well as "basic" mode. Basic mode
   configures the server to listen on one port and respond to STUN binding
   requests. Full mode configures the service to listen on two different IP
   address interfaces (if available) and provide NAT behavior and filtering
-  detection support for clients
+  detection support for clients.
 
   Open source Apache license. See LICENSE file fore more details.
 ---------------------------------------------------------
@@ -23,8 +24,7 @@ Features:
 
 Known issues:
 
-  UDP only. Command line options for working in TCP or TLS modes have yet to
-  be implemented.
+  TLS mode has yet to be implemented.
 
   Server does not honor the stun padding attribute. If someone really wants
   this support, let me know and I will consider adding it.
@@ -38,7 +38,7 @@ Known issues:
   hooks are provided for implementors to write their own code to validate a
   username, fetch a password, and allow/deny a request. Details of writing
   your own authentication provider code are described in the file
-  "server/sampleauthprovider.h"
+  "server/sampleauthprovider.h".
 
   Dependency checking is not implemented in the Makefile. So if you need to
   recompile, I recommend "make clean" from the root to preceed any subsequent
@@ -67,15 +67,14 @@ Testing:
 
 Prerequisites before compiling and running.
 
+  perl. Just have any old version installed. It is needed for one particular
+  build script.
+
   Boost header files. (Actual boost runtime not required) www.boost.org (sudo
   yum install boost-devel)
 
   OpenSSL development files and runtime. www.boost.org (sudo yum install
   openssl-devel)
-
-  /usr/bin/xxd (this is a tool for converting the help text into resources. It
-  is usually universally installed. If not, then "sudo yum install
-  vim-common")
 
   pthreads header and libs (I haven't seen a distribution where this wasn't
   already installed)
@@ -113,17 +112,18 @@ Firewall
 
 Feature roadmap (the features I want to implement in a subsequent release)
 
-  TCP and TLS support
+  Host a full server across two separate machines (such that two ip addresses
+  on a single machine will not be required for full mode).
+
+  Cleanup Makefile and add "configure" and autotools support
 
   Finish Windows port and able to run as a Windows service
 
   Scale across more than one CPU (for multi-core and multi-proc machines). The
   threading code has already been written, just needs some finish work.
 
-  Host a full server across two separate machines (such that two ip addresses
-  on a single machine will not be required for full mode).
+  TLS support
 
-  Cleanup Makefile and add "configure" and autotools support
 ---------------------------------------------------------
 
 

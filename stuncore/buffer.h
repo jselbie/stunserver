@@ -51,7 +51,7 @@ public:
     HRESULT InitWithAllocAndCopy(uint8_t* pByteArray, size_t nByteArraySize);
     HRESULT InitNoAlloc(uint8_t* pByteArray, size_t nByteArraySize);
 
-    size_t GetSize() {return _size;}
+    inline size_t GetSize() {return _size;}
     inline size_t GetAllocatedSize() {return _allocatedSize;}
 
     HRESULT SetSize(size_t size);

@@ -19,6 +19,11 @@
 #define STUNSERVER_COMMON_COMMONINCLUDES_H
 
 
+
+#if __linux || __linux__ || __gnu_linux__ || linux
+#define IS_LINUX
+#endif
+
 // standard system includes
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -48,9 +53,13 @@
 #include <list>
 #include <string>
 
-#ifndef _bsd
+
+#ifdef IS_LINUX
+#define HAS_EPOLL
 #include <sys/epoll.h>
 #endif
+
+#include <poll.h>
 
 
 #include <pthread.h>

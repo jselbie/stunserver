@@ -124,7 +124,7 @@ as appropriate:
                
 
     To have the server host an instance of an IStunAuth implementation, modify
-    CStunServer::Initialize to create an instance of your class and initialize
+    CStunServer::Initialize and CTCPServer::Initialize to create an instance of your class and initialize
     _spAuth as appropriate.
                
 #endif
@@ -138,6 +138,7 @@ class CShortTermAuth :
 {
 public:
     virtual HRESULT DoAuthCheck(AuthAttributes* pAuthAttributes, AuthResponse* pResponse);
+    ADDREF_AND_RELEASE_IMPL();
 };
 
 
@@ -154,6 +155,7 @@ private:
 public:
     
     virtual HRESULT DoAuthCheck(AuthAttributes* pAuthAttributes, AuthResponse* pResponse);
+    ADDREF_AND_RELEASE_IMPL();
 };
 
 

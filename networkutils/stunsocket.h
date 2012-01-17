@@ -30,7 +30,7 @@ private:
     CStunSocket(const CStunSocket&) {;}
     void operator=(const CStunSocket&) {;}
     
-    HRESULT InitCommon(int socktype, const CSocketAddress& addrlocal, SocketRole role);
+    HRESULT InitCommon(int socktype, const CSocketAddress& addrlocal, SocketRole role, bool fSetReuseFlag);
     
     void Reset();
     
@@ -59,7 +59,7 @@ public:
     void UpdateAddresses();
     
     HRESULT UDPInit(const CSocketAddress& local, SocketRole role);
-    HRESULT TCPInit(const CSocketAddress& local, SocketRole role);
+    HRESULT TCPInit(const CSocketAddress& local, SocketRole role, bool fSetReuseFlag);
 };
 
 typedef boost::shared_ptr<CStunSocket> CRefCountedStunSocket;
