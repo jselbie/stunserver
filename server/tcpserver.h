@@ -31,7 +31,7 @@
 class CTCPStunThread
 {
     static const int c_sweepTimeoutSeconds = 60;
-    static const int c_sweepTimeoutMilliseconds = c_sweepTimeoutSeconds * 1000;
+    
     
     int _pipe[2];
     HRESULT CreatePipes();
@@ -98,7 +98,7 @@ class CTCPStunThread
     void CloseAllConnections(StunThreadConnectionMap* pConnMap);
     void SweepDeadConnections();
     void ThreadCleanup();
-    bool IsTimeoutNeeded();
+    int GetTimeoutSeconds();
     bool IsConnectionCountAtMax();
     void CloseConnection(StunConnection* pConn);
     

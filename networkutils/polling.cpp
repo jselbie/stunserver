@@ -1,12 +1,26 @@
+/*
+   Copyright 2011 John Selbie
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 #include "commonincludes.h"
 #include "polling.h"
 #include "fasthash.h"
 
 #ifdef __GNUC__
-    #ifdef HAS_EPOLL
-    #pragma message "polling.cpp: EPOLL is available"
-    #else
-    #pragma message "polling.cpp: no kernel polling api available!"
+    #ifndef HAS_EPOLL
+    #pragma message "polling.cpp: WARNING - EPOLL IS NOT AVAILABLE"
     #endif
 #endif
 
@@ -28,7 +42,7 @@ private:
     uint32_t FromNativeFlags(uint32_t eventflags);
     
 public:
-    virtual HRESULT Initialize();
+    virtual HRESULT Initialize(size_t maxSockets);
     virtual HRESULT Close();
     virtual HRESULT Add(int fd, uint32_t eventflags);
     virtual HRESULT Remove(int fd);
@@ -86,13 +100,13 @@ uint32_t CEpoll::FromNativeFlags(uint32_t eventflags)
 }
 
 
-HRESULT CEpoll::Initialize()
+HRESULT CEpoll::Initialize(size_t maxSockets)
 {
     ASSERT(_epollfd == -1);
     
     Close();
     
-    _epollfd = epoll_create(1000);
+    _epollfd = epoll_create(maxSockets); // maxSockets is likely ignored by epoll_create
     if (_epollfd == -1)
     {
         return ERRNOHR;
@@ -193,7 +207,7 @@ private:
     uint32_t _unreadcount;
     bool _fInitialized;
     
-    FastHash<int, size_t, 100, 101> _hashtable; // maps socket to position in fds
+    FastHashDynamic<int, size_t> _hashtable; // maps socket to position in fds
     
     void Reindex();
     
@@ -203,7 +217,7 @@ private:
     bool FindNextEvent(PollEvent* pEvent);
     
 public:
-    virtual HRESULT Initialize();
+    virtual HRESULT Initialize(size_t maxSockets);
     virtual HRESULT Close();
     virtual HRESULT Add(int fd, uint32_t eventflags);
     virtual HRESULT Remove(int fd);
@@ -259,16 +273,20 @@ uint32_t CPoll::FromNativeFlags(uint32_t eventflags)
 }
 
 
-HRESULT CPoll::Initialize()
+HRESULT CPoll::Initialize(size_t maxSockets)
 {
     pollfd pfd = {};
     pfd.fd = -1;
     
-    
-    _fds.reserve(1000);
+    _fds.reserve(maxSockets);
     _rotation = 0;
     _unreadcount = 0;
+    
+    _hashtable.InitTable(maxSockets, 0);
+    
     _fInitialized = true;
+    
+    
 
     return S_OK;
 }
@@ -448,7 +466,7 @@ bool CPoll::FindNextEvent(PollEvent* pEvent)
 
 
 
-HRESULT CreatePollingInstance(uint32_t type, IPolling** ppPolling)
+HRESULT CreatePollingInstance(uint32_t type, size_t maxSockets, IPolling** ppPolling)
 {
     HRESULT hr = S_OK;
     
@@ -472,12 +490,12 @@ HRESULT CreatePollingInstance(uint32_t type, IPolling** ppPolling)
 #ifndef HAS_EPOLL
         ChkA(E_FAIL);
 #else
-        ChkA(CEpoll::CreateInstance(ppPolling));
+        ChkA(CEpoll::CreateInstance(maxSockets, ppPolling));
 #endif
     }
     else if (type == IPOLLING_TYPE_POLL)
     {
-        ChkA(CPoll::CreateInstance(ppPolling));
+        ChkA(CPoll::CreateInstance(maxSockets, ppPolling));
     }
     else
     {

@@ -1,9 +1,18 @@
-/* 
- * File:   polling.h
- * Author: jselbie
- *
- * Created on January 12, 2012, 5:58 PM
- */
+/*
+   Copyright 2011 John Selbie
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 
 #ifndef POLLING_H
 #define	POLLING_H
@@ -29,7 +38,7 @@ const uint32_t IPOLLING_ERROR =        0x01 << 6;
 class IPolling : public IRefCounted
 {
 public:
-    virtual HRESULT Initialize() = 0;
+    virtual HRESULT Initialize(size_t maxSockets) = 0;
     virtual HRESULT Close() = 0;
     virtual HRESULT Add(int fd, uint32_t eventflags) = 0;
     virtual HRESULT Remove(int fd) = 0;
@@ -42,7 +51,7 @@ const uint32_t IPOLLING_TYPE_BEST  = 0x01 << 0;
 const uint32_t IPOLLING_TYPE_EPOLL = 0x01 << 1;
 const uint32_t IPOLLING_TYPE_POLL  = 0x01 << 2;
 
-HRESULT CreatePollingInstance(uint32_t type, IPolling** ppPolling);
+HRESULT CreatePollingInstance(uint32_t type, size_t maxSockets, IPolling** ppPolling);
 
 
 

@@ -28,57 +28,6 @@
 
 
 
-#define IS_DIVISIBLE_BY(x, y)  ((x % y)==0)
-
-static bool IsPrime(unsigned int val)
-{
-    unsigned int stop;
-    
-    if (val <= 1)
-    {
-        return false;
-    }
-    
-    if ((val == 2) || (val == 3) || (val == 5))
-    {
-        return false;
-    }
-    
-    if (IS_DIVISIBLE_BY(val, 2))
-    {
-        return false;
-    }
-    
-    stop = (unsigned int)((int)(ceil(sqrt(val))));
-    
-    for (unsigned int i = 3; i <= stop; i+=2)
-    {
-        if (IS_DIVISIBLE_BY(val, i))
-        {
-            return false;        
-        }
-    }
-    
-    return true;
-}
-
-static size_t GetHashTableWidth(unsigned int maxConnections)
-{
-    size_t width;
-    
-    if (maxConnections >= 10007)
-    {
-        return 10007;
-    }
-    
-    width = maxConnections;
-    
-    while (IsPrime(width) == false)
-    {
-        width++;
-    }
-    return width;
-}
 
 // client sockets are edge triggered
 const uint32_t EPOLL_CLIENT_READ_EVENT_SET = IPOLLING_EDGETRIGGER | IPOLLING_READ | IPOLLING_RDHUP;
@@ -290,13 +239,14 @@ HRESULT CTCPStunThread::Init(const TransportAddressSet& tsaListen, const Transpo
 {
     HRESULT hr = S_OK;
     int ret;
-    size_t hashTableWidth;
     int countListen = 0;
     int countHandler = 0;
     
     // we shouldn't be initialized at this point
     ChkIfA(_pipe[0] != -1, E_UNEXPECTED);
     ChkIfA(_fThreadIsValid, E_UNEXPECTED);
+    
+    _maxConnections = (maxConnections > 0) ? maxConnections : c_MaxNumberOfConnectionsDefault;    
 
     // Max sure we didn't accidently pass in anything crazy
     ChkIfA(_maxConnections >= 100000, E_INVALIDARG);
@@ -312,7 +262,6 @@ HRESULT CTCPStunThread::Init(const TransportAddressSet& tsaListen, const Transpo
     
     _tsaListen = tsaListen;
     _tsa = tsaHandler;
-
     
     _spAuth.Attach(pAuth);
 
@@ -320,7 +269,7 @@ HRESULT CTCPStunThread::Init(const TransportAddressSet& tsaListen, const Transpo
     
     ChkA(CreatePipes());
     
-    ChkA(CreatePollingInstance(IPOLLING_TYPE_BEST, _spPolling.GetPointerPointer()));
+    ChkA(CreatePollingInstance(IPOLLING_TYPE_BEST, (size_t)_maxConnections, _spPolling.GetPointerPointer()));
     
     // add listen socket to epoll
     ASSERT(_fListenSocketsOnEpoll == false);
@@ -330,15 +279,13 @@ HRESULT CTCPStunThread::Init(const TransportAddressSet& tsaListen, const Transpo
     // add read end of pipe to epoll so we can get notified of when a signal to exit has occurred
     ChkA(_spPolling->Add(_pipe[0], EPOLL_PIPE_EVENT_SET));
     
-    _maxConnections = (maxConnections > 0) ? maxConnections : c_MaxNumberOfConnectionsDefault;
-    
+       
     // todo - get "max connections" from an init param
     
-    hashTableWidth = GetHashTableWidth(_maxConnections);
-    ret = _hashConnections1.InitTable(_maxConnections, hashTableWidth);
+    ret = _hashConnections1.InitTable(_maxConnections, 0);
     ChkIfA(ret == -1, E_FAIL);
     
-    ret = _hashConnections2.InitTable(_maxConnections, hashTableWidth);
+    ret = _hashConnections2.InitTable(_maxConnections, 0);
     ChkIfA(ret == -1, E_FAIL);
     
     _pNewConnList = &_hashConnections1;
@@ -404,9 +351,10 @@ void* CTCPStunThread::ThreadFunction(void* pThis)
     return NULL;
 }
 
-bool CTCPStunThread::IsTimeoutNeeded()
+int CTCPStunThread::GetTimeoutSeconds()
 {
-    return ((_pNewConnList->Size() > 0) || (_pOldConnList->Size() > 0));
+    size_t connCount = _pNewConnList->Size() + _pOldConnList->Size();
+    return (connCount == 0) ? -1 : (int)c_sweepTimeoutSeconds;
 }
 
 bool CTCPStunThread::IsConnectionCountAtMax()
@@ -430,13 +378,8 @@ void CTCPStunThread::Run()
     {
         PollEvent pollevent = {};
         // wait for a notification
-        int timeout = -1; // wait forever
+        int timeout = GetTimeoutSeconds();
         CStunSocket* pListenSocket = NULL;
-
-        if (IsTimeoutNeeded())
-        {
-            timeout = CTCPStunThread::c_sweepTimeoutMilliseconds;
-        }
         
         // turn off epoll eventing from the listen sockets if we are at max connections
         // otherwise, make sure it is enabled.
@@ -842,9 +785,9 @@ void CTCPStunThread::SweepDeadConnections()
 {
     time_t timeCurrent = time(NULL);
     StunThreadConnectionMap* pSwap = NULL;
-
-
-    // todo - make the timeout scale to the number of active connections
+    
+    // should we try to scale the timeout based on the active number of connections?
+    
     if ((timeCurrent - _timeLastSweep) >= c_sweepTimeoutSeconds)
     {
         if  (_pOldConnList->Size())

@@ -56,8 +56,8 @@ HRESULT CTestBuilder::Test1()
     ChkA(builder.AddStringAttribute(STUN_ATTRIBUTE_SOFTWARE, "FOOBAR"));
     ChkA(builder.AddMappedAddress(addr));
     ChkA(builder.AddXorMappedAddress(addr));
-    ChkA(builder.AddOtherAddress(addrOther, false));
-    ChkA(builder.AddResponseOriginAddress(addrOrigin, false));
+    ChkA(builder.AddOtherAddress(addrOther));
+    ChkA(builder.AddResponseOriginAddress(addrOrigin));
     ChkA(builder.AddFingerprintAttribute());
     ChkA(builder.GetResult(&spBuffer));
 

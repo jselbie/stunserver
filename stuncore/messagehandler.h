@@ -97,6 +97,7 @@ private:
     
     bool _fRequestHasResponsePort;
     StunTransactionId _transid;
+    bool _fLegacyMode;
     
     bool HasAddress(SocketRole role);
     bool IsIPAddressZeroOrInvalid(SocketRole role);

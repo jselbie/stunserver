@@ -415,6 +415,7 @@ HRESULT CTestClientLogic::Test1()
     config.fFilteringTest = false;
     config.timeoutSeconds = 10;
     config.uMaxAttempts = 2;
+    config.fTimeoutIsInstant = false;
     
     ChkA(clientlogic.Initialize(config));
     

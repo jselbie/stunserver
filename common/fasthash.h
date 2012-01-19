@@ -26,6 +26,9 @@
 // Use FastHash when the maximum number of elements in the hash table is known at compile time
 
 
+size_t FastHash_GetHashTableWidth(unsigned int maxConnections);
+
+
 inline size_t FastHash_Hash(void* ptr)
 {
     return (size_t)ptr;
@@ -459,9 +462,15 @@ public:
         typedef FastHashBase<K,V> itemnode;
         typedef FastHashBase<K,V>* itemnodeptr;
         
-        if ((fsize <= 0) || (tsize <= 0))
+        
+        if (fsize <= 0)
         {
             return -1;
+        }
+        
+        if (tsize == 0)
+        {
+            tsize = FastHash_GetHashTableWidth(fsize);
         }
         
         ResetTable();

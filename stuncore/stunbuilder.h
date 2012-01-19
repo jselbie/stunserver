@@ -33,13 +33,17 @@ public:
 private:
     CDataStream _stream;
     StunTransactionId _transactionid;
+    bool _fLegacyMode;
 
     HRESULT AddMappedAddressImpl(uint16_t attribute, const CSocketAddress& addr);
     
     HRESULT AddMessageIntegrityImpl(uint8_t* key, size_t keysize);
+    
 
 public:
     CStunMessageBuilder();
+    
+    void SetLegacyMode(bool fLegacyMode);
 
     HRESULT AddHeader(StunMessageType msgType, StunMessageClass msgClass);
     HRESULT AddBindingRequestHeader();
@@ -54,8 +58,8 @@ public:
 
     HRESULT AddXorMappedAddress(const CSocketAddress& addr);
     HRESULT AddMappedAddress(const CSocketAddress& addr);
-    HRESULT AddResponseOriginAddress(const CSocketAddress& other, bool fLegacy);
-    HRESULT AddOtherAddress(const CSocketAddress& other, bool fLegacy);
+    HRESULT AddResponseOriginAddress(const CSocketAddress& other);
+    HRESULT AddOtherAddress(const CSocketAddress& other);
 
     HRESULT AddResponsePort(uint16_t port);
     HRESULT AddPaddingAttribute(uint16_t paddingSize);

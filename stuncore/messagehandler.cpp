@@ -28,8 +28,9 @@ _pMsgIn(NULL),
 _pMsgOut(NULL),
 _integrity(), // zero-init
 _error(), // zero-init
-_fRequestHasResponsePort(), // zero-init,
-_transid() // zero-init
+_fRequestHasResponsePort(false),
+_transid(), // zero-init
+_fLegacyMode(false)
 {
     
 }
@@ -87,12 +88,13 @@ HRESULT CStunRequestHandler::ProcessRequestImpl()
     // ignore anything that is not a request (with no response)
     ChkIf(reader.GetMessageClass() != StunMsgClassRequest, E_FAIL);
     
-    // pre-prep the error message in case we wind up needing to send it
+    // pre-prep the error message in case we wind up needing senderrorto send it
     _error.msgtype = reader.GetMessageType();
     _error.msgclass = StunMsgClassFailureResponse;
     
     
     reader.GetTransactionId(&_transid);
+    _fLegacyMode = reader.IsMessageLegacyFormat();
     
     // we always try to honor the response port
     reader.GetResponsePort(&responseport);
@@ -163,6 +165,9 @@ void CStunRequestHandler::BuildErrorResponse()
     _pMsgOut->spBufferOut->SetSize(0);
     builder.GetStream().Attach(_pMsgOut->spBufferOut, true);
     
+    // set RFC 3478 mode if the request appears to be that way
+    builder.SetLegacyMode(_fLegacyMode);
+    
     builder.AddHeader((StunMessageType)_error.msgtype, _error.msgclass);
     builder.AddTransactionId(_transid);
     builder.AddErrorCode(_error.errorcode, "FAILED");
@@ -208,13 +213,13 @@ HRESULT CStunRequestHandler::ProcessBindingRequest()
     CSocketAddress addrOther;
     CStunMessageBuilder builder;
     uint16_t paddingSize = 0;
-    bool fLegacyFormat = false; // set to true if the client appears to be rfc3489 based instead of based on rfc 5789
 
     
     _pMsgOut->spBufferOut->SetSize(0);
     builder.GetStream().Attach(_pMsgOut->spBufferOut, true);
-    
-    fLegacyFormat = reader.IsMessageLegacyFormat();
+
+    // if the client request smells like RFC 3478, then send the resposne back in the same way
+    builder.SetLegacyMode(_fLegacyMode);
 
     // check for an alternate response port
     // check for padding attribute (todo - figure out how to inject padding into the response)
@@ -323,12 +328,12 @@ HRESULT CStunRequestHandler::ProcessBindingRequest()
 
     if (fSendOriginAddress)
     {
-        builder.AddResponseOriginAddress(addrOrigin, fLegacyFormat); // pass true to send back SOURCE_ADDRESS, otherwise, pass false to send back RESPONSE-ORIGIN
+        builder.AddResponseOriginAddress(addrOrigin); // pass true to send back SOURCE_ADDRESS, otherwise, pass false to send back RESPONSE-ORIGIN
     }
 
     if (fSendOtherAddress)
     {
-        builder.AddOtherAddress(addrOther, fLegacyFormat); // pass true to send back CHANGED-ADDRESS, otherwise, pass false to send back OTHER-ADDRESS
+        builder.AddOtherAddress(addrOther); // pass true to send back CHANGED-ADDRESS, otherwise, pass false to send back OTHER-ADDRESS
     }
 
     // even if this is a legacy client request, we can send back XOR-MAPPED-ADDRESS since it's an optional-understanding attribute

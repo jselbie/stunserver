@@ -32,9 +32,15 @@ static int g_sequence_number = 0xaaaaaaaa;
 
 
 CStunMessageBuilder::CStunMessageBuilder() :
-_transactionid()
+_transactionid(),
+_fLegacyMode(false)
 {
     ;
+}
+
+void CStunMessageBuilder::SetLegacyMode(bool fLegacyMode)
+{
+    _fLegacyMode = fLegacyMode;
 }
 
 
@@ -151,17 +157,27 @@ Cleanup:
 HRESULT CStunMessageBuilder::AddAttribute(uint16_t attribType, const void* data, uint16_t size)
 {
     uint8_t padBytes[4] = {0};
-    size_t padding;
+    size_t padding = 0;
     HRESULT hr = S_OK;
+    uint16_t sizeheader = size;
 
     if (data == NULL)
     {
         size = 0;
     }
-
+    
+    // attributes always start on a 4-byte boundary
+    padding = (size % 4) ? (4 - (size % 4)) : 0;
+    
+    if (_fLegacyMode)
+    {
+        // in legacy mode (RFC 3489), the header size of the attribute includes the padding
+        // in RFC 5389, the attribute header is the exact size of the data, and extra padding bytes are implicitly assumed
+        sizeheader += padding;
+    }
+    
     // I suppose you can have zero length attributes as an indicator of something
-    Chk(AddAttributeHeader(attribType, size));
-
+    Chk(AddAttributeHeader(attribType, sizeheader));
 
     if (size > 0)
     {
@@ -169,9 +185,8 @@ HRESULT CStunMessageBuilder::AddAttribute(uint16_t attribType, const void* data,
     }
 
     // pad with zeros to get the 4-byte alignment
-    if (size%4)
+    if (padding > 0)
     {
-        padding = 4 - size%4;
         Chk(_stream.Write(padBytes, padding));
     }
 
@@ -196,8 +211,10 @@ Cleanup:
 HRESULT CStunMessageBuilder::AddErrorCode(uint16_t errorNumber, const char* pszReason)
 {
     HRESULT hr = S_OK;
+    uint8_t padBytes[4] = {0};
     size_t strsize = (pszReason==NULL) ? 0 : strlen(pszReason);
     size_t size = strsize + 4;
+    size_t sizeheader = size;
     size_t padding = 0;
     uint8_t cl = 0;
     uint8_t ernum = 0;
@@ -205,16 +222,22 @@ HRESULT CStunMessageBuilder::AddErrorCode(uint16_t errorNumber, const char* pszR
     ChkIf(strsize >= 128, E_INVALIDARG);
     ChkIf(errorNumber < 300, E_INVALIDARG);
     ChkIf(errorNumber > 600, E_INVALIDARG);
+    
+    padding = (size%4) ? (4-size%4) : 0;
 
     // fix for RFC 3489 clients - explicitly do the 4-byte padding alignment on the string with spaces instead of
     // padding the message with zeros. Adjust the length field to always be a multiple of 4.
-    if (size % 4)
+    if ((size % 4) && _fLegacyMode)
     {
         padding = 4 - (size % 4);
-        size = size + padding;
+    }
+    
+    if (_fLegacyMode)
+    {
+        sizeheader += padding;
     }
 
-    Chk(AddAttributeHeader(STUN_ATTRIBUTE_ERRORCODE, size));
+    Chk(AddAttributeHeader(STUN_ATTRIBUTE_ERRORCODE, sizeheader));
 
     Chk(_stream.WriteInt16(0));
 
@@ -227,16 +250,14 @@ HRESULT CStunMessageBuilder::AddErrorCode(uint16_t errorNumber, const char* pszR
     if (strsize > 0)
     {
         _stream.Write(pszReason, strsize);
-
-        if (padding > 0)
-        {
-            const uint32_t spaces = 0x20202020; // four spaces
-            Chk(_stream.Write(&spaces, padding));
-        }
+    }
+    
+    if (padding > 0)
+    {
+        Chk(_stream.Write(padBytes, padding));
     }
 
 Cleanup:
-
     return hr;
 }
 
@@ -255,7 +276,7 @@ HRESULT CStunMessageBuilder::AddUnknownAttributes(const uint16_t* arr, size_t co
     // that would make the length of the attribute not a multiple of 4, then repeat one
     // attribute.
     
-    fPad = !!(count % 2);
+    fPad = _fLegacyMode && (!!(count % 2));
     
     if (fPad)
     {
@@ -291,16 +312,16 @@ HRESULT CStunMessageBuilder::AddMappedAddress(const CSocketAddress& addr)
     return AddMappedAddressImpl(STUN_ATTRIBUTE_MAPPEDADDRESS, addr);
 }
 
-HRESULT CStunMessageBuilder::AddResponseOriginAddress(const CSocketAddress& addr, bool fLegacy)
+HRESULT CStunMessageBuilder::AddResponseOriginAddress(const CSocketAddress& addr)
 {
-    uint16_t attribid = fLegacy ? STUN_ATTRIBUTE_SOURCEADDRESS : STUN_ATTRIBUTE_RESPONSE_ORIGIN;
+    uint16_t attribid = _fLegacyMode ? STUN_ATTRIBUTE_SOURCEADDRESS : STUN_ATTRIBUTE_RESPONSE_ORIGIN;
     
     return AddMappedAddressImpl(attribid, addr);
 }
 
-HRESULT CStunMessageBuilder::AddOtherAddress(const CSocketAddress& addr, bool fLegacy)
+HRESULT CStunMessageBuilder::AddOtherAddress(const CSocketAddress& addr)
 {
-    uint16_t attribid = fLegacy ? STUN_ATTRIBUTE_CHANGEDADDRESS : STUN_ATTRIBUTE_OTHER_ADDRESS;
+    uint16_t attribid = _fLegacyMode ? STUN_ATTRIBUTE_CHANGEDADDRESS : STUN_ATTRIBUTE_OTHER_ADDRESS;
     return AddMappedAddressImpl(attribid, addr);
 }
 
