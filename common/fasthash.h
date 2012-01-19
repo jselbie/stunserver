@@ -26,7 +26,7 @@
 // Use FastHash when the maximum number of elements in the hash table is known at compile time
 
 
-size_t FastHash_GetHashTableWidth(unsigned int maxConnections);
+size_t FastHash_GetHashTableWidth(unsigned int maxItems);
 
 
 inline size_t FastHash_Hash(void* ptr)
