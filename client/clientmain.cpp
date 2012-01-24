@@ -28,9 +28,9 @@
 #include "oshelper.h"
 #include "prettyprint.h"
 
-// unusual to include usage.cpp and usagelite.cpp here, but these are auto-generated resource file
-#include "usage.txtcode"
-#include "usagelite.txtcode"
+// These files are in ../resources
+#include "stunclient.txtcode"
+#include "stunclient_lite.txtcode"
 
 
 struct ClientCmdLineArgs
@@ -74,7 +74,7 @@ void DumpConfig(StunClientLogicConfig& config, ClientSocketConfig& socketConfig)
 void PrintUsage(bool fSummaryUsage)
 {
     size_t width = GetConsoleWidth();
-    const char* psz = fSummaryUsage ? usagelite_text : usage_text;
+    const char* psz = fSummaryUsage ? stunclient_lite_text : stunclient_text;
 
     // save some margin space
     if (width > 2)

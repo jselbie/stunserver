@@ -178,5 +178,6 @@ stunserver --mode full --primaryinterface eth0 --altinterface eth1
     enumerate available interface names.
 
 # AUTHOR
-john selbie (jselbie@gmail.com)
+john selbie (john@selbie.com)
+
 

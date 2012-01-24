@@ -12,12 +12,17 @@ include ../common.inc
 	pandoc -s -w man -o $@ $^
 
 
-all: stunserver.txtcode README stunclient.txtcode stunserver.1 stunclient.1
+all:
+	@echo "specify one of the following make options: textres manpages README or clean"
 
-README: readme.src
+textres: stunserver.txtcode stunserver_lite.txtcode stunclient.txtcode stunclient_lite.txtcode
+
+manpages: stunserver.1 stunclient.1
+
+README: 
 	../stuntestcode --pp < readme.src > README
 
 clean:
-	rm -f *.txtcode *.txt README *.1
+	rm -f *.txtcode README *.1
 
 

@@ -1,0 +1,135 @@
+StunServer version 1.1.0
+January 22, 2012
+---------------------------------------------------------
+
+
+Features:
+
+  Compliant with the latest RFCs including 5389, 5769, and 5780. Also includes
+  backwards compatibility for RFC 3489.
+
+  Supports both UDP and TCP on both IPv4 and IPv6.
+
+  Client test app provided.
+
+  Stun server can operate in "full" mode as well as "basic" mode. Basic mode
+  configures the server to listen on one port and respond to STUN binding
+  requests. Full mode configures the service to listen on two different IP
+  address interfaces (if available) and provide NAT behavior and filtering
+  detection support for clients.
+
+  Open source Apache license. See LICENSE file fore more details.
+---------------------------------------------------------
+
+
+Known issues:
+
+  TLS mode has yet to be implemented.
+
+  Server does not honor the stun padding attribute. If someone really wants
+  this support, let me know and I will consider adding it.
+
+  By default, the stun server operates in an open mode without performing
+  authentication. All the code for authentication, challenge-response, message
+  hashing, and message integrity attributes are fully coded. HMAC/SHA1/MD5
+  hashing code for generating and validating the message integrity attribute
+  has been implemented and tested. However, the code for validating a username
+  or looking up a password is outside the scope of this release. Instead,
+  hooks are provided for implementors to write their own code to validate a
+  username, fetch a password, and allow/deny a request. Details of writing
+  your own authentication provider code are described in the file
+  "server/sampleauthprovider.h".
+
+  Dependency checking is not implemented in the Makefile. So if you need to
+  recompile, I recommend "make clean" from the root to preceed any subsequent
+  "make" call.
+
+  If you run an instance of stunserver locally, you may observe that
+  "stunclient localhost" may not successfully work. This is because the server
+  is not listening on the loopback adapter when running in full mode. The
+  workaround is to specify the actual IP address that the server is listening
+  on. Type "ifconfig" to discover your IP address (e.g. 10.11.12.13) followed
+  by "stunclient 10.11.12.13"
+---------------------------------------------------------
+
+
+Testing:
+
+  Fedora 15 with gcc/g++ 4.6.0
+  Ubuntu 11 with gcc/g++ 4.5.2
+  Amazon AWS with gcc/g++ 4.4
+  MacOS Snow Leopard (will not compile on earlier versions without updating to
+  a newer version of gcc/g++)
+
+  Parsing code has been fuzz tested with zzuf. http://caca.zoy.org/wiki/zzuf
+---------------------------------------------------------
+
+
+Prerequisites before compiling and running.
+
+  perl. Just have any old version installed. It is needed for one particular
+  build script.
+
+  Boost header files. (Actual boost runtime not required) www.boost.org (sudo
+  yum install boost-devel)
+
+  OpenSSL development files and runtime. www.boost.org (sudo yum install
+  openssl-devel)
+
+  pthreads header and libs (I haven't seen a distribution where this wasn't
+  already installed)
+---------------------------------------------------------
+
+
+Compiling and running
+
+  Got Boost and OpenSSL taken care of as described above? Good. Just type
+  "make". There will be three resulting binaries in the root of the source
+  code package produced.
+
+  stuntestcode - This is the unit test code. I highly recommend you run this
+  program first. When run, you'll see a series of lines being printed in
+  regards to different code paths being tested. If you see any line that ends
+  in "FAIL", we likely have a bug. Please contact me immediately if you see
+  this.
+
+  stunserver - this is the server binary. Run "./stunserver --help" for
+  details on running this program. Running this program without any command
+  line arguments defaults to listening on port 3478 on all adapters.
+
+  stunclient - this is the client test binary. Run "./stunclient --help" for
+  details on running this program. Example: "./stunclient stun.selbie.com"
+---------------------------------------------------------
+
+
+Firewall
+
+  Don't forget to configure your firewall to allow traffic for the local ports
+  the stunserver will be listening on!
+
+---------------------------------------------------------
+
+
+Feature roadmap (the features I want to implement in a subsequent release)
+
+  Host a full server across two separate machines (such that two ip addresses
+  on a single machine will not be required for full mode).
+
+  Cleanup Makefile and add "configure" and autotools support
+
+  Finish Windows port and able to run as a Windows service
+
+  Scale across more than one CPU (for multi-core and multi-proc machines). The
+  threading code has already been written, just needs some finish work.
+
+  TLS support
+
+---------------------------------------------------------
+
+
+Contact the author
+
+  John Selbie
+  john@selbie.com
+
+

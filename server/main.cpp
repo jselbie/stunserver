@@ -28,15 +28,15 @@
 #include "stringhelper.h"
 
 
-// unusual to include usage.cpp and usagelite.cpp here, but these are auto-generated resource file
-#include "usage.txtcode"
-#include "usagelite.txtcode"
+// these are auto-generated files made from markdown sources.  See ../resources
+#include "stunserver.txtcode"
+#include "stunserver_lite.txtcode"
 
 
 void PrintUsage(bool fSummaryUsage)
 {
     size_t width = GetConsoleWidth();
-    const char* psz = fSummaryUsage ? usagelite_text : usage_text;
+    const char* psz = fSummaryUsage ? stunserver_lite_text : stunserver_text;
 
     // save some margin space
     if (width > 2)

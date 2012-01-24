@@ -79,6 +79,7 @@ ____
 **--protocol** PROTO
 
 PROTO is either "udp" or "tcp". "udp" is the default if this parameter is not specified
+
 ____
 
 **--verbosity** LOGLEVEL
