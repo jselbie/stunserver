@@ -213,6 +213,7 @@ HRESULT CStunRequestHandler::ProcessBindingRequest()
     CSocketAddress addrOther;
     CStunMessageBuilder builder;
     uint16_t paddingSize = 0;
+    HRESULT hrResult;
 
     
     _pMsgOut->spBufferOut->SetSize(0);
@@ -243,7 +244,10 @@ HRESULT CStunRequestHandler::ProcessBindingRequest()
     }
     
     // handle change request logic and figure out what "other-address" attribute is going to be
-    if (SUCCEEDED(reader.GetChangeRequest(&changerequest)))
+    // Some clients (like jstun) will send a change-request attribute with neither the IP or PORT flag set
+    // So ignore this block of code in that case (because the fConnectionOriented check below could fail)
+    hrResult = reader.GetChangeRequest(&changerequest);
+    if (SUCCEEDED(hrResult) && (changerequest.fChangeIP || changerequest.fChangePort))
     {
         if (changerequest.fChangeIP)
         {
