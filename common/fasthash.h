@@ -221,6 +221,7 @@ public:
         _lookuptable = table;
         _indexlist = indexlist;
         _fIndexValid = (_indexlist != NULL);
+        _indexStart = 0;
         
         Reset();
         
@@ -248,6 +249,7 @@ public:
         _size = 0;
         
         _fIndexValid = (_indexlist != NULL); // index is valid when we are empty
+        _indexStart = 0;
     }
     
     bool IsValid()

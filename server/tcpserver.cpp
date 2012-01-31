@@ -268,8 +268,10 @@ HRESULT CTCPStunThread::Init(const TransportAddressSet& tsaListen, const Transpo
     ChkA(CreateListenSockets());
     
     ChkA(CreatePipes());
-    
-    ChkA(CreatePollingInstance(IPOLLING_TYPE_BEST, (size_t)_maxConnections, _spPolling.GetPointerPointer()));
+
+    // +5 for listening sockets and pipe
+    //ChkA(CreatePollingInstance(IPOLLING_TYPE_BEST, (size_t)(_maxConnections + 5), _spPolling.GetPointerPointer()));
+    ChkA(CreatePollingInstance(IPOLLING_TYPE_POLL, (size_t)(_maxConnections + 5), _spPolling.GetPointerPointer()));
     
     // add listen socket to epoll
     ASSERT(_fListenSocketsOnEpoll == false);
@@ -520,7 +522,7 @@ StunConnection* CTCPStunThread::AcceptConnection(CStunSocket* pListenSocket)
         pConn->_stunsocket.GetLocalAddress().ToStringBuffer(szIPLocal, ARRAYSIZE(szIPLocal));
         pConn->_stunsocket.GetRemoteAddress().ToStringBuffer(szIPRemote, ARRAYSIZE(szIPRemote));
         Logging::LogMsg(LL_VERBOSE, "accepting new connection on socket %d from %s on interface %s", pConn->_stunsocket.GetSocketHandle(), szIPRemote, szIPLocal);
-    } 
+    }
     
     
 Cleanup:

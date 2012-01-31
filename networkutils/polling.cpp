@@ -38,6 +38,13 @@ class CEpoll :
 private:
     int _epollfd;
     
+    epoll_event* _events;
+    size_t _sizeEvents;        // total allocated size for events
+    size_t _pendingCount;      // number of valid events in _events
+    size_t _currentEventIndex; // which one to process next
+    
+    
+    
     uint32_t ToNativeFlags(uint32_t eventflags);
     uint32_t FromNativeFlags(uint32_t eventflags);
     
@@ -58,7 +65,11 @@ public:
 
 
 CEpoll::CEpoll() :
-_epollfd(-1)
+_epollfd(-1),
+_events(NULL),
+_sizeEvents(0),
+_pendingCount(0),
+_currentEventIndex(0)
 {
     
 }
@@ -102,14 +113,27 @@ uint32_t CEpoll::FromNativeFlags(uint32_t eventflags)
 
 HRESULT CEpoll::Initialize(size_t maxSockets)
 {
+    HRESULT hr = S_OK;
+    
     ASSERT(_epollfd == -1);
     
     Close();
     
     _epollfd = epoll_create(maxSockets); // maxSockets is likely ignored by epoll_create
-    if (_epollfd == -1)
+    ChkIf(_epollfd == -1, ERRNOHR);
+    
+
+    _sizeEvents = maxSockets;
+    _events = new epoll_event[maxSockets];
+    ChkIf(_events == NULL, E_OUTOFMEMORY);
+    
+    
+    _pendingCount = 0;
+    _currentEventIndex = 0;
+Cleanup:
+    if (FAILED(hr))
     {
-        return ERRNOHR;
+        Close();
     }
     return S_OK;
 }
@@ -119,8 +143,15 @@ HRESULT CEpoll::Close()
     if (_epollfd != -1)   
     {
         close(_epollfd);
-
+        _epollfd = -1;
     }
+    
+    delete [] _events;
+    _events = NULL;
+    _sizeEvents = 0;
+    _pendingCount = 0;
+    _currentEventIndex = 0;
+    
     return S_OK;
 }
 
@@ -144,6 +175,12 @@ Cleanup:
 
 HRESULT CEpoll::Remove(int fd)
 {
+    // Remove doesn't bother to check to see if the socket is within any
+    // unprocessed event within _events.  A more robust polling and eventing
+    // library might want to check this.  For the stun server, "Remove" gets
+    // called immediately after WaitForNextEvent in most cases. That is, the socket
+    // we just got notified for isn't going to be within the _events array
+    
     HRESULT hr = S_OK;
     epoll_event ev={}; // pass empty ev, because some implementations of epoll_ctl can't handle a NULL event struct
 
@@ -175,18 +212,30 @@ Cleanup:
 HRESULT CEpoll::WaitForNextEvent(PollEvent* pPollEvent, int timeoutMilliseconds)
 {
     HRESULT hr = S_OK;
-    epoll_event ev = {};
-    int ret;
+    epoll_event *pEvent = NULL;
+    int ret = 0;
     
-    ChkIfA(_epollfd==-1, E_UNEXPECTED);    
+    ChkIfA(_epollfd==-1, E_UNEXPECTED);   
     
-    ret = ::epoll_wait(_epollfd, &ev, 1, timeoutMilliseconds);
-    ChkIf(ret == -1, ERRNOHR);
+    if (_currentEventIndex >= _pendingCount)
+    {
+        _currentEventIndex = 0;
+        _pendingCount = 0;
+        
+        ret = ::epoll_wait(_epollfd, _events, _sizeEvents, timeoutMilliseconds);
+        ChkIf(ret <= -1, ERRNOHR);
+        ChkIf(ret == 0, S_FALSE);
+        
+        _pendingCount = (size_t)ret;
+    }
     
-    ChkIf(ret == 0, S_FALSE);
     
-    pPollEvent->fd = ev.data.fd;
-    pPollEvent->eventflags = FromNativeFlags(ev.events);
+    pEvent = &_events[_currentEventIndex];
+    _currentEventIndex++;
+    
+    
+    pPollEvent->fd = pEvent->data.fd;
+    pPollEvent->eventflags = FromNativeFlags(pEvent->events);
     
 Cleanup:
     return hr;
@@ -392,7 +441,7 @@ HRESULT CPoll::WaitForNextEvent(PollEvent* pPollEvent, int timeoutMilliseconds)
     ChkIfA(pPollEvent == NULL, E_INVALIDARG);
     pPollEvent->eventflags = 0;
     
-    ChkIfA(size == 0, S_FALSE);
+    ChkIf(size == 0, S_FALSE);
 
     // check first to see if there is a pending event from the last poll() call
     fFound = FindNextEvent(pPollEvent);
@@ -400,6 +449,8 @@ HRESULT CPoll::WaitForNextEvent(PollEvent* pPollEvent, int timeoutMilliseconds)
     if (fFound == false)
     {
         ASSERT(_unreadcount == 0);
+        
+        _unreadcount = 0;
         
         list = _fds.data();
     
@@ -447,19 +498,13 @@ bool CPoll::FindNextEvent(PollEvent* pEvent)
             pEvent->eventflags = FromNativeFlags(list[slotindex].revents);
             list[slotindex].revents = 0;
             fFound = true;
+            _rotation++;
+            _unreadcount--;
             break;
         }
     }
     
-    if (fFound)
-    {
-        _rotation++;        
-    }
-    else
-    {
-        _unreadcount = _unreadcount - 1;
-        // don't increment rotation if we didn't find anything
-    }
+    // don't increment _rotation if we didn't find anything
     
     return fFound;
 }

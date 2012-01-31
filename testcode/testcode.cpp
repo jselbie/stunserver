@@ -30,6 +30,8 @@
 #include "cmdlineparser.h"
 #include "oshelper.h"
 #include "prettyprint.h"
+#include "polling.h"
+#include "testpolling.h"
 
 void ReaderFuzzTest()
 {
@@ -78,6 +80,7 @@ void RunUnitTests()
     boost::shared_ptr<CTestClientLogic> spTestClientLogic(new CTestClientLogic);
     boost::shared_ptr<CTestRecvFromEx> spTestRecvFromEx(new CTestRecvFromEx);
     boost::shared_ptr<CTestFastHash> spTestFastHash(new CTestFastHash);
+    boost::shared_ptr<CTestPolling> spTestPolling(new CTestPolling);
 
     vecTests.push_back(spTestDataStream.get());
     vecTests.push_back(spTestReader.get());
@@ -88,6 +91,7 @@ void RunUnitTests()
     vecTests.push_back(spTestClientLogic.get());
     vecTests.push_back(spTestRecvFromEx.get());
     vecTests.push_back(spTestFastHash.get());
+    vecTests.push_back(spTestPolling.get());
 
 
     for (size_t index = 0; index < vecTests.size(); index++)
