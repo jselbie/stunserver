@@ -270,8 +270,8 @@ HRESULT CTCPStunThread::Init(const TransportAddressSet& tsaListen, const Transpo
     ChkA(CreatePipes());
 
     // +5 for listening sockets and pipe
-    //ChkA(CreatePollingInstance(IPOLLING_TYPE_BEST, (size_t)(_maxConnections + 5), _spPolling.GetPointerPointer()));
-    ChkA(CreatePollingInstance(IPOLLING_TYPE_POLL, (size_t)(_maxConnections + 5), _spPolling.GetPointerPointer()));
+    ChkA(CreatePollingInstance(IPOLLING_TYPE_BEST, (size_t)(_maxConnections + 5), _spPolling.GetPointerPointer()));
+    
     
     // add listen socket to epoll
     ASSERT(_fListenSocketsOnEpoll == false);
