@@ -28,6 +28,7 @@ HRESULT CTestPolling::Run()
     _polltype = IPOLLING_TYPE_POLL;
     ChkA(Test1());
     ChkA(Test2());
+    ChkA(Test3());
 Cleanup:
     return hr;
 }
@@ -349,4 +350,37 @@ HRESULT CTestPolling::Test2()
 
 Cleanup:
     return hr;
+}
+
+HRESULT CTestPolling::Test3()
+{
+    HRESULT hr = S_OK;
+    HRESULT hrResult;
+    PollEvent event;  
+    const size_t c_maxSockets = 10;
+    
+    ChkA(TestInit(c_maxSockets, 0));
+    
+    ChkA(_spPolling->Add(3, IPOLLING_READ));
+    ChkA(_spPolling->Remove(3));
+    ChkA(_spPolling->Add(5, IPOLLING_READ));
+    ChkA(_spPolling->Add(7, IPOLLING_READ));
+    ChkA(_spPolling->Add(9, IPOLLING_READ));
+    ChkA(_spPolling->Remove(5));
+    ChkA(_spPolling->Add(11, IPOLLING_READ));
+    ChkA(_spPolling->Add(13, IPOLLING_READ));
+    ChkA(_spPolling->Remove(7));
+    ChkA(_spPolling->Add(15, IPOLLING_READ));
+    ChkA(_spPolling->Add(17, IPOLLING_READ));
+    ChkA(_spPolling->Add(19, IPOLLING_READ));
+    ChkA(_spPolling->Remove(11));
+    ChkA(_spPolling->Add(21, IPOLLING_READ));
+    ChkA(_spPolling->Add(23, IPOLLING_READ));
+    ChkA(_spPolling->Add(25, IPOLLING_READ));
+    ChkA(_spPolling->Add(27, IPOLLING_READ));
+    ChkA(_spPolling->Remove(13));
+    
+Cleanup:
+    return hr;
+    
 }

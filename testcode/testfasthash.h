@@ -17,7 +17,6 @@
 #ifndef TEST_FAST_HASH_H
 #define TEST_FAST_HASH_H
 
-#include "commonincludes.h"
 #include "fasthash.h"
 #include "unittest.h"
 

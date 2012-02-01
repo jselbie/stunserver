@@ -106,32 +106,92 @@ void CStunSocket::SetRole(SocketRole role)
     _role = role;
 }
 
+
+
+// About the "packet info option"
+// What we are trying to do is enable the socket to be able to provide the "destination address"
+// for packets we receive.  However, Linux, BSD, and MacOS all differ in what the
+// socket option is. And it differs even differently between IPV4 and IPV6 across these operating systems.
+// So we have the "try one or the other" implementation based on what's DEFINED
+// On some operating systems, there's only one option defined. Other's have both, but only one works!
+// So we have to try them both
+
+HRESULT CStunSocket::EnablePktInfoImpl(int level, int option1, int option2, bool fEnable)
+{
+    HRESULT hr = S_OK;
+    int enable = fEnable?1:0;
+    int ret = -1;
+    
+    
+    ChkIfA((option1 == -1) && (option2 == -1), E_FAIL);
+    
+    if (option1 != -1)
+    {
+        ret = setsockopt(_sock, level, option1, &enable, sizeof(enable));
+    }
+    
+    if ((ret < 0) && (option2 != -1))
+    {
+        enable = fEnable?1:0;
+        ret = setsockopt(_sock, level, option2, &enable, sizeof(enable));
+    }
+    
+    ChkIfA(ret < 0, ERRNOHR);
+    
+Cleanup:
+    return hr;
+}
+
+HRESULT CStunSocket::EnablePktInfo_IPV4(bool fEnable)
+{
+    int level = IPPROTO_IP;
+    int option1 = -1;
+    int option2 = -1;
+    
+#ifdef IP_PKTINFO
+    option1 = IP_PKTINFO;
+#endif
+    
+#ifdef IP_RECVDSTADDR
+    option2 = IP_RECVDSTADDR;
+#endif
+    
+    return EnablePktInfoImpl(level, option1, option2, fEnable);
+}
+
+HRESULT CStunSocket::EnablePktInfo_IPV6(bool fEnable)
+{
+    int level = IPPROTO_IPV6;
+    int option1 = -1;
+    int option2 = -1;
+    
+#ifdef IPV6_RECVPKTINFO
+    option1 = IPV6_RECVPKTINFO;
+#endif
+    
+#ifdef IPV6_PKTINFO
+    option2 = IPV6_PKTINFO;
+#endif
+    
+    return EnablePktInfoImpl(level, option1, option2, fEnable);
+}
+
+
 HRESULT CStunSocket::EnablePktInfoOption(bool fEnable)
 {
-    int enable = fEnable?1:0;
-    int ret;
-    
     int family = _addrlocal.GetFamily();
-    int level =  (family==AF_INET) ? IPPROTO_IP : IPPROTO_IPV6;
-
-// if you change the ifdef's below, make sure you it's matched with the same logic in recvfromex.cpp
-#ifdef IP_PKTINFO
-    int option = (family==AF_INET) ? IP_PKTINFO : IPV6_RECVPKTINFO;
-#elif defined(IP_RECVDSTADDR)
-    int option = (family==AF_INET) ? IP_RECVDSTADDR : IPV6_PKTINFO;
-#else
-    int fail[-1]; // set a compile time assert
-#endif
-
-    ret = ::setsockopt(_sock, level, option, &enable, sizeof(enable));
+    HRESULT hr;
     
-    // Linux documentation (man ipv6) says you are supposed to set IPV6_PKTINFO as the option
-    // Yet, it's really IPV6_RECVPKTINFO.  Other operating systems might expect IPV6_PKTINFO.
-    // We'll cross that bridge, when we get to it.
-    // todo - we should write a unit test that tests the packet info behavior
-    ASSERT(ret == 0);
+    if (family == AF_INET)
+    {
+        hr = EnablePktInfo_IPV4(fEnable);
+    }
+    else
+    {
+        hr = EnablePktInfo_IPV6(fEnable);
+    }
     
-    return (ret == 0) ? S_OK : ERRNOHR;
+    return hr;
 }
 
 HRESULT CStunSocket::SetNonBlocking(bool fEnable)

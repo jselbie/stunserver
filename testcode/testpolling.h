@@ -32,6 +32,7 @@ public:
     
     HRESULT Test1();
     HRESULT Test2();
+    HRESULT Test3();
     
     HRESULT Run();
     

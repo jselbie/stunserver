@@ -19,7 +19,7 @@ textres: stunserver.txtcode stunserver_lite.txtcode stunclient.txtcode stunclien
 
 manpages: stunserver.1 stunclient.1
 
-README: 
+README: readme.src
 	../stuntestcode --pp < readme.src > README
 
 clean:

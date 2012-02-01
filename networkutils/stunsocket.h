@@ -34,6 +34,10 @@ private:
     
     void Reset();
     
+    HRESULT EnablePktInfoImpl(int level, int option1, int option2, bool fEnable);
+    HRESULT EnablePktInfo_IPV4(bool fEnable);
+    HRESULT EnablePktInfo_IPV6(bool fEnable);
+    
 public:
 
     CStunSocket();

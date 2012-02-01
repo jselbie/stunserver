@@ -59,7 +59,18 @@ void LogHR(uint16_t level, HRESULT hr)
         msg[0] = '\0';
         int err = (int)(HRESULT_CODE(hr));
         
+#ifdef _GNU_SOURCE        
         pMsg = strerror_r(err, msg, ARRAYSIZE(msg));
+#else
+        {
+            int result = strerror_r(err, msg, ARRAYSIZE(msg));
+            if (result == -1)
+            {
+                    sprintf(msg, "%d", err);
+            }
+            pMsg = msg;
+        }
+#endif
 
         if (pMsg)
         {

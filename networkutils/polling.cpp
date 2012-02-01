@@ -298,7 +298,9 @@ uint32_t CPoll::ToNativeFlags(uint32_t eventflags)
     
     if (eventflags & IPOLLING_READ)        result |= POLLIN;
     if (eventflags & IPOLLING_WRITE)       result |= POLLOUT;
+#ifdef POLLRDHUP
     if (eventflags & IPOLLING_RDHUP)       result |= POLLRDHUP;
+#endif
     if (eventflags & IPOLLING_HUP)         result |= POLLHUP;
     if (eventflags & IPOLLING_PRI)         result |= POLLPRI;
     if (eventflags & IPOLLING_ERROR)       result |= POLLERR;
@@ -313,7 +315,9 @@ uint32_t CPoll::FromNativeFlags(uint32_t eventflags)
     
     if (eventflags & POLLIN)    result |= IPOLLING_READ;
     if (eventflags & POLLOUT)   result |= IPOLLING_WRITE;
+#ifdef POLLRDHUP    
     if (eventflags & POLLRDHUP) result |= IPOLLING_RDHUP;
+#endif
     if (eventflags & POLLHUP)   result |= IPOLLING_HUP;
     if (eventflags & POLLPRI)   result |= IPOLLING_PRI;
     if (eventflags & POLLERR)   result |= IPOLLING_ERROR;
@@ -369,7 +373,10 @@ Cleanup:
 
 HRESULT CPoll::Remove(int fd)
 {
-    size_t* pPos = NULL;
+    
+    // See notes below why pPos is declared volatile.  Gets around a compiler bug
+    volatile size_t* pPos = NULL;
+    
     size_t size = _fds.size();
     size_t pos;
     HRESULT hr = S_OK;
@@ -394,7 +401,13 @@ HRESULT CPoll::Remove(int fd)
     {
         _fds[pos] = _fds[size-1];
         pPos = _hashtable.Lookup(_fds[pos].fd);
-        ASSERT(pPos);
+        
+        ASSERT(pPos != NULL);
+       
+        // If the volatile declaration above was not made, this block of code
+        // gets over-optimized on older GCC compilers (g++ 4.2.1 on BSD) with with -O2
+        // The following line would essentially not get executed.
+        // There are multiple workarounds, but "volatile" seems to work.
         *pPos = pos;
     }
     

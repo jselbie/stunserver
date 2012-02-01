@@ -1,5 +1,6 @@
-StunServer version 1.1.0
-January 22, 2012
+STUNK - An open source STUN server
+Version 1.1.0
+February 1, 2012
 ---------------------------------------------------------
 
 
@@ -37,6 +38,7 @@ Testing:
   Ubuntu 11 with gcc/g++ 4.5.2
   Amazon AWS with gcc/g++ 4.4
   MacOS Snow Leopard (will not compile on earlier versions without updating to a newer version of gcc/g++)
+  FreeBSD 9.0 with gcc/g++ 4.2.1
 
   Parsing code has been fuzz tested with zzuf. http://caca.zoy.org/wiki/zzuf
 ---------------------------------------------------------
@@ -44,13 +46,14 @@ Testing:
 
 Prerequisites before compiling and running.
 
-  perl. Just have any old version installed. It is needed for one particular build script.
-
   Boost header files. (Actual boost runtime not required) www.boost.org (sudo yum install boost-devel)
 
-  OpenSSL development files and runtime. www.boost.org (sudo yum install openssl-devel)
+  OpenSSL development files and runtime. www.openssl.org (sudo yum install openssl-devel)
 
   pthreads header and libs (I haven't seen a distribution where this wasn't already installed)
+
+  perl. Only needed if you rebuild the content in the resources directory. Otherwise, not needed.
+
 ---------------------------------------------------------
 
 
