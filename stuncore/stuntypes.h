@@ -53,6 +53,10 @@ const uint16_t STUN_ATTRIBUTE_NONCE = 0x0015;
 const uint16_t STUN_ATTRIBUTE_XORMAPPEDADDRESS = 0x0020;
 
 
+// This attribute is sent by the server to legacy clients
+// 0x8020 is is not defined in any RFC, but is the value that Vovida server uses
+const uint16_t STUN_ATTRIBUTE_XORMAPPEDADDRESS_OPTIONAL = 0x8020;
+
 const uint16_t STUN_ATTRIBUTE_SOFTWARE = 0x8022;
 const uint16_t STUN_ATTRIBUTE_ALTERNATESERVER = 0x8023;
 const uint16_t STUN_ATTRIBUTE_PADDING = 0x8026;

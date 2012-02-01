@@ -326,7 +326,7 @@ HRESULT CStunRequestHandler::ProcessBindingRequest()
     // MAPPED-ADDRESS
     // SOURCE-ADDRESS (RESPONSE-ORIGIN)
     // CHANGED-ADDRESS (OTHER-ADDRESS)
-    // XOR-MAPPED-ADDRESS
+    // XOR-MAPPED-ADDRESS (XOR-MAPPED_ADDRESS-OPTIONAL)
     
     builder.AddMappedAddress(_pMsgIn->addrRemote);
 
@@ -340,7 +340,7 @@ HRESULT CStunRequestHandler::ProcessBindingRequest()
         builder.AddOtherAddress(addrOther); // pass true to send back CHANGED-ADDRESS, otherwise, pass false to send back OTHER-ADDRESS
     }
 
-    // even if this is a legacy client request, we can send back XOR-MAPPED-ADDRESS since it's an optional-understanding attribute
+    // send back the XOR-MAPPED-ADDRESS (encoded as an optional message for legacy clients)
     builder.AddXorMappedAddress(_pMsgIn->addrRemote);
     
     

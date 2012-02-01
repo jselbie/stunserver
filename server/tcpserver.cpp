@@ -189,7 +189,7 @@ HRESULT CTCPStunThread::CreateListenSockets()
             ChkA(_socketListenArray[r].TCPInit(_tsaListen.set[r].addr, (SocketRole)r, true));
             _socketTable[r] = _socketListenArray[r].GetSocketHandle();
             ChkA(_socketListenArray[r].SetNonBlocking(true));
-            ret = listen(_socketTable[r], 128); // todo - figure out the right value to pass to listen
+            ret = listen(_socketTable[r], 128); // 128 - large backlog.
             ChkIfA(ret == -1, ERRNOHR);
             _countSocks++;
         }
@@ -280,9 +280,6 @@ HRESULT CTCPStunThread::Init(const TransportAddressSet& tsaListen, const Transpo
     
     // add read end of pipe to epoll so we can get notified of when a signal to exit has occurred
     ChkA(_spPolling->Add(_pipe[0], EPOLL_PIPE_EVENT_SET));
-    
-       
-    // todo - get "max connections" from an init param
     
     ret = _hashConnections1.InitTable(_maxConnections, 0);
     ChkIfA(ret == -1, E_FAIL);
@@ -868,8 +865,6 @@ HRESULT CTCPServer::Initialize(const CStunServerConfig& config)
         tsaListen = tsaHandler;
         _threads[0] = new CTCPStunThread();
         
-        // todo - max connections needs to be a config param!        
-        // todo - create auth
         ChkA(_threads[0]->Init(tsaListen, tsaHandler, _spAuth, config.nMaxConnections));
     }
     else
@@ -884,9 +879,8 @@ HRESULT CTCPServer::Initialize(const CStunServerConfig& config)
                 
                 _threads[threadindex] = new CTCPStunThread();
                 
-                // todo - max connections needs to be a config param!        
-                // todo - create auth
-                Chk(_threads[threadindex]->Init(tsaListen, tsaHandler, NULL, config.nMaxConnections));
+
+                Chk(_threads[threadindex]->Init(tsaListen, tsaHandler, _spAuth, config.nMaxConnections));
             }
         }
     }
@@ -930,9 +924,8 @@ Cleanup:
 
 HRESULT CTCPServer::Stop()
 {
-    // for now shutdown and stop are equivalent
+    // for now shutdown and stop are equivalent (something about the notification "pipe" thing would need to get reset to restart the thread
     // we don't really support restarting a server anyway
-    // todo - clean this up
     Shutdown();
     return S_OK;
 }

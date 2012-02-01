@@ -301,10 +301,11 @@ Cleanup:
 HRESULT CStunMessageBuilder::AddXorMappedAddress(const CSocketAddress& addr)
 {
     CSocketAddress addrxor(addr);
+    uint16_t attributeID = _fLegacyMode ? STUN_ATTRIBUTE_XORMAPPEDADDRESS_OPTIONAL : STUN_ATTRIBUTE_XORMAPPEDADDRESS;
 
     addrxor.ApplyStunXorMap(_transactionid);
 
-    return AddMappedAddressImpl(STUN_ATTRIBUTE_XORMAPPEDADDRESS, addrxor);
+    return AddMappedAddressImpl(attributeID, addrxor);
 }
 
 HRESULT CStunMessageBuilder::AddMappedAddress(const CSocketAddress& addr)

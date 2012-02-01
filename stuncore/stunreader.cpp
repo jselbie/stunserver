@@ -484,19 +484,34 @@ HRESULT CStunMessageReader::GetOtherAddress(CSocketAddress* pAddr)
 HRESULT CStunMessageReader::GetXorMappedAddress(CSocketAddress* pAddr)
 {
     HRESULT hr = S_OK;
-    Chk(GetAddressHelper(STUN_ATTRIBUTE_XORMAPPEDADDRESS, pAddr));
-    pAddr->ApplyStunXorMap(_transactionid);
+    hr = GetAddressHelper(STUN_ATTRIBUTE_XORMAPPEDADDRESS, pAddr);
+    
+    if (FAILED(hr))
+    {
+        // this is the vovida compat address attribute
+        hr = GetAddressHelper(STUN_ATTRIBUTE_XORMAPPEDADDRESS_OPTIONAL, pAddr);
+    }
+    
+    if (SUCCEEDED(hr))
+    {
+        pAddr->ApplyStunXorMap(_transactionid);
+    }
 
-Cleanup:
     return hr;
 }
 
 HRESULT CStunMessageReader::GetResponseOriginAddress(CSocketAddress* pAddr)
 {
     HRESULT hr = S_OK;
-    Chk(GetAddressHelper(STUN_ATTRIBUTE_RESPONSE_ORIGIN, pAddr));
     
-Cleanup:
+    hr = GetAddressHelper(STUN_ATTRIBUTE_RESPONSE_ORIGIN, pAddr);
+    
+    if (FAILED(hr))
+    {
+        // look for the legacy address attribute that a legacy (RFC 3489) server would send
+        hr = GetAddressHelper(STUN_ATTRIBUTE_SOURCEADDRESS, pAddr);
+    }
+    
     return hr;
     
 }
