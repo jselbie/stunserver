@@ -232,6 +232,12 @@ HRESULT CTestPolling::RemovePipe(int pipeindex)
     
     ChkA(_spPolling->Remove(_pipes[pipeindex].readpipe));
     
+    close(_pipes[pipeindex].readpipe);
+    _pipes[pipeindex].readpipe = -1;
+    
+    close(_pipes[pipeindex].writepipe);
+    _pipes[pipeindex].writepipe = -1;
+    
     _pipes.erase(_pipes.begin()+pipeindex);
     
 Cleanup:

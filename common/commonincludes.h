@@ -34,6 +34,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <stdio.h>
+#include <string.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/time.h>
@@ -43,6 +44,7 @@
 #include <net/if.h>
 #include <stdarg.h>
 #include <math.h>
+#include <sys/termios.h>
 
 #include <boost/shared_ptr.hpp>
 #include <boost/scoped_array.hpp>

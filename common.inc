@@ -10,6 +10,15 @@ DEBUG_FLAGS := -g
 PROFILE_FLAGS := -O2 -g
 FLAVOR_FLAGS = $(RELEASE_FLAGS)
 
+
+#SOLARIS HACK
+UNAME := $(shell uname -s)
+ifeq ($(UNAME),SunOS)
+  SOCKET_LIBS := -lsocket -lnsl
+endif
+
+
+
 .PHONY: all clean debug
 
 %.h.gch: %.h
