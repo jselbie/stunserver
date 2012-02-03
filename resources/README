@@ -62,6 +62,7 @@ Testing:
   MacOS Snow Leopard (will not compile on earlier versions without updating to
   a newer version of gcc/g++)
   FreeBSD 9.0 with gcc/g++ 4.2.1
+  Solaris 11 with gcc/g++ 4.5.2
 
   Parsing code has been fuzz tested with zzuf. http://caca.zoy.org/wiki/zzuf
 ---------------------------------------------------------
@@ -69,11 +70,19 @@ Testing:
 
 Prerequisites before compiling and running.
 
-  Boost header files. (Actual boost runtime not required) www.boost.org (sudo
-  yum install boost-devel)
+  Boost header files. www.boost.org (sudo yum install boost-devel). The
+  compiled Boost runtime is not necessary. Just unpacking the Boost source
+  code distribution will suffice. If you do not have the adminstrative
+  privaleges to install the Boost distribution into a standard system include
+  path, you may uncomment and edit the top line of the common.inc file for the
+  BOOST_INCLUDE variable. The common.inc file is in the same folder as this
+  README file.
 
   OpenSSL development files and runtime. www.openssl.org (sudo yum install
-  openssl-devel)
+  openssl-devel). On most systems with development tools already installed,
+  OpenSSL include files are already installed in the standard include path. If
+  this is not the case, you can uncomment and edit the common.inc file to have
+  the OPENSSL_INCLUDE variable defined.
 
   pthreads header and libs (I haven't seen a distribution where this wasn't
   already installed)
@@ -87,8 +96,8 @@ Prerequisites before compiling and running.
 Compiling and running
 
   Got Boost and OpenSSL taken care of as described above? Good. Just type
-  "make". There will be three resulting binaries in the root of the source
-  code package produced.
+  "make" (or "gmake" on some systems). There will be three resulting binaries
+  in the root of the source code package produced.
 
   stuntestcode - This is the unit test code. I highly recommend you run this
   program first. When run, you'll see a series of lines being printed in
