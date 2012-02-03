@@ -18,6 +18,8 @@
 #ifndef STUNSERVER_COMMON_COMMONINCLUDES_H
 #define STUNSERVER_COMMON_COMMONINCLUDES_H
 
+// Fix for Lion (http://www.opensource.apple.com/source/xnu/xnu-1699.24.8/bsd/netinet6/in6.h)
+#define __APPLE_USE_RFC_3542
 
 // standard system includes
 #include <sys/types.h>
