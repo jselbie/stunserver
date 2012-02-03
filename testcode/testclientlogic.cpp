@@ -155,6 +155,16 @@ HRESULT CTestClientLogic::CommonInit(NatBehavior behavior, NatFiltering filterin
     _addrServerAP = CSocketAddress(0xbbbbbbbb, 1001);
     _addrServerAA = CSocketAddress(0xbbbbbbbb, 1002);
     
+    _tsa.set[RolePP].fValid = true;
+    _tsa.set[RolePP].addr = _addrServerPP;
+    _tsa.set[RolePA].fValid = true;
+    _tsa.set[RolePA].addr = _addrServerPA;
+    _tsa.set[RoleAP].fValid = true;
+    _tsa.set[RoleAP].addr = _addrServerAP;
+    _tsa.set[RoleAA].fValid = true;
+    _tsa.set[RoleAA].addr = _addrServerAA;
+    
+    
     _addrLocal = CSocketAddress(0x33333333, 7000);
     
     _addrMappedPP = addrMapped;
@@ -163,16 +173,6 @@ HRESULT CTestClientLogic::CommonInit(NatBehavior behavior, NatFiltering filterin
     _addrMappedAA = addrMapped;
     
     _spClientLogic = boost::shared_ptr<CStunClientLogic>(new CStunClientLogic());
-    
-    Chk(CMockTransport::CreateInstanceNoInit(_spTransport.GetPointerPointer()));
-    
-    _spHandler = boost::shared_ptr<CStunThreadMessageHandler>(new CStunThreadMessageHandler);
-    _spHandler->SetResponder(_spTransport);
-    
-    _spTransport->AddPP(_addrServerPP);
-    _spTransport->AddPA(_addrServerPA);
-    _spTransport->AddAP(_addrServerAP);
-    _spTransport->AddAA(_addrServerAA);
     
     
     switch (behavior)
@@ -252,8 +252,15 @@ HRESULT CTestClientLogic::TestBehaviorAndFiltering(bool fBehaviorTest, NatBehavi
     StunClientLogicConfig config;
     HRESULT hrRet;
     uint32_t time = 0;
-    CRefCountedBuffer spMsgOut(new CBuffer(1500));
-    CRefCountedBuffer spMsgIn;
+    CRefCountedBuffer spMsgOut(new CBuffer(MAX_STUN_MESSAGE_SIZE));
+    CRefCountedBuffer spMsgResponse(new CBuffer(MAX_STUN_MESSAGE_SIZE));
+    SocketRole outputRole;
+    CSocketAddress addrDummy;
+    
+    StunMessageIn stunmsgIn;
+    StunMessageOut stunmsgOut;
+    
+    
     CSocketAddress addrDest;
     CSocketAddress addrMapped;
     CSocketAddress addrServerResponse; // what address the fake server responded back on
@@ -275,8 +282,9 @@ HRESULT CTestClientLogic::TestBehaviorAndFiltering(bool fBehaviorTest, NatBehavi
     
     while (true)
     {
+        CStunMessageReader reader;
+        
         bool fDropMessage = false;
-        StunMessageEnvelope envelope;
         
         time += 1000;
         
@@ -303,29 +311,38 @@ HRESULT CTestClientLogic::TestBehaviorAndFiltering(bool fBehaviorTest, NatBehavi
         
         ChkA(ValidateBindingRequest(spMsgOut, &transid));
         
-        envelope.localAddr = addrDest;
-        envelope.remoteAddr = addrMapped;
-        envelope.spBuffer = spMsgOut;
-        envelope.localSocket = GetSocketRoleForDestinationAddress(addrDest);
-
+        // --------------------------------------------------
         
-        _spTransport->ClearStream();
-        _spHandler->ProcessRequest(envelope);
+        reader.AddBytes(spMsgOut->GetData(), spMsgOut->GetSize());
+        
+        ChkIfA(reader.GetState() != CStunMessageReader::BodyValidated, E_UNEXPECTED);
+        
+        // Simulate sending the binding request and getting a response back
+        stunmsgIn.socketrole = GetSocketRoleForDestinationAddress(addrDest);
+        stunmsgIn.addrLocal = addrDest;
+        stunmsgIn.addrRemote = addrMapped;
+        stunmsgIn.fConnectionOriented = false;
+        stunmsgIn.pReader = &reader;
+        
+        stunmsgOut.socketrole = (SocketRole)-1; // intentionally setting it wrong
+        stunmsgOut.addrDest = addrDummy;  // we don't care what address the server sent back to
+        stunmsgOut.spBufferOut = spMsgResponse;
+        spMsgResponse->SetSize(0);
+        
+        ChkA(::CStunRequestHandler::ProcessRequest(stunmsgIn, stunmsgOut, &_tsa, NULL));
         
         // simulate the message coming back
-
+        
         // make sure we got something!
-        ChkIfA(_spTransport->m_outputRole == ((SocketRole)-1), E_FAIL);
+        outputRole = stunmsgOut.socketrole;
+        ChkIfA(::IsValidSocketRole(outputRole)==false, E_FAIL);
         
-        if (spMsgIn != NULL)
-        {
-            spMsgIn->SetSize(0);
-        }
+        ChkIfA(spMsgResponse->GetSize() == 0, E_FAIL);
         
-        _spTransport->m_outputstream.GetBuffer(&spMsgIn);
-        ChkIf(spMsgIn->GetSize() == 0, E_FAIL);
+        addrServerResponse = _tsa.set[stunmsgOut.socketrole].addr;
         
-        ChkA(_spTransport->GetSocketAddressForRole(_spTransport->m_outputRole, &addrServerResponse));
+        // --------------------------------------------------
+
         
         //addrServerResponse.ToString(&strAddr);
         //printf("Server is sending back from %s\n", strAddr.c_str());
@@ -334,14 +351,32 @@ HRESULT CTestClientLogic::TestBehaviorAndFiltering(bool fBehaviorTest, NatBehavi
         // decide if we need to drop the response
         
         fDropMessage = ( addrDest.IsSameIP_and_Port(_addrServerPP) &&
-                         ( ((_spTransport->m_outputRole == RoleAA) && (_fAllowChangeRequestAA==false)) ||
-                           ((_spTransport->m_outputRole == RolePA) && (_fAllowChangeRequestPA==false)) 
+                         ( ((outputRole == RoleAA) && (_fAllowChangeRequestAA==false)) ||
+                           ((outputRole == RolePA) && (_fAllowChangeRequestPA==false)) 
                          )
                        );
         
+        
+        //{
+        //    CStunMessageReader::ReaderParseState state;
+        //    CStunMessageReader readerDebug;
+        //    state = readerDebug.AddBytes(spMsgResponse->GetData(), spMsgResponse->GetSize());
+        //    if (state != CStunMessageReader::BodyValidated)
+        //    {
+        //        printf("Error - response from server doesn't look valid");
+        //    }
+        //    else
+        //    {
+        //        CSocketAddress addr;
+        //        readerDebug.GetMappedAddress(&addr);
+        //        addr.ToString(&strAddr);
+        //        printf("Response from server indicates our mapped address is %s\n", strAddr.c_str());
+        //    }
+        //}
+        
         if (fDropMessage == false)
         {
-            ChkA(_spClientLogic->ProcessResponse(spMsgIn, addrServerResponse, _addrLocal));
+            ChkA(_spClientLogic->ProcessResponse(spMsgResponse, addrServerResponse, _addrLocal));
         }
     }
     
@@ -352,8 +387,6 @@ HRESULT CTestClientLogic::TestBehaviorAndFiltering(bool fBehaviorTest, NatBehavi
     ChkIfA(results.behavior != behavior, E_UNEXPECTED);
     
 Cleanup:
-   
-    _spTransport.ReleaseAndClear();
             
     return hr;
     
@@ -366,8 +399,8 @@ HRESULT CTestClientLogic::Test1()
     HRESULT hrTmp = 0;
     CStunClientLogic clientlogic;    
     ::StunClientLogicConfig config;
-    CRefCountedBuffer spMsgOut(new CBuffer(1500));
-    CRefCountedBuffer spMsgIn(new CBuffer(1500));
+    CRefCountedBuffer spMsgOut(new CBuffer(MAX_STUN_MESSAGE_SIZE));
+    CRefCountedBuffer spMsgIn(new CBuffer(MAX_STUN_MESSAGE_SIZE));
     StunClientResults results;
     StunTransactionId transid;
     
@@ -382,6 +415,7 @@ HRESULT CTestClientLogic::Test1()
     config.fFilteringTest = false;
     config.timeoutSeconds = 10;
     config.uMaxAttempts = 2;
+    config.fTimeoutIsInstant = false;
     
     ChkA(clientlogic.Initialize(config));
     

@@ -28,12 +28,16 @@
 class CStunServerConfig
 {
 public:
+    
     bool fHasPP; // PP: Primary ip,   Primary port
     bool fHasPA; // PA: Primary ip,   Alternate port
     bool fHasAP; // AP: Alternate ip, Primary port
     bool fHasAA; // AA: Alternate ip, Alternate port
 
     bool fMultiThreadedMode;  // if true, one thread for each socket
+    
+    bool fTCP; // if true, then use TCP instead of UDP
+    uint32_t nMaxConnections; // only valid for TCP (on a per-thread basis)
 
     CSocketAddress addrPP; // address for PP
     CSocketAddress addrPA; // address for PA
@@ -51,12 +55,10 @@ public:
 class CStunServer :
 public CBasicRefCount,
 public CObjectFactory<CStunServer>,
-public IStunResponder
+public IRefCounted
 {
 private:
-    CRefCountedStunSocket _arrSockets[4];
-
-    // when we support multithreaded servers, this will change to a list
+    CStunSocket _arrSockets[4];
 
     std::vector<CStunSocketThread*> _threads;
 
@@ -65,9 +67,7 @@ private:
 
     friend class CObjectFactory<CStunServer>;
 
-    
     CRefCountedPtr<IStunAuth> _spAuth;
-
 
 public:
 
@@ -76,14 +76,6 @@ public:
 
     HRESULT Start();
     HRESULT Stop();
-
-
-    // IStunResponder
-    virtual HRESULT SendResponse(SocketRole roleOutput, const CSocketAddress& addr, CRefCountedBuffer& spResponse);
-    virtual bool HasAddress(SocketRole role);
-    virtual HRESULT GetSocketAddressForRole(SocketRole role, /*out*/ CSocketAddress* pAddr);
-    
-    
 
     ADDREF_AND_RELEASE_IMPL();
 };

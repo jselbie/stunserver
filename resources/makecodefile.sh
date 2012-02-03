@@ -13,9 +13,13 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+plfile=`dirname $0`/xxdperl.pl
+
 echo BUILDING $1 INTO $2
 echo const char $3[] = { > $2
-xxd -i < $1 >> $2
+#xxd -i < $1 >> $2
+echo "perl $plfile <" $1 ">>" $2
+perl $plfile  < $1 >> $2
 echo ",0x00};" >> $2
 echo "" >> $2
 

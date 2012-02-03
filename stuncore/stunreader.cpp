@@ -26,29 +26,35 @@
 #include <openssl/hmac.h>
 #include <openssl/md5.h>
 #include "stunauth.h"
+#include "fasthash.h"
 
 
 
 
 
-CStunMessageReader::CStunMessageReader() :
-_fAllowLegacyFormat(false),
-_fMessageIsLegacyFormat(false),
-_state(HeaderNotRead),
-_nAttributeCount(0),
-_transactionid(),
-_msgTypeNormalized(0xffff),
-_msgClass(StunMsgClassInvalidMessageClass),
-_msgLength(0),
-_indexFingerprint(-1),
-_indexResponsePort(-1),
-_indexChangeRequest(-1),
-_indexPaddingAttribute(-1),
-_indexErrorCode(-1),
-_indexMessageIntegrity(-1)
+CStunMessageReader::CStunMessageReader()
 {
-    ;
+    Reset();
 }
+
+void CStunMessageReader::Reset()
+{
+    _fAllowLegacyFormat = true;
+    _fMessageIsLegacyFormat = false;
+    _state = HeaderNotRead;
+    _mapAttributes.Reset();
+    
+    _indexFingerprint = -1;
+    _indexMessageIntegrity = -1;
+    _countAttributes = 0;
+    
+    memset(&_transactionid, '\0', sizeof(_transactionid));
+    _msgTypeNormalized = 0xffff;
+    _msgClass = StunMsgClassInvalidMessageClass;
+    _msgLength = 0;
+    _stream.Reset();
+}
+
 
 void CStunMessageReader::SetAllowLegacyFormat(bool fAllowLegacyFormat)
 {
@@ -69,8 +75,8 @@ uint16_t CStunMessageReader::HowManyBytesNeeded()
         BOOST_ASSERT(STUN_HEADER_SIZE > currentSize);
         return STUN_HEADER_SIZE - currentSize;
     case HeaderValidated:
-        BOOST_ASSERT(_msgLength > currentSize);
-        return _msgLength - currentSize;
+        BOOST_ASSERT((_msgLength+STUN_HEADER_SIZE) > currentSize);
+        return (_msgLength+STUN_HEADER_SIZE) - currentSize;
     default:
     	return 0;
     }
@@ -79,13 +85,14 @@ uint16_t CStunMessageReader::HowManyBytesNeeded()
 
 bool CStunMessageReader::HasFingerprintAttribute()
 {
-    return (_indexFingerprint >= 0);
+    StunAttribute *pAttrib = _mapAttributes.Lookup(STUN_ATTRIBUTE_FINGERPRINT);
+    return (pAttrib != NULL);
 }
 
 bool CStunMessageReader::IsFingerprintAttributeValid()
 {
     HRESULT hr = S_OK;
-    StunAttribute attrib={};
+    StunAttribute* pAttrib = _mapAttributes.Lookup(STUN_ATTRIBUTE_FINGERPRINT);
     CRefCountedBuffer spBuffer;
     size_t size=0;
     boost::crc_32_type crc;
@@ -97,11 +104,11 @@ bool CStunMessageReader::IsFingerprintAttributeValid()
     // the fingerprint attribute MUST be the last attribute in the stream.
     // If it's not, then the code below will return false
 
+    ChkIf(pAttrib==NULL, E_FAIL);
+    
+    ChkIfA(pAttrib->attributeType != STUN_ATTRIBUTE_FINGERPRINT, E_FAIL);
 
-    GetAttributeByIndex(_indexFingerprint, &attrib);
-    ChkIfA(attrib.attributeType != STUN_ATTRIBUTE_FINGERPRINT, E_FAIL);
-
-    ChkIf(attrib.size != 4, E_FAIL);
+    ChkIf(pAttrib->size != 4, E_FAIL);
     ChkIf(_state != BodyValidated, E_FAIL);
     Chk(_stream.GetBuffer(&spBuffer));
 
@@ -115,7 +122,7 @@ bool CStunMessageReader::IsFingerprintAttributeValid()
     computedValue = crc.checksum();
     computedValue = computedValue ^ STUN_FINGERPRINT_XOR;
 
-    readValue = *(uint32_t*)(ptr+attrib.offset);
+    readValue = *(uint32_t*)(ptr+pAttrib->offset);
     readValue = ntohl(readValue);
     hr = (readValue==computedValue) ? S_OK : E_FAIL;
 
@@ -125,13 +132,14 @@ Cleanup:
 
 bool CStunMessageReader::HasMessageIntegrityAttribute()
 {
-    return (_indexMessageIntegrity >= 0);
+    return (NULL != _mapAttributes.Lookup(STUN_ATTRIBUTE_MESSAGEINTEGRITY));
 }
 
 HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylength)
 {
     HRESULT hr = S_OK;
-    int lastAttributeIndex = _nAttributeCount - 1;
+    
+    int lastAttributeIndex = _countAttributes - 1;
     bool fFingerprintAdjustment = false;
     bool fNoOtherAttributesAfterIntegrity = false;
     const size_t c_hmacsize = 20;
@@ -143,23 +151,26 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
     size_t len, nChunks;
     CDataStream stream;
     CRefCountedBuffer spBuffer;
-    StunAttribute attribIntegrity;
+    StunAttribute* pAttribIntegrity=NULL;
+    
     int cmp = 0;
     bool fContextInit = false;
     
+    
     ChkIf(_state != BodyValidated, E_FAIL);
-    ChkIf(_indexMessageIntegrity < 0, E_FAIL);
+    
+    ChkIf(_countAttributes == 0, E_FAIL); // if there's not attributes, there's definitely not a message integrity attribute
+    ChkIf(_indexMessageIntegrity == -1, E_FAIL);
     
     // can a key be empty?
     ChkIfA(key==NULL, E_INVALIDARG);
     ChkIfA(keylength==0, E_INVALIDARG);
     
+    pAttribIntegrity = _mapAttributes.Lookup(::STUN_ATTRIBUTE_MESSAGEINTEGRITY);
     
-    Chk(this->GetAttributeByIndex(_indexMessageIntegrity, &attribIntegrity));
-    
-    ChkIf(attribIntegrity.size != c_hmacsize, E_FAIL);
-    
-    ChkIfA(lastAttributeIndex < 0, E_FAIL);
+    ChkIf(pAttribIntegrity == NULL, E_FAIL);
+
+    ChkIf(pAttribIntegrity->size != c_hmacsize, E_FAIL);
     
     // first, check to make sure that no other attributes (other than fingerprint) follow the message integrity
     fNoOtherAttributesAfterIntegrity = (_indexMessageIntegrity == lastAttributeIndex) || ((_indexMessageIntegrity == (lastAttributeIndex-1)) && (_indexFingerprint == lastAttributeIndex));
@@ -187,15 +198,17 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
         // fingerprint attribute is 8 bytes long including it's own header
         // and to do this, we have to fix the network byte ordering issue
         uint16_t lengthHeader = ntohs(chunk16);
-        lengthHeader -= 8;
-        chunk16 = htons(lengthHeader);
+        uint16_t adjustedlengthHeader = lengthHeader - 8;
+        
+        
+        chunk16 = htons(adjustedlengthHeader);
     }
     HMAC_Update(&ctx, (unsigned char*)&chunk16, sizeof(chunk16));
     
     // now include everything up to the hash attribute itself.
-    len = _attributes[_indexMessageIntegrity].offset;
+    len = pAttribIntegrity->offset;
     len -= 4; // subtract the size of the attribute header
-    len -= 4; // subtrack the size of the message header (not including the transaction id)
+    len -= 4; // subtract the size of the message header (not including the transaction id)
     
     // len should be the number of bytes from the start of the transaction ID up through to the start of the integrity attribute header
     // the stun message has to be a multiple of 4 bytes, so we can read in 32 bit chunks
@@ -210,7 +223,7 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
     HMAC_Final(&ctx, hmaccomputed, &hmaclength);
     
     // now compare the bytes
-    cmp = memcmp(hmaccomputed, spBuffer->GetData() + attribIntegrity.offset, c_hmacsize);
+    cmp = memcmp(hmaccomputed, spBuffer->GetData() + pAttribIntegrity->offset, c_hmacsize);
     
     hr = (cmp == 0 ? S_OK : E_FAIL);
     
@@ -285,62 +298,62 @@ Cleanup:
 
 
 
-
+HRESULT CStunMessageReader::GetAttributeByIndex(int index, StunAttribute* pAttribute)
+{
+    StunAttribute* pFound = _mapAttributes.LookupValueByIndex((size_t)index);
+    
+    if (pFound == NULL)
+    {
+        return E_FAIL;
+    }
+    
+    if (pAttribute)
+    {
+        *pAttribute = *pFound;
+    }
+    return S_OK;
+}
 
 HRESULT CStunMessageReader::GetAttributeByType(uint16_t attributeType, StunAttribute* pAttribute)
 {
-    HRESULT hr = E_FAIL;
-
-    for (size_t index = 0; index < _nAttributeCount; index++)
+    StunAttribute* pFound = _mapAttributes.Lookup(attributeType);
+        
+    if (pFound == NULL)
     {
-        if (attributeType == _attributes[index].attributeType)
-        {
-            hr = S_OK;
-
-            // pAttribute can be NULL - useful if the caller just wants to detect the presence of an attribute
-            if (pAttribute)
-            {
-                *pAttribute = _attributes[index];
-            }
-        }
+        return E_FAIL;
     }
-
-    return hr;
+    
+    if (pAttribute)
+    {
+        *pAttribute = *pFound;
+    }
+    return S_OK;
 }
 
-HRESULT CStunMessageReader::GetAttributeByIndex(int index, StunAttribute* pAttribute)
+
+int CStunMessageReader::GetAttributeCount()
 {
-    HRESULT hr = E_FAIL;
-
-    if ((index >= 0) && (index < (int)_nAttributeCount))
-    {
-        hr = S_OK;
-
-        if (pAttribute)
-        {
-            *pAttribute = _attributes[index];
-        }
-    }
-
-    return hr;
+    return (int)(this->_mapAttributes.Size());
 }
 
 HRESULT CStunMessageReader::GetResponsePort(uint16_t* pPort)
 {
-    StunAttribute attrib;
+    StunAttribute* pAttrib = NULL;
     HRESULT hr = S_OK;
     uint16_t portNBO;
     uint8_t *pData = NULL;
 
     ChkIfA(pPort == NULL, E_INVALIDARG);
 
-    Chk(GetAttributeByIndex(_indexResponsePort, &attrib));
-    ChkIf(attrib.size != STUN_ATTRIBUTE_RESPONSE_PORT_SIZE, E_UNEXPECTED);
+    pAttrib = _mapAttributes.Lookup(STUN_ATTRIBUTE_RESPONSE_PORT);
+    ChkIf(pAttrib == NULL, E_FAIL);
+    
+    ChkIf(pAttrib->size != STUN_ATTRIBUTE_RESPONSE_PORT_SIZE, E_UNEXPECTED);
 
     pData = _stream.GetDataPointerUnsafe();
     ChkIf(pData==NULL, E_UNEXPECTED);
 
-    memcpy(&portNBO, pData + attrib.offset, STUN_ATTRIBUTE_RESPONSE_PORT_SIZE);
+    memcpy(&portNBO, pData + pAttrib->offset, STUN_ATTRIBUTE_RESPONSE_PORT_SIZE);
     *pPort = ntohs(portNBO);
 Cleanup:
     return hr;
@@ -350,18 +363,20 @@ HRESULT CStunMessageReader::GetChangeRequest(StunChangeRequestAttribute* pChange
 {
     HRESULT hr = S_OK;
     uint8_t *pData = NULL;
-    StunAttribute attrib;
+    StunAttribute *pAttrib;
     uint32_t value = 0;
 
     ChkIfA(pChangeRequest == NULL, E_INVALIDARG);
+    
+    pAttrib = _mapAttributes.Lookup(STUN_ATTRIBUTE_CHANGEREQUEST);
+    ChkIf(pAttrib == NULL, E_FAIL);
 
-    Chk(GetAttributeByIndex(_indexChangeRequest, &attrib));
-    ChkIf(attrib.size != STUN_ATTRIBUTE_CHANGEREQUEST_SIZE, E_UNEXPECTED);
+    ChkIf(pAttrib->size != STUN_ATTRIBUTE_CHANGEREQUEST_SIZE, E_UNEXPECTED);
 
     pData = _stream.GetDataPointerUnsafe();
     ChkIf(pData==NULL, E_UNEXPECTED);
 
-    memcpy(&value, pData + attrib.offset, STUN_ATTRIBUTE_CHANGEREQUEST_SIZE);
+    memcpy(&value, pData + pAttrib->offset, STUN_ATTRIBUTE_CHANGEREQUEST_SIZE);
 
     value = ntohl(value);
 
@@ -382,15 +397,17 @@ Cleanup:
 HRESULT CStunMessageReader::GetPaddingAttributeSize(uint16_t* pSizePadding)
 {
     HRESULT hr = S_OK;
-    StunAttribute attrib;
+    StunAttribute *pAttrib;
 
     ChkIfA(pSizePadding == NULL, E_INVALIDARG);
 
     *pSizePadding = 0;
+    
+    pAttrib = _mapAttributes.Lookup(STUN_ATTRIBUTE_PADDING);
 
-    Chk(GetAttributeByIndex(_indexPaddingAttribute, &attrib));
+    ChkIf(pAttrib == NULL, E_FAIL);
 
-    *pSizePadding = attrib.size;
+    *pSizePadding = pAttrib->size;
 
 Cleanup:
     return hr;
@@ -403,15 +420,16 @@ HRESULT CStunMessageReader::GetErrorCode(uint16_t* pErrorNumber)
     uint8_t cl = 0;
     uint8_t num = 0;
 
-    StunAttribute attrib;
+    StunAttribute* pAttrib;
 
     ChkIf(pErrorNumber==NULL, E_INVALIDARG);
 
-    Chk(GetAttributeByIndex(_indexErrorCode, &attrib));
+    pAttrib = _mapAttributes.Lookup(STUN_ATTRIBUTE_ERRORCODE);
+    ChkIf(pAttrib == NULL, E_FAIL);
 
     // first 21 bits of error-code attribute must be zero.
     // followed by 3 bits of "class" and 8 bits for the error number modulo 100
-    ptr = _stream.GetDataPointerUnsafe() + attrib.offset + 2;
+    ptr = _stream.GetDataPointerUnsafe() + pAttrib->offset + 2;
 
     cl = *ptr++;
     cl = cl & 0x07;
@@ -426,12 +444,13 @@ Cleanup:
 HRESULT CStunMessageReader::GetAddressHelper(uint16_t attribType, CSocketAddress* pAddr)
 {
     HRESULT hr = S_OK;
-    StunAttribute attrib={};
+    StunAttribute* pAttrib = _mapAttributes.Lookup(attribType);
     uint8_t *pAddrStart = NULL;
 
-    Chk(GetAttributeByType(attribType, &attrib));
-    pAddrStart = _stream.GetDataPointerUnsafe() + attrib.offset;
-    Chk(::GetMappedAddress(pAddrStart, attrib.size, pAddr));
+    ChkIf(pAttrib == NULL, E_FAIL);
+    
+    pAddrStart = _stream.GetDataPointerUnsafe() + pAttrib->offset;
+    Chk(::GetMappedAddress(pAddrStart, pAttrib->size, pAddr));
 
 Cleanup:
     return hr;
@@ -465,27 +484,52 @@ HRESULT CStunMessageReader::GetOtherAddress(CSocketAddress* pAddr)
 HRESULT CStunMessageReader::GetXorMappedAddress(CSocketAddress* pAddr)
 {
     HRESULT hr = S_OK;
-    Chk(GetAddressHelper(STUN_ATTRIBUTE_XORMAPPEDADDRESS, pAddr));
-    pAddr->ApplyStunXorMap(_transactionid);
+    hr = GetAddressHelper(STUN_ATTRIBUTE_XORMAPPEDADDRESS, pAddr);
+    
+    if (FAILED(hr))
+    {
+        // this is the vovida compat address attribute
+        hr = GetAddressHelper(STUN_ATTRIBUTE_XORMAPPEDADDRESS_OPTIONAL, pAddr);
+    }
+    
+    if (SUCCEEDED(hr))
+    {
+        pAddr->ApplyStunXorMap(_transactionid);
+    }
 
-Cleanup:
     return hr;
 }
+
+HRESULT CStunMessageReader::GetResponseOriginAddress(CSocketAddress* pAddr)
+{
+    HRESULT hr = S_OK;
+    
+    hr = GetAddressHelper(STUN_ATTRIBUTE_RESPONSE_ORIGIN, pAddr);
+    
+    if (FAILED(hr))
+    {
+        // look for the legacy address attribute that a legacy (RFC 3489) server would send
+        hr = GetAddressHelper(STUN_ATTRIBUTE_SOURCEADDRESS, pAddr);
+    }
+    
+    return hr;
+    
+}
+
 
 HRESULT CStunMessageReader::GetStringAttributeByType(uint16_t attributeType, char* pszValue, /*in-out*/ size_t size)
 {
     HRESULT hr = S_OK;
-    StunAttribute attrib = {};
+    StunAttribute* pAttrib = _mapAttributes.Lookup(attributeType);
     
     ChkIfA(pszValue == NULL, E_INVALIDARG);
+    ChkIf(pAttrib == NULL, E_INVALIDARG);
     
-    Chk(GetAttributeByType(attributeType, &attrib));
-
     // size needs to be 1 greater than attrib.size so we can properly copy over a null char at the end
-    ChkIf(attrib.size >= size, E_INVALIDARG);
+    ChkIf(pAttrib->size >= size, E_INVALIDARG);
     
-    memcpy(pszValue, _stream.GetDataPointerUnsafe() + attrib.offset, attrib.size);
-    pszValue[attrib.size] = '\0';
+    memcpy(pszValue, _stream.GetDataPointerUnsafe() + pAttrib->offset, pAttrib->size);
+    pszValue[pAttrib->size] = '\0';
     
 Cleanup:
     return hr;
@@ -601,39 +645,37 @@ HRESULT CStunMessageReader::ReadBody()
 
         if (SUCCEEDED(hr))
         {
-            hr = (_nAttributeCount < MAX_NUM_ATTRIBUTES) ? S_OK : E_FAIL;
-        }
-
-        if (SUCCEEDED(hr))
-        {
+            int result;
             StunAttribute attrib;
-            int attributeIndex = _nAttributeCount;
             attrib.attributeType = attributeType;
             attrib.size = attributeLength;
             attrib.offset = attributeOffset;
-            _attributes[_nAttributeCount++] = attrib;
 
-            // now if this attribute is one we want to cache the index for, let's do it here
-            // todo - think about a "fast map" for this operation
-            switch (attributeType)
+            // if we have already read in more attributes than MAX_NUM_ATTRIBUTES, then Insert call will fail (this is how we gate too many attributes)
+            result = _mapAttributes.Insert(attributeType, attrib);
+            hr = (result >= 0) ? S_OK : E_FAIL;
+        }
+        
+        if (SUCCEEDED(hr))
+        {
+            
+            if (attributeType == ::STUN_ATTRIBUTE_FINGERPRINT)
             {
-                case STUN_ATTRIBUTE_FINGERPRINT:
-                    _indexFingerprint = attributeIndex; break;
-                case STUN_ATTRIBUTE_RESPONSE_PORT:
-                    _indexResponsePort = attributeIndex; break;
-                case STUN_ATTRIBUTE_CHANGEREQUEST:
-                    _indexChangeRequest = attributeIndex; break;
-                case STUN_ATTRIBUTE_PADDING:
-                    _indexPaddingAttribute = attributeIndex; break;
-                case STUN_ATTRIBUTE_ERRORCODE:
-                    _indexErrorCode = attributeIndex; break;
-                case STUN_ATTRIBUTE_MESSAGEINTEGRITY:
-                    _indexMessageIntegrity = attributeIndex; break;
-                    
-                default: break;
+                _indexFingerprint = _countAttributes;
             }
+            
+            if (attributeType == ::STUN_ATTRIBUTE_MESSAGEINTEGRITY)
+            {
+                _indexMessageIntegrity = _countAttributes;
+            }
+            
+            _countAttributes++;
+        }
+        
 
-
+        
+        if (SUCCEEDED(hr))
+        {
             hr = _stream.SeekRelative(attributeLength);
         }
 
@@ -674,6 +716,9 @@ CStunMessageReader::ReaderParseState CStunMessageReader::AddBytes(const uint8_t*
     {
         return _state;
     }
+    
+    // seek to the end of the stream
+    _stream.SeekDirect(_stream.GetSize());
 
     if (FAILED(_stream.Write(pData, size)))
     {
@@ -725,6 +770,11 @@ CStunMessageReader::ReaderParseState CStunMessageReader::AddBytes(const uint8_t*
 
     return _state;
 
+}
+
+CStunMessageReader::ReaderParseState CStunMessageReader::GetState()
+{
+    return _state;
 }
 
 void CStunMessageReader::GetTransactionId(StunTransactionId* pTrans)

@@ -17,6 +17,7 @@
 #include "commonincludes.h"
 #include "stuncore.h"
 #include "server.h"
+#include "tcpserver.h"
 #include "adapters.h"
 #include "cmdlineparser.h"
 
@@ -27,15 +28,15 @@
 #include "stringhelper.h"
 
 
-// unusual to include usage.cpp and usagelite.cpp here, but these are auto-generated resource file
-#include "usage.txtcode"
-#include "usagelite.txtcode"
+// these are auto-generated files made from markdown sources.  See ../resources
+#include "stunserver.txtcode"
+#include "stunserver_lite.txtcode"
 
 
 void PrintUsage(bool fSummaryUsage)
 {
     size_t width = GetConsoleWidth();
-    const char* psz = fSummaryUsage ? usagelite_text : usage_text;
+    const char* psz = fSummaryUsage ? stunserver_lite_text : stunserver_text;
 
     // save some margin space
     if (width > 2)
@@ -44,6 +45,54 @@ void PrintUsage(bool fSummaryUsage)
     }
 
     PrettyPrint(psz, width);
+}
+
+void LogHR(uint16_t level, HRESULT hr)
+{
+    uint32_t facility = HRESULT_FACILITY(hr);
+    char msg[400];
+    const char* pMsg = NULL;
+    bool fGotMsg = false;
+    
+    if (facility == FACILITY_ERRNO)
+    {
+        msg[0] = '\0';
+        int err = (int)(HRESULT_CODE(hr));
+        
+#ifdef _GNU_SOURCE        
+        pMsg = strerror_r(err, msg, ARRAYSIZE(msg));
+#else
+        {
+            int result = strerror_r(err, msg, ARRAYSIZE(msg));
+            if (result == -1)
+            {
+                    sprintf(msg, "%d", err);
+            }
+            pMsg = msg;
+        }
+#endif
+
+        if (pMsg)
+        {
+            Logging::LogMsg(level, "Error: %s", pMsg);
+            fGotMsg = true;
+        }
+        
+        if (err == EADDRINUSE)
+        {
+            Logging::LogMsg(level, 
+                "This error likely means another application is listening on one\n"
+                "or more of the same ports you are attempting to configure this\n"
+                "server to listen on.  Run \"netstat -a -p -t -u\" to see a list\n"
+                "of all ports in use and associated process id for each");
+        }
+        
+    }
+    
+    if (fGotMsg == false)
+    {
+        Logging::LogMsg(level, "Error: %x", hr);
+    }
 }
 
 
@@ -59,6 +108,7 @@ struct StartupArgs
     std::string strProtocol;
     std::string strHelp;
     std::string strVerbosity;
+    std::string strMaxConnections;
 };
 
 #define PRINTARG(member) Logging::LogMsg(LL_DEBUG, "%s = %s", #member, args.member.length() ? args.member.c_str() : "<empty>");
@@ -75,6 +125,7 @@ void DumpStartupArgs(StartupArgs& args)
     PRINTARG(strProtocol);
     PRINTARG(strHelp);
     PRINTARG(strVerbosity);
+    PRINTARG(strMaxConnections);
     Logging::LogMsg(LL_DEBUG, "--------------------------\n");
 }
 
@@ -106,6 +157,11 @@ void DumpConfig(CStunServerConfig &config)
         Logging::LogMsg(LL_DEBUG, "AA = %s", strSocket.c_str());
     }
     
+    Logging::LogMsg(LL_DEBUG, "Protocol = %s", config.fTCP ? "TCP" : "UDP");
+    if (config.fTCP && (config.nMaxConnections>0))
+    {
+        Logging::LogMsg(LL_DEBUG, "Max TCP Connections per thread: %d", config.nMaxConnections);
+    }
 }
 
 
@@ -149,6 +205,7 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
     int nAltPort = DEFAULT_STUN_PORT + 1;
     bool fHasAtLeastTwoAdapters = false;
     CStunServerConfig config;
+    int nMaxConnections = 0;
 
     enum ServerMode
     {
@@ -224,12 +281,36 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
     // ---- PROTOCOL --------------------------------------------------------
     if (args.strProtocol.length() > 0)
     {
-        if (args.strProtocol != "udp")
+        if ((args.strProtocol != "udp") && (args.strProtocol != "tcp"))
         {
-            Logging::LogMsg(LL_ALWAYS, "Protocol argument must be 'udp' .  'tcp' and 'tls' are not supported yet");
+            Logging::LogMsg(LL_ALWAYS, "Protocol argument must be 'udp' or 'tcp'. 'tls' is not supported yet");
             Chk(E_INVALIDARG);
         }
+        
+        config.fTCP = (args.strProtocol == "tcp");
     }
+    
+    
+    // ---- MAX Connections -----------------------------------------------------
+    nMaxConnections = 0;
+    if (args.strMaxConnections.length() > 0)
+    {
+        if (config.fTCP == false)
+        {
+            Logging::LogMsg(LL_ALWAYS, "Max connections parameter has no meaning in UDP mode. Did you mean to specify \"--protocol=tcp ?\"");
+        }
+        else
+        {
+            hr = StringHelper::ValidateNumberString(args.strMaxConnections.c_str(), 1, 100000, &nMaxConnections);
+            if (FAILED(hr))
+            {
+                Logging::LogMsg(LL_ALWAYS, "Max connections must be between 1-100000");
+                Chk(hr);
+            }
+        }
+        config.nMaxConnections = nMaxConnections;
+    }
+
 
     // ---- PRIMARY PORT --------------------------------------------------------
     nPrimaryPort = DEFAULT_STUN_PORT;
@@ -334,6 +415,7 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
             Logging::LogMsg(LL_ALWAYS, "Error - Primary interface and Alternate Interface appear to have the same IP address. Full mode requires two IP addresses that are unique");
             Chk(E_INVALIDARG);
         }
+        
 
         config.addrPP = addrPrimary;
         config.addrPP.SetPort(portPrimary);
@@ -350,6 +432,7 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
         config.addrAA = addrAlternate;
         config.addrAA.SetPort(portAlternate);
         config.fHasAA = true;
+
     }
 
     *pConfigOut = config;
@@ -373,6 +456,7 @@ HRESULT ParseCommandLineArgs(int argc, char** argv, int startindex, StartupArgs*
     cmdline.AddOption("altport", required_argument, &pStartupArgs->strAltPort);
     cmdline.AddOption("family", required_argument, &pStartupArgs->strFamily);
     cmdline.AddOption("protocol", required_argument, &pStartupArgs->strProtocol);
+    cmdline.AddOption("maxconn", required_argument, &pStartupArgs->strMaxConnections);
     cmdline.AddOption("help", no_argument, &pStartupArgs->strHelp);
     cmdline.AddOption("verbosity", required_argument, &pStartupArgs->strVerbosity);
 
@@ -426,6 +510,55 @@ void WaitForAppExitSignal()
 
 
 
+HRESULT StartUDP(CRefCountedPtr<CStunServer>& spServer, CStunServerConfig& config)
+{
+    HRESULT hr;
+    
+    hr = CStunServer::CreateInstance(config, spServer.GetPointerPointer());
+    if (FAILED(hr))
+    {
+        Logging::LogMsg(LL_ALWAYS, "Unable to initialize server (error code = x%x)", hr);
+        LogHR(LL_ALWAYS, hr);
+        return hr;
+    }
+
+    hr = spServer->Start();
+    if (FAILED(hr))
+    {
+        Logging::LogMsg(LL_ALWAYS, "Unable to start server (error code = x%x)", hr);
+        LogHR(LL_ALWAYS, hr);
+        return hr;
+    }
+    
+    return S_OK;
+}
+
+HRESULT StartTCP(CRefCountedPtr<CTCPServer>& spTCPServer, CStunServerConfig& config)
+{
+    HRESULT hr;
+    
+    hr = CTCPServer::CreateInstance(config, spTCPServer.GetPointerPointer());
+    if (FAILED(hr))
+    {
+        Logging::LogMsg(LL_ALWAYS, "Unable to initialize TCP server (error code = x%x)", hr);
+        LogHR(LL_ALWAYS, hr);
+        return hr;
+    }
+    
+    hr = spTCPServer->Start();
+    if (FAILED(hr))
+    {
+        Logging::LogMsg(LL_ALWAYS, "Unable to start TCP server (error code = x%x)", hr);
+        LogHR(LL_ALWAYS, hr);
+        return hr;
+    }
+    
+    return S_OK;
+    
+}
+
+
+
 
 int main(int argc, char** argv)
 {
@@ -433,6 +566,8 @@ int main(int argc, char** argv)
     StartupArgs args;
     CStunServerConfig config;
     CRefCountedPtr<CStunServer> spServer;
+    CRefCountedPtr<CTCPServer> spTCPServer;
+    
 
 #ifdef DEBUG
     Logging::SetLogLevel(LL_DEBUG);
@@ -482,19 +617,22 @@ int main(int argc, char** argv)
     DumpConfig(config);
 
     InitAppExitListener();
-
-    hr = CStunServer::CreateInstance(config, spServer.GetPointerPointer());
-    if (FAILED(hr))
+    
+    if (config.fTCP == false)
     {
-        Logging::LogMsg(LL_ALWAYS, "Unable to initialize server (error code = x%x)", hr);
-        return -4;
+        hr = StartUDP(spServer, config);
+        if (FAILED(hr))
+        {
+            return -4;
+        }
     }
-
-    hr = spServer->Start();
-    if (FAILED(hr))
+    else
     {
-        Logging::LogMsg(LL_ALWAYS, "Unable to start server (error code = x%x)", hr);
-        return -5;
+        hr = StartTCP(spTCPServer, config);
+        if (FAILED(hr))
+        {
+            return -5;
+        }
     }
 
     Logging::LogMsg(LL_DEBUG, "Successfully started server.");
@@ -503,8 +641,18 @@ int main(int argc, char** argv)
 
     Logging::LogMsg(LL_DEBUG, "Server is exiting");
 
-    spServer->Stop();
-    spServer->Release();
+    if (spServer != NULL)
+    {
+        spServer->Stop();
+        spServer.ReleaseAndClear();
+    }
+    
+    if (spTCPServer != NULL)
+    {
+        spTCPServer->Stop();
+        spTCPServer.ReleaseAndClear();
+    }
+    
 
     return 0;
 }

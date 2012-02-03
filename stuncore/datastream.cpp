@@ -22,6 +22,7 @@
 
 
 CDataStream::CDataStream() :
+_pBuffer(NULL),
 _pos(0),
 _fNoGrow(false)
 {
@@ -34,7 +35,7 @@ _spBuffer(spBuffer),
 _pos(0),
 _fNoGrow(false)
 {
-    
+    _pBuffer = spBuffer.get();
 }
 
 HRESULT CDataStream::SetSizeHint(size_t size)
@@ -46,6 +47,7 @@ HRESULT CDataStream::SetSizeHint(size_t size)
 void CDataStream::Reset()
 {
     _spBuffer.reset();
+    _pBuffer = NULL;
     _pos = 0;
     _fNoGrow = false;
 }
@@ -54,6 +56,7 @@ void CDataStream::Attach(CRefCountedBuffer& buf, bool fForWriting)
 {
     Reset();
     _spBuffer = buf;
+    _pBuffer = _spBuffer.get();
 
     if (_spBuffer && fForWriting)
     {
@@ -73,14 +76,14 @@ HRESULT CDataStream::Read(void* data, size_t size)
         return E_INVALIDARG;
     }
 
-    memcpy(data, _spBuffer->GetData() + _pos, size);
+    memcpy(data, _pBuffer->GetData() + _pos, size);
     _pos = newpos;
     return S_OK;
 }
 
 HRESULT CDataStream::Grow(size_t size)
 {
-    size_t currentAllocated = (_spBuffer ? _spBuffer->GetAllocatedSize() : 0);
+    size_t currentAllocated = (_pBuffer ? _pBuffer->GetAllocatedSize() : 0);
     size_t currentSize = GetSize();
     size_t newallocationsize=0;
 
@@ -93,8 +96,7 @@ HRESULT CDataStream::Grow(size_t size)
     {
         return E_FAIL;
     }
-
-
+    
     if (size > (currentAllocated*2))
     {
         newallocationsize = size;
@@ -117,12 +119,13 @@ HRESULT CDataStream::Grow(size_t size)
     // Grow only increases allocated size.  It doesn't influence the actual data stream size
     spNewBuffer->SetSize(currentSize);
 
-    if (_spBuffer && (currentSize > 0))
+    if (_pBuffer && (currentSize > 0))
     {
-        memcpy(spNewBuffer->GetData(), _spBuffer->GetData(), currentSize);
+        memcpy(spNewBuffer->GetData(), _pBuffer->GetData(), currentSize);
     }
 
     _spBuffer = spNewBuffer;
+    _pBuffer = _spBuffer.get();
 
     return S_OK;
 }
@@ -151,12 +154,12 @@ HRESULT CDataStream::Write(const void* data, size_t size)
         return hr;
     }
 
-    memcpy(_spBuffer->GetData()+_pos, data, size);
+    memcpy(_pBuffer->GetData()+_pos, data, size);
     _pos = newposition;
 
     if (newposition > currentSize)
     {
-        hr = _spBuffer->SetSize(newposition);
+        hr = _pBuffer->SetSize(newposition);
         ASSERT(SUCCEEDED(hr));
     }
 
@@ -178,13 +181,13 @@ size_t CDataStream::GetPos()
 
 size_t CDataStream::GetSize()
 {
-    return (_spBuffer ? _spBuffer->GetSize() : 0);
+    return (_pBuffer ? _pBuffer->GetSize() : 0);
 }
 
 HRESULT CDataStream::SeekDirect(size_t pos)
 {
     HRESULT hr = S_OK;
-    size_t currentSize = (_spBuffer ? _spBuffer->GetSize() : 0);
+    size_t currentSize = (_pBuffer ? _pBuffer->GetSize() : 0);
 
     // seeking is allowed anywhere between 0 and stream size
 
@@ -229,9 +232,9 @@ uint8_t* CDataStream::GetDataPointerUnsafe()
 {
     uint8_t* pRet = NULL;
 
-    if (_spBuffer)
+    if (_pBuffer)
     {
-        pRet = _spBuffer->GetData();
+        pRet = _pBuffer->GetData();
     }
 
     return pRet;

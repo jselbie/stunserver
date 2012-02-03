@@ -132,8 +132,9 @@ ssize_t recvfromex(int sockfd, void* buf, size_t len, int flags, CSocketAddress*
                     GetLocalPortNumberFromSocket(sockfd, pDstAddr);
                     break;
                 }
+#endif
                 
-#elif defined(IP_RECVDSTADDR)
+#ifdef IP_RECVDSTADDR
                 // This code path for MacOSX and likely BSD as well
                 if ((pCmsg->cmsg_level == IPPROTO_IP) && (pCmsg->cmsg_type==IP_RECVDSTADDR) && CMSG_DATA(pCmsg))
                 {
@@ -143,10 +144,6 @@ ssize_t recvfromex(int sockfd, void* buf, size_t len, int flags, CSocketAddress*
                     *pDstAddr = CSocketAddress(addr);
                     GetLocalPortNumberFromSocket(sockfd, pDstAddr);
                     break;
-                }
-#else
-                {
-                    int fail[-1];   // set a compile time assert if there's no option
                 }
 #endif
             }

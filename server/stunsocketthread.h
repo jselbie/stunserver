@@ -32,14 +32,13 @@ public:
     CStunSocketThread();
     ~CStunSocketThread();
     
-    HRESULT Init(std::vector<CRefCountedStunSocket>& listSockets, IStunResponder* pResponder, IStunAuth* pAuth);
+    HRESULT Init(CStunSocket* arrayOfFourSockets, IStunAuth* pAuth, SocketRole rolePrimaryRecv);
     HRESULT Start();
 
     HRESULT SignalForStop(bool fPostMessages);
     HRESULT WaitForStopAndClose();
     
-    /// returns back the index of the socket _socks that is ready for data, otherwise, -1
-    int WaitForSocketData();
+    
     
 private:
     
@@ -48,13 +47,40 @@ private:
     
     static void* ThreadFunction(void* pThis);
     
-    std::vector<CRefCountedStunSocket> _socks;
+    CStunSocket* WaitForSocketData();
+    
+    CStunSocket* _arrSendSockets;  // matches CStunServer::_arrSockets
+    std::vector<CStunSocket*> _socks; // sockets for receiving on
+    
+    
     bool _fNeedToExit;
-    CStunThreadMessageHandler _handler;
     pthread_t _pthread;
     bool _fThreadIsValid;
     
     int _rotation;
+    
+    
+    
+    TransportAddressSet _tsa;
+    
+    CRefCountedPtr<IStunAuth> _spAuth;
+    
+    
+    // pre-allocated objects for the thread
+    CStunMessageReader _reader;
+    CRefCountedBuffer _spBufferReader; // buffer internal to the reader
+    CRefCountedBuffer _spBufferIn;     // buffer we receive requests on
+    CRefCountedBuffer _spBufferOut;    // buffer we send response on
+    StunMessageIn _msgIn;
+    StunMessageOut _msgOut;
+    
+    HRESULT InitThreadBuffers();
+    void UninitThreadBuffers();
+    
+    HRESULT ProcessRequestAndSendResponse();
+    
+    void ClearSocketArray();
+    
 };
 
 

@@ -18,28 +18,52 @@
 #define	STUNSOCKET_H
 
 
+
 class CStunSocket
 {
 private:
     int _sock;
     CSocketAddress _addrlocal;
+    CSocketAddress _addrremote;
     SocketRole _role;
     
-    CStunSocket() {;}
     CStunSocket(const CStunSocket&) {;}
     void operator=(const CStunSocket&) {;}
     
+    HRESULT InitCommon(int socktype, const CSocketAddress& addrlocal, SocketRole role, bool fSetReuseFlag);
+    
+    void Reset();
+    
+    HRESULT EnablePktInfoImpl(int level, int option1, int option2, bool fEnable);
+    HRESULT EnablePktInfo_IPV4(bool fEnable);
+    HRESULT EnablePktInfo_IPV6(bool fEnable);
+    
 public:
+
+    CStunSocket();
     ~CStunSocket();
+    
     void Close();
+    
+    bool IsValid();
+    
+    HRESULT Attach(int sock);
+    int Detach();
     
     int GetSocketHandle() const;
     const CSocketAddress& GetLocalAddress() const;
+    const CSocketAddress& GetRemoteAddress() const;
+    
     SocketRole GetRole() const;
+    void SetRole(SocketRole role);
     
     HRESULT EnablePktInfoOption(bool fEnable);
+    HRESULT SetNonBlocking(bool fEnable);
     
-    static HRESULT Create(const CSocketAddress& local, SocketRole role, boost::shared_ptr<CStunSocket>* pStunSocketShared);
+    void UpdateAddresses();
+    
+    HRESULT UDPInit(const CSocketAddress& local, SocketRole role);
+    HRESULT TCPInit(const CSocketAddress& local, SocketRole role, bool fSetReuseFlag);
 };
 
 typedef boost::shared_ptr<CStunSocket> CRefCountedStunSocket;

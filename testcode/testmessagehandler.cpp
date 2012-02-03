@@ -23,102 +23,16 @@
 #include "testmessagehandler.h"
 
 
-
-CMockTransport::CMockTransport()
-{
-    ;
-}
-
-CMockTransport::~CMockTransport()
-{
-    ;
-}
-
-HRESULT CMockTransport::Reset()
-{
-    for (unsigned int index = 0; index < ARRAYSIZE(m_addrs); index++)
-    {
-        m_addrs[index] = CSocketAddress();
-    }
-    ClearStream();
-
-    return S_OK;
-}
-
-HRESULT CMockTransport::ClearStream()
-
-{
-    m_outputstream.Reset();
-    m_outputRole = (SocketRole)-1;
-    m_addrDestination = CSocketAddress();
-    return S_OK;
-}
-
-
-HRESULT CMockTransport::AddPP(const CSocketAddress& addr)
-{
-    int index = RolePP;
-    m_addrs[index] = addr;
-    return S_OK;
-}
-
-HRESULT CMockTransport::AddPA(const CSocketAddress& addr)
-{
-    int index = RolePA;
-    m_addrs[index] = addr;
-    return S_OK;
-}
-
-
-HRESULT CMockTransport::AddAP(const CSocketAddress& addr)
-{
-    int index = RoleAP;
-    m_addrs[index] = addr;
-    return S_OK;
-}
-
-HRESULT CMockTransport::AddAA(const CSocketAddress& addr)
-{
-    int index = RoleAA;
-    m_addrs[index] = addr;
-    return S_OK;
-}
-
-
-
-HRESULT CMockTransport::SendResponse(SocketRole roleOutput, const CSocketAddress& addr, CRefCountedBuffer& spResponse)
-{
-    m_outputRole = roleOutput;
-    m_addrDestination = addr;
-    m_outputstream.Write(spResponse->GetData(), spResponse->GetSize());
-
-    return S_OK;
-}
-
-bool CMockTransport::HasAddress(SocketRole role)
-{
-    int index = (int)role;
-    ASSERT(index >= 0);
-    ASSERT(index <= 3);
-
-    return (m_addrs[index].GetPort() != 0);
-}
-
-HRESULT CMockTransport::GetSocketAddressForRole(SocketRole role, CSocketAddress* pAddr)
-{
-    HRESULT hr=S_OK;
-
-    if (HasAddress(role))
-    {
-       *pAddr = m_addrs[(int)role];
-    }
-    else
-    {
-        hr = E_FAIL;
-    }
-
-    return hr;
-}
+static const uint16_t c_portServerPrimary = 3478;
+static const uint16_t c_portServerAlternate = 3479;
+static const char* c_szIPServerPrimary = "1.2.3.4";
+static const char* c_szIPServerAlternate = "1.2.3.5";
+    
+static const char* c_szIPLocal = "2.2.2.2";
+static const uint16_t c_portLocal = 2222;
+    
+static const char* c_szIPMapped = "3.3.3.3";
+static const uint16_t c_portMapped = 3333;
 
 
 
@@ -177,10 +91,70 @@ HRESULT CMockAuthLong::DoAuthCheck(AuthAttributes* pAuthAttributes, AuthResponse
 
 CTestMessageHandler::CTestMessageHandler()
 {
-    CMockTransport::CreateInstanceNoInit(_spTransport.GetPointerPointer());
     CMockAuthShort::CreateInstanceNoInit(_spAuthShort.GetPointerPointer());
     CMockAuthLong::CreateInstanceNoInit(_spAuthLong.GetPointerPointer());
+
+    ToAddr(c_szIPLocal, c_portLocal, &_addrLocal);
+    ToAddr(c_szIPMapped, c_portMapped, &_addrMapped);
+    
+    ToAddr(c_szIPServerPrimary, c_portServerPrimary, &_addrServerPP);
+    ToAddr(c_szIPServerPrimary, c_portServerAlternate, &_addrServerPA);
+    ToAddr(c_szIPServerAlternate, c_portServerPrimary, &_addrServerAP);
+    ToAddr(c_szIPServerAlternate, c_portServerAlternate, &_addrServerAA);
 }
+
+
+HRESULT CTestMessageHandler::SendHelper(CStunMessageBuilder& builderRequest, CStunMessageReader* pReaderResponse, IStunAuth* pAuth)
+{
+    CRefCountedBuffer spBufferRequest;
+    CRefCountedBuffer spBufferResponse(new CBuffer(MAX_STUN_MESSAGE_SIZE));
+    StunMessageIn msgIn;
+    StunMessageOut msgOut;
+    CStunMessageReader reader;
+    CSocketAddress addrDest;
+    TransportAddressSet tas;
+    HRESULT hr = S_OK;
+    
+    
+    InitTransportAddressSet(tas, true, true, true, true);
+    
+    builderRequest.GetResult(&spBufferRequest);
+    
+    ChkIf(CStunMessageReader::BodyValidated != reader.AddBytes(spBufferRequest->GetData(), spBufferRequest->GetSize()), E_FAIL);
+    
+    msgIn.fConnectionOriented = false;
+    msgIn.addrLocal = _addrServerPP;
+    msgIn.pReader = &reader;
+    msgIn.socketrole = RolePP;
+    msgIn.addrRemote = _addrMapped;
+    
+    msgOut.spBufferOut = spBufferResponse;
+    
+    ChkA(CStunRequestHandler::ProcessRequest(msgIn, msgOut, &tas, pAuth));
+    
+    ChkIf(CStunMessageReader::BodyValidated != pReaderResponse->AddBytes(spBufferResponse->GetData(), spBufferResponse->GetSize()), E_FAIL);
+    
+Cleanup:
+    
+    return hr;
+    
+}
+
+void CTestMessageHandler::ToAddr(const char* pszIP, uint16_t port, CSocketAddress* pAddr)
+{
+    sockaddr_in addr={};
+    int result;
+    
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    
+    result = ::inet_pton(AF_INET, pszIP, &addr.sin_addr);
+    
+    ASSERT(result == 1);
+    
+    *pAddr = addr;
+}
+
 
 HRESULT CTestMessageHandler::InitBindingRequest(CStunMessageBuilder& builder)
 {
@@ -191,67 +165,74 @@ HRESULT CTestMessageHandler::InitBindingRequest(CStunMessageBuilder& builder)
     return S_OK;
 }
 
-HRESULT CTestMessageHandler::ValidateMappedAddress(CStunMessageReader& reader, const CSocketAddress& addrClient)
+HRESULT CTestMessageHandler::ValidateMappedAddress(CStunMessageReader& reader, const CSocketAddress& addrExpected, bool fLegacyOnly)
 {
     HRESULT hr = S_OK;
-    StunTransactionId transid;
-    CSocketAddress mappedaddr;
-    
-    CRefCountedBuffer spBuffer;
-    
-    Chk(reader.GetStream().GetBuffer(&spBuffer));
-    
-    reader.GetTransactionId(&transid);
+    CSocketAddress addrMapped;
+    CSocketAddress addrXorMapped;
+    HRESULT hrResult;
 
-    //ChkA(reader.GetAttributeByType(STUN_ATTRIBUTE_XORMAPPEDADDRESS, &attrib));
-    //ChkA(GetXorMappedAddress(spBuffer->GetData()+attrib.offset, attrib.size, transid, &mappedaddr));
-    reader.GetXorMappedAddress(&mappedaddr);
-    ChkIfA(false == addrClient.IsSameIP_and_Port(mappedaddr), E_FAIL);    
+    hrResult = reader.GetXorMappedAddress(&addrXorMapped);
     
-    //ChkA(reader.GetAttributeByType(STUN_ATTRIBUTE_MAPPEDADDRESS, &attrib));
-    //ChkA(GetMappedAddress(spBuffer->GetData()+attrib.offset, attrib.size, &mappedaddr));
-    
-    reader.GetMappedAddress(&mappedaddr);
-    ChkIfA(false == addrClient.IsSameIP_and_Port(mappedaddr), E_FAIL);    
-    
-Cleanup:
-    return hr;
-}
-
-HRESULT CTestMessageHandler::ValidateOriginAddress(CStunMessageReader& reader, SocketRole socketExpected)
-{
-    HRESULT hr = S_OK;
-    StunAttribute attrib;
-    CSocketAddress addrExpected, mappedaddr;
-    
-    CRefCountedBuffer spBuffer;
-    Chk(reader.GetStream().GetBuffer(&spBuffer));
-    
-    Chk(_spTransport->GetSocketAddressForRole(socketExpected, &addrExpected));
-    
-
-    ChkA(reader.GetAttributeByType(STUN_ATTRIBUTE_RESPONSE_ORIGIN, &attrib));
-
-    
-    ChkA(GetMappedAddress(spBuffer->GetData()+attrib.offset, attrib.size, &mappedaddr));
-    ChkIfA(false == addrExpected.IsSameIP_and_Port(mappedaddr), E_FAIL);    
-    
-    ChkIfA(socketExpected != _spTransport->m_outputRole, E_FAIL);
-    
-Cleanup:
-    return hr;
-}
-
-HRESULT CTestMessageHandler::ValidateResponseAddress(const CSocketAddress& addr)
-{
-    HRESULT hr = S_OK;
-    
-    if (false == _spTransport->m_addrDestination.IsSameIP_and_Port(addr))
+    if (SUCCEEDED(hrResult))
     {
-        hr = E_FAIL;
+        ChkIfA(false == addrExpected.IsSameIP_and_Port(addrXorMapped), E_FAIL);
+        ChkIfA(fLegacyOnly, E_FAIL); // legacy responses should not include XOR mapped
+    }
+    else
+    {
+        ChkIfA(fLegacyOnly==false, E_FAIL); // non-legacy responses should include XOR Mapped address
     }
     
+    ChkA(reader.GetMappedAddress(&addrMapped));
+    ChkIfA(false == addrExpected.IsSameIP_and_Port(addrMapped), E_FAIL);
+    
+Cleanup:
     return hr;
+}
+
+HRESULT CTestMessageHandler::ValidateResponseOriginAddress(CStunMessageReader& reader, const CSocketAddress& addrExpected)
+{
+    HRESULT hr = S_OK;
+    CSocketAddress addr;
+    
+    ChkA(reader.GetResponseOriginAddress(&addr));
+    ChkIfA(false == addrExpected.IsSameIP_and_Port(addr), E_FAIL);
+    
+Cleanup:
+    return hr;
+}
+
+
+
+HRESULT CTestMessageHandler::ValidateOtherAddress(CStunMessageReader& reader, const CSocketAddress& addrExpected)
+{
+    HRESULT hr = S_OK;
+    CSocketAddress addr;
+    
+    ChkA(reader.GetOtherAddress(&addr));
+    ChkIfA(false == addrExpected.IsSameIP_and_Port(addr), E_FAIL);
+    
+Cleanup:
+    return hr;
+}
+
+void CTestMessageHandler::InitTransportAddressSet(TransportAddressSet& tas, bool fRolePP, bool fRolePA, bool fRoleAP, bool fRoleAA)
+{
+    CSocketAddress addrZero;
+    
+    tas.set[RolePP].fValid = fRolePP;
+    tas.set[RolePP].addr = fRolePP ? _addrServerPP : addrZero;
+    
+    tas.set[RolePA].fValid = fRolePA;
+    tas.set[RolePA].addr = fRolePA ? _addrServerPA : addrZero;
+    
+    tas.set[RoleAP].fValid = fRoleAP;
+    tas.set[RoleAP].addr = fRoleAP ? _addrServerAP : addrZero;
+    
+    tas.set[RoleAA].fValid = fRoleAA;
+    tas.set[RoleAA].addr = fRoleAA ? _addrServerAA : addrZero;
+    
 }
 
 
@@ -259,77 +240,83 @@ HRESULT CTestMessageHandler::ValidateResponseAddress(const CSocketAddress& addr)
 // Test1 - just do a basic binding request
 HRESULT CTestMessageHandler::Test1()
 {
-    HRESULT hr=S_OK;
+    HRESULT hr = S_OK;
     CStunMessageBuilder builder;
-    CSocketAddress clientaddr(0x12345678, 9876);
-    CRefCountedBuffer spBuffer;
-    CStunThreadMessageHandler handler;
+    CRefCountedBuffer spBuffer, spBufferOut(new CBuffer(MAX_STUN_MESSAGE_SIZE));
     CStunMessageReader reader;
-    CStunMessageReader::ReaderParseState state;
-    StunMessageEnvelope message;
-
-    _spTransport->Reset();
-    _spTransport->AddPP(CSocketAddress(0xaaaaaaaa, 1234));
-
-    InitBindingRequest(builder);
-
-    builder.GetStream().GetBuffer(&spBuffer);
-
-    handler.SetResponder(_spTransport);
+    StunMessageIn msgIn;
+    StunMessageOut msgOut;
+    TransportAddressSet tas = {};
     
+    InitTransportAddressSet(tas, true, true, true, true);
     
-    message.localSocket = RolePP;
-    message.remoteAddr = clientaddr;
-    message.spBuffer = spBuffer;
-    _spTransport->GetSocketAddressForRole(message.localSocket, &(message.localAddr));
+    ChkA(InitBindingRequest(builder));
     
-    handler.ProcessRequest(message);
+  
+    Chk(builder.GetResult(&spBuffer));
+    
+    ChkIfA(CStunMessageReader::BodyValidated != reader.AddBytes(spBuffer->GetData(), spBuffer->GetSize()), E_FAIL);
 
-
+    // a message send to the PP socket on the server from the 
+    msgIn.socketrole = RolePP;
+    msgIn.addrRemote = _addrMapped;
+    msgIn.pReader = &reader;
+    msgIn.addrLocal = _addrServerPP;
+    msgIn.fConnectionOriented = false;
+    
     spBuffer.reset();
-    _spTransport->GetOutputStream().GetBuffer(&spBuffer);
-
-    state = reader.AddBytes(spBuffer->GetData(), spBuffer->GetSize());
-
-    ChkIfA(state != CStunMessageReader::BodyValidated, E_FAIL);
-
-    // validate that the binding response matches our expectations
-    ChkA(ValidateMappedAddress(reader, clientaddr));
     
-    // validate that it came from the server port we expected
-    ChkA(ValidateOriginAddress(reader, RolePP));
+    msgOut.spBufferOut = spBufferOut;
+    msgOut.socketrole = RoleAA; // deliberately wrong - so we can validate if it got changed to RolePP
+    
+    ChkA(CStunRequestHandler::ProcessRequest(msgIn, msgOut, &tas, NULL));
+    
+    reader.Reset();
+    ChkIfA(CStunMessageReader::BodyValidated != reader.AddBytes(spBufferOut->GetData(), spBufferOut->GetSize()), E_FAIL);
 
-    // did we get back the binding request we expected
-    ChkA(ValidateResponseAddress(clientaddr));
+    
+    // validate that the message returned is a success response for a binding request
+    ChkIfA(reader.GetMessageClass() != StunMsgClassSuccessResponse, E_FAIL);
+    ChkIfA(reader.GetMessageType() != (uint16_t)StunMsgTypeBinding, E_FAIL);
+    
+    
+    // Validate that the message came from the server port we expected
+    //    and that it's the same address the server set for the origin address
+    ChkIfA(msgOut.socketrole != RolePP, E_FAIL);
+    ChkA(ValidateResponseOriginAddress(reader, _addrServerPP));
+    ChkIfA(msgOut.addrDest.IsSameIP_and_Port(_addrMapped)==false, E_FAIL);
+    
+    // validate that the mapping was done correctly
+    ChkA(ValidateMappedAddress(reader, _addrMapped, false));
+    
+    ChkA(ValidateOtherAddress(reader, _addrServerAA));
+
     
 Cleanup:
-
     return hr;
 }
 
-
-// send a binding request to a duplex server instructing it to send back on it's alternate port and alternate IP to an alternate client port
+// Test2 - send a binding request to a duplex server instructing it to send back on it's alternate port and alternate IP to an alternate client port
 HRESULT CTestMessageHandler::Test2()
 {
-    HRESULT hr=S_OK;
+    HRESULT hr = S_OK;
     CStunMessageBuilder builder;
-    CSocketAddress clientaddr(0x12345678, 9876);
-    CSocketAddress recvaddr;
-    uint16_t responsePort = 2222;
-    CRefCountedBuffer spBuffer;
-    CStunThreadMessageHandler handler;
+    CRefCountedBuffer spBuffer, spBufferOut(new CBuffer(MAX_STUN_MESSAGE_SIZE));
     CStunMessageReader reader;
+    StunMessageIn msgIn;
+    StunMessageOut msgOut;
+    TransportAddressSet tas = {};
+    uint16_t responsePort = 2222;
+    StunChangeRequestAttribute changereq;
     CStunMessageReader::ReaderParseState state;
-    ::StunChangeRequestAttribute changereq;
-    StunMessageEnvelope message;
+    CSocketAddress addrDestExpected;
     
-    _spTransport->Reset();
-    _spTransport->AddPP(CSocketAddress(0xaaaaaaaa, 1234));
-    _spTransport->AddPA(CSocketAddress(0xaaaaaaaa, 1235));
-    _spTransport->AddAP(CSocketAddress(0xbbbbbbbb, 1234));
-    _spTransport->AddAA(CSocketAddress(0xbbbbbbbb, 1235));
+    
+    InitTransportAddressSet(tas, true, true, true, true);
+    
     
     InitBindingRequest(builder);
+    
     
     builder.AddResponsePort(responsePort);
     
@@ -339,223 +326,154 @@ HRESULT CTestMessageHandler::Test2()
     builder.AddResponsePort(responsePort);
     builder.GetResult(&spBuffer);
     
-    message.localSocket = RolePP;
-    message.remoteAddr = clientaddr;
-    message.spBuffer = spBuffer;
-    _spTransport->GetSocketAddressForRole(RolePP, &(message.localAddr));
+    ChkIfA(CStunMessageReader::BodyValidated != reader.AddBytes(spBuffer->GetData(), spBuffer->GetSize()), E_FAIL);
+
+    msgIn.fConnectionOriented = false;
+    msgIn.addrLocal = _addrServerPP;
+    msgIn.pReader = &reader;
+    msgIn.socketrole = RolePP;
+    msgIn.addrRemote = _addrMapped;
     
-    handler.SetResponder(_spTransport);
-    handler.ProcessRequest(message);
+    msgOut.socketrole = RolePP; // deliberate initialized wrong
+    msgOut.spBufferOut = spBufferOut;
     
-    spBuffer->Reset();
-    _spTransport->GetOutputStream().GetBuffer(&spBuffer);
+    ChkA(CStunRequestHandler::ProcessRequest(msgIn, msgOut, &tas, NULL));
     
     // parse the response
-    state = reader.AddBytes(spBuffer->GetData(), spBuffer->GetSize());
+    reader.Reset();
+    state = reader.AddBytes(spBufferOut->GetData(), spBufferOut->GetSize());
     ChkIfA(state != CStunMessageReader::BodyValidated, E_FAIL);
     
-
-    // validate that the binding response matches our expectations
-    ChkA(ValidateMappedAddress(reader, clientaddr));
+    // validate that the message was sent back from the AA
+    ChkIfA(msgOut.socketrole != RoleAA, E_FAIL);
+    // validate that the server though it was sending back from the AA
+    ChkA(ValidateResponseOriginAddress(reader, _addrServerAA));
     
-    ChkA(ValidateOriginAddress(reader, RoleAA));
+    // validate that the message was sent to the response port requested
+    addrDestExpected = _addrMapped;
+    addrDestExpected.SetPort(responsePort);
+    ChkIfA(addrDestExpected.IsSameIP_and_Port(msgOut.addrDest)==false, E_FAIL);
     
-    // did it get sent back to where we thought it was
-    recvaddr = clientaddr;
-    recvaddr.SetPort(responsePort);
-    ChkA(ValidateResponseAddress(recvaddr));
+    // validate that the binding response came back
+    ChkA(ValidateMappedAddress(reader, _addrMapped, false));
+    
+    // the "other" address is still AA (See RFC 3489 - section 8.1)
+    ChkA(ValidateOtherAddress(reader, _addrServerAA));
     
 
 Cleanup:
 
     return hr;
 }
+
+
+
+
 
 
 // test simple authentication
 HRESULT CTestMessageHandler::Test3()
 {
-    HRESULT hr=S_OK;
     CStunMessageBuilder builder1, builder2, builder3;
-    CStunMessageReader reader1, reader2, reader3;
-    CSocketAddress clientaddr(0x12345678, 9876);
-    CRefCountedBuffer spBuffer;
-    CStunThreadMessageHandler handler;
+    CStunMessageReader readerResponse;
     uint16_t errorcode = 0;
+    HRESULT hr = S_OK;
     
-    CStunMessageReader::ReaderParseState state;
-    StunMessageEnvelope message;
-    
-    _spTransport->Reset();
-    _spTransport->AddPP(CSocketAddress(0xaaaaaaaa, 1234));
-    
-    handler.SetAuth(_spAuthShort);
-    handler.SetResponder(_spTransport);
 
     // -----------------------------------------------------------------------
     // simulate an authorized user making a request with a valid password
-    InitBindingRequest(builder1);
+    
+    ChkA(InitBindingRequest(builder1));
     builder1.AddStringAttribute(STUN_ATTRIBUTE_USERNAME, "AuthorizedUser");
     builder1.AddMessageIntegrityShortTerm("password");
-    builder1.GetResult(&spBuffer);
+    builder1.FixLengthField();
     
-    message.localSocket = RolePP;
-    message.remoteAddr = clientaddr;
-    message.spBuffer = spBuffer;
-    _spTransport->GetSocketAddressForRole(message.localSocket, &(message.localAddr));
-    
-    handler.ProcessRequest(message);
-    
-    // we expect back a response with a valid message integrity field
-    spBuffer.reset();
-    _spTransport->m_outputstream.GetBuffer(&spBuffer);
-    
-    state = reader1.AddBytes(spBuffer->GetData(), spBuffer->GetSize());
-    ChkIfA(state != CStunMessageReader::BodyValidated, E_FAIL);
-    ChkA(reader1.ValidateMessageIntegrityShort("password"));
+    ChkA(SendHelper(builder1, &readerResponse, _spAuthShort));
+    ChkA(readerResponse.ValidateMessageIntegrityShort("password"));
     
 
     // -----------------------------------------------------------------------
     // simulate a user with a bad password
-    spBuffer.reset();
+    readerResponse.Reset();
     InitBindingRequest(builder2);
     builder2.AddStringAttribute(STUN_ATTRIBUTE_USERNAME, "WrongUser");
     builder2.AddMessageIntegrityShortTerm("wrongpassword");
-    builder2.GetResult(&spBuffer);
+    builder2.FixLengthField();
     
-    message.localSocket = RolePP;
-    message.remoteAddr = clientaddr;
-    message.spBuffer = spBuffer;
-    _spTransport->GetSocketAddressForRole(message.localSocket, &(message.localAddr));
-
-    _spTransport->ClearStream();
-    handler.ProcessRequest(message);
+    ChkA(SendHelper(builder2, &readerResponse, _spAuthShort))
     
-    spBuffer.reset();
-    _spTransport->m_outputstream.GetBuffer(&spBuffer);
-    
-    state = reader2.AddBytes(spBuffer->GetData(), spBuffer->GetSize());
-    ChkIfA(state != CStunMessageReader::BodyValidated, E_FAIL);
     errorcode = 0;
-    ChkA(reader2.GetErrorCode(&errorcode));
+    ChkA(readerResponse.GetErrorCode(&errorcode));
     ChkIfA(errorcode != ::STUN_ERROR_UNAUTHORIZED, E_FAIL);
     
     // -----------------------------------------------------------------------
     // simulate a client sending no credentials - we expect it to fire back with a 400/bad-request
-    spBuffer.reset();
-    InitBindingRequest(builder3);
-    builder3.GetResult(&spBuffer);
+    readerResponse.Reset();
+    ChkA(InitBindingRequest(builder3));
     
-    message.localSocket = RolePP;
-    message.remoteAddr = clientaddr;
-    message.spBuffer = spBuffer;
-    _spTransport->GetSocketAddressForRole(message.localSocket, &(message.localAddr));
-
-    _spTransport->ClearStream();
-    handler.ProcessRequest(message);
+    ChkA(SendHelper(builder3, &readerResponse, _spAuthShort));
     
-    spBuffer.reset();
-    _spTransport->m_outputstream.GetBuffer(&spBuffer);
-    
-    
-    state = reader3.AddBytes(spBuffer->GetData(), spBuffer->GetSize());
-    ChkIfA(state != CStunMessageReader::BodyValidated, E_FAIL);
     errorcode = 0;
-    ChkA(reader3.GetErrorCode(&errorcode));
+    ChkA(readerResponse.GetErrorCode(&errorcode));
     ChkIfA(errorcode != ::STUN_ERROR_BADREQUEST, E_FAIL);
     
-    
 Cleanup:
-
     return hr;
     
 }
+
 
 // test long-credential authentication
 HRESULT CTestMessageHandler::Test4()
 {
     HRESULT hr=S_OK;
     CStunMessageBuilder builder1, builder2;
-    CStunMessageReader reader1, reader2;
-    CSocketAddress clientaddr(0x12345678, 9876);
+    CStunMessageReader readerResponse;
     CSocketAddress addrMapped;
-    CRefCountedBuffer spBuffer;
-    CStunThreadMessageHandler handler;
     uint16_t errorcode = 0;
     char szNonce[MAX_STUN_AUTH_STRING_SIZE+1];
     char szRealm[MAX_STUN_AUTH_STRING_SIZE+1];
     
-    CStunMessageReader::ReaderParseState state;
-    StunMessageEnvelope message;
-    
-    _spTransport->Reset();
-    _spTransport->AddPP(CSocketAddress(0xaaaaaaaa, 1234));
-    
-    handler.SetAuth(_spAuthLong);
-    handler.SetResponder(_spTransport);
 
     // -----------------------------------------------------------------------
     // simulate a user making a request with no message integrity attribute (or username, or realm)
     InitBindingRequest(builder1);
-    builder1.GetResult(&spBuffer);
-    message.localSocket = RolePP;
-    message.remoteAddr = clientaddr;
-    message.spBuffer = spBuffer;
-    _spTransport->GetSocketAddressForRole(message.localSocket, &(message.localAddr));
+    builder1.FixLengthField();
     
-    handler.ProcessRequest(message);
+    ChkA(SendHelper(builder1, &readerResponse, _spAuthLong));
     
-    spBuffer.reset();
-    _spTransport->m_outputstream.GetBuffer(&spBuffer);
-    state = reader1.AddBytes(spBuffer->GetData(), spBuffer->GetSize());
+    Chk(readerResponse.GetErrorCode(&errorcode));
     
-    ChkIfA(state != CStunMessageReader::BodyValidated, E_FAIL);
-    // we expect the response back will be a 401 with a provided nonce and realm
-    Chk(reader1.GetErrorCode(&errorcode));
-    
-    ChkIfA(reader1.GetMessageClass() != ::StunMsgClassFailureResponse, E_UNEXPECTED);
+    ChkIfA(readerResponse.GetMessageClass() != ::StunMsgClassFailureResponse, E_UNEXPECTED);
     ChkIf(errorcode != ::STUN_ERROR_UNAUTHORIZED, E_UNEXPECTED);
 
-    reader1.GetStringAttributeByType(STUN_ATTRIBUTE_REALM, szRealm, ARRAYSIZE(szRealm));
-    reader1.GetStringAttributeByType(STUN_ATTRIBUTE_NONCE, szNonce, ARRAYSIZE(szNonce));
+    readerResponse.GetStringAttributeByType(STUN_ATTRIBUTE_REALM, szRealm, ARRAYSIZE(szRealm));
+    readerResponse.GetStringAttributeByType(STUN_ATTRIBUTE_NONCE, szNonce, ARRAYSIZE(szNonce));
     
     
     // --------------------------------------------------------------------------------
     // now simulate the follow-up request
-    _spTransport->ClearStream();
-    spBuffer.reset();
+    readerResponse.Reset();
     InitBindingRequest(builder2);
     builder2.AddNonce(szNonce);
     builder2.AddRealm(szRealm);
     builder2.AddUserName("AuthorizedUser");
     builder2.AddMessageIntegrityLongTerm("AuthorizedUser", szRealm, "password");
-    builder2.GetResult(&spBuffer);
+    builder2.FixLengthField();
     
-    message.localSocket = RolePP;
-    message.remoteAddr = clientaddr;
-    message.spBuffer = spBuffer;
-    _spTransport->GetSocketAddressForRole(message.localSocket, &(message.localAddr));
+    ChkA(SendHelper(builder2, &readerResponse, _spAuthLong));
     
-    handler.ProcessRequest(message);
-    
-    spBuffer.reset();
-    _spTransport->m_outputstream.GetBuffer(&spBuffer);
-    
-    state = reader2.AddBytes(spBuffer->GetData(), spBuffer->GetSize());
-    ChkIfA(state != CStunMessageReader::BodyValidated, E_FAIL);
-    ChkIfA(reader2.GetMessageClass() != ::StunMsgClassSuccessResponse, E_UNEXPECTED);
+    ChkIfA(readerResponse.GetMessageClass() != ::StunMsgClassSuccessResponse, E_UNEXPECTED);
     
     // should have a mapped address
-    ChkA(reader2.GetMappedAddress(&addrMapped));
+    ChkA(readerResponse.GetMappedAddress(&addrMapped));
     
     // and the message integrity field should be valid
-    ChkA(reader2.ValidateMessageIntegrityLong("AuthorizedUser", szRealm, "password"));
-    
+    ChkA(readerResponse.ValidateMessageIntegrityLong("AuthorizedUser", szRealm, "password"));
     
 Cleanup:
     return hr;
 }
-
 
 
 HRESULT CTestMessageHandler::Run()

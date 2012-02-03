@@ -1,4 +1,4 @@
-# BOOST_INCLUDE := -I/home/jselbie/lib/boost_1_46_1
+# BOOST_INCLUDE := -I/home/jselbie/boost_1_48_0
 # OPENSSL_INCLUDE := -I/home/jselbie/lib/openssl
 
 DEFINES := -DNDEBUG
@@ -7,7 +7,17 @@ STANDARD_FLAGS := -Wall -Wuninitialized
 
 RELEASE_FLAGS := -O2
 DEBUG_FLAGS := -g
+PROFILE_FLAGS := -O2 -g
 FLAVOR_FLAGS = $(RELEASE_FLAGS)
+
+
+#SOLARIS HACK
+UNAME := $(shell uname -s)
+ifeq ($(UNAME),SunOS)
+  SOCKET_LIBS := -lsocket -lnsl
+endif
+
+
 
 .PHONY: all clean debug
 
@@ -24,5 +34,9 @@ all:
 debug: FLAVOR_FLAGS = $(DEBUG_FLAGS)
 debug: DEFINES = -DDEBUG
 debug: all
+
+
+profile: FLAVOR_FLAGS = $(PROFILE_FLAGS)
+profile: all
 
 

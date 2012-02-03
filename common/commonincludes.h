@@ -21,6 +21,11 @@
 // Fix for Lion (http://www.opensource.apple.com/source/xnu/xnu-1699.24.8/bsd/netinet6/in6.h)
 #define __APPLE_USE_RFC_3542
 
+
+#if __linux || __linux__ || __gnu_linux__ || linux
+#define IS_LINUX
+#endif
+
 // standard system includes
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -31,6 +36,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <stdio.h>
+#include <string.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/time.h>
@@ -39,6 +45,8 @@
 #include <ifaddrs.h>
 #include <net/if.h>
 #include <stdarg.h>
+#include <math.h>
+#include <sys/termios.h>
 
 #include <boost/shared_ptr.hpp>
 #include <boost/scoped_array.hpp>
@@ -48,6 +56,15 @@
 #include <vector>
 #include <list>
 #include <string>
+
+
+#ifdef IS_LINUX
+#define HAS_EPOLL
+#include <sys/epoll.h>
+#endif
+
+#include <poll.h>
+
 
 #include <pthread.h>
 
@@ -121,6 +138,8 @@ inline void cta_noop(const char* psz)
 
 
 #include "logger.h"
+
+
 
 
 #endif

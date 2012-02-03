@@ -24,6 +24,7 @@
 #include "stuntypes.h"
 #include "datastream.h"
 #include "socketaddress.h"
+#include "fasthash.h"
 
 
 class CStunMessageReader
@@ -46,8 +47,16 @@ private:
     ReaderParseState _state;
 
     static const size_t MAX_NUM_ATTRIBUTES = 30;
-    StunAttribute _attributes[MAX_NUM_ATTRIBUTES];
-    size_t _nAttributeCount;
+    
+    typedef FastHash<uint16_t, StunAttribute, MAX_NUM_ATTRIBUTES, 53> AttributeHashTable; // 53 is a prime number for a reasonable table width
+    
+    AttributeHashTable _mapAttributes;
+    
+    // special index values for message integrity attribute validation
+    int _indexFingerprint;
+    int _indexMessageIntegrity;
+    int _countAttributes;
+    
 
     StunTransactionId _transactionid;
     uint16_t _msgTypeNormalized;
@@ -57,14 +66,6 @@ private:
     HRESULT ReadHeader();
     HRESULT ReadBody();
 
-    // cached indexes for common properties
-    int _indexFingerprint;
-    int _indexResponsePort;
-    int _indexChangeRequest;
-    int _indexPaddingAttribute;
-    int _indexErrorCode;
-    int _indexMessageIntegrity;
-    
     HRESULT GetAddressHelper(uint16_t attribType, CSocketAddress* pAddr);
     
     HRESULT ValidateMessageIntegrity(uint8_t* key, size_t keylength);
@@ -72,10 +73,13 @@ private:
 public:
     CStunMessageReader();
     
+    void Reset();
+    
     void SetAllowLegacyFormat(bool fAllowLegacyFormat);
     
     ReaderParseState AddBytes(const uint8_t* pData, uint32_t size);
     uint16_t HowManyBytesNeeded();
+    ReaderParseState GetState();
 
     bool IsMessageLegacyFormat();
     
@@ -105,6 +109,7 @@ public:
     HRESULT GetXorMappedAddress(CSocketAddress* pAddress);
     HRESULT GetMappedAddress(CSocketAddress* pAddress);
     HRESULT GetOtherAddress(CSocketAddress* pAddress);
+    HRESULT GetResponseOriginAddress(CSocketAddress* pAddress);
     
     HRESULT GetStringAttributeByType(uint16_t attributeType, char* pszValue, /*in-out*/ size_t size);
     

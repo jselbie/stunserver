@@ -122,15 +122,6 @@ CBuffer::CBuffer(uint8_t* pByteArray, size_t nByteArraySize, bool fCopy)
 
 
 
-size_t CBuffer::GetSize()
-{
-    return _size;
-}
-
-size_t CBuffer::GetAllocatedSize()
-{
-    return _allocatedSize;
-}
 
 HRESULT CBuffer::SetSize(size_t size)
 {
@@ -147,10 +138,7 @@ HRESULT CBuffer::SetSize(size_t size)
 }
 
 
-uint8_t* CBuffer::GetData()
-{
-    return _data;
-}
+
 
 bool CBuffer::IsValid()
 {

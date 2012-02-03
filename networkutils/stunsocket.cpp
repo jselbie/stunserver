@@ -18,9 +18,24 @@
 #include "stuncore.h"
 #include "stunsocket.h"
 
+CStunSocket::CStunSocket() :
+_sock(-1),
+_role(RolePP)
+{
+    
+}
+
 CStunSocket::~CStunSocket()
 {
     Close();
+}
+
+void CStunSocket::Reset()
+{
+    _sock = -1;
+    _addrlocal = CSocketAddress(0,0);
+    _addrremote = CSocketAddress(0,0);
+    _role = RolePP;
 }
 
 void CStunSocket::Close()
@@ -28,8 +43,40 @@ void CStunSocket::Close()
     if (_sock != -1)
     {
         close(_sock);
-        _addrlocal = CSocketAddress(0,0);
+        _sock = -1;
     }
+    Reset();
+}
+
+bool CStunSocket::IsValid()
+{
+    return (_sock != -1);
+}
+
+HRESULT CStunSocket::Attach(int sock)
+{
+    if (sock == -1)
+    {
+        ASSERT(false);
+        return E_INVALIDARG;
+    }
+    
+    if (sock != _sock)
+    {
+        // close any existing socket
+        Close(); // this will also call "Reset"
+        _sock = sock;
+    }
+    
+    UpdateAddresses();
+    return S_OK;
+}
+
+int CStunSocket::Detach()
+{
+    int sock = _sock;
+    Reset();
+    return sock;
 }
 
 int CStunSocket::GetSocketHandle() const
@@ -42,85 +89,207 @@ const CSocketAddress& CStunSocket::GetLocalAddress() const
     return _addrlocal;
 }
 
+const CSocketAddress& CStunSocket::GetRemoteAddress() const
+{
+    return _addrremote;
+}
+
+
 SocketRole CStunSocket::GetRole() const
 {
     ASSERT(_sock != -1);
-    
     return _role;
 }
 
-HRESULT CStunSocket::EnablePktInfoOption(bool fEnable)
+void CStunSocket::SetRole(SocketRole role)
 {
-    int enable = fEnable?1:0;
-    int ret;
-    
-    int family = _addrlocal.GetFamily();
-    int level =  (family==AF_INET) ? IPPROTO_IP : IPPROTO_IPV6;
-
-// if you change the ifdef's below, make sure you it's matched with the same logic in recvfromex.cpp
-#ifdef IP_PKTINFO
-    int option = (family==AF_INET) ? IP_PKTINFO : IPV6_RECVPKTINFO;
-#elif defined(IP_RECVDSTADDR)
-    int option = (family==AF_INET) ? IP_RECVDSTADDR : IPV6_PKTINFO;
-#else
-    int fail[-1]; // set a compile time assert
-#endif
-
-    ret = ::setsockopt(_sock, level, option, &enable, sizeof(enable));
-    
-    // Linux documentation (man ipv6) says you are supposed to set IPV6_PKTINFO as the option
-    // Yet, it's really IPV6_RECVPKTINFO.  Other operating systems might expect IPV6_PKTINFO.
-    // We'll cross that bridge, when we get to it.
-    // todo - we should write a unit test that tests the packet info behavior
-    ASSERT(ret == 0);
-    
-    return (ret == 0) ? S_OK : ERRNOHR;
+    _role = role;
 }
 
-//static
-HRESULT CStunSocket::Create(const CSocketAddress& addrlocal, SocketRole role, boost::shared_ptr<CStunSocket>* pStunSocketShared)
+
+
+// About the "packet info option"
+// What we are trying to do is enable the socket to be able to provide the "destination address"
+// for packets we receive.  However, Linux, BSD, and MacOS all differ in what the
+// socket option is. And it differs even differently between IPV4 and IPV6 across these operating systems.
+// So we have the "try one or the other" implementation based on what's DEFINED
+// On some operating systems, there's only one option defined. Other's have both, but only one works!
+// So we have to try them both
+
+HRESULT CStunSocket::EnablePktInfoImpl(int level, int option1, int option2, bool fEnable)
 {
-    int sock = -1;
-    int ret;
-    CStunSocket* pSocket = NULL;
-    sockaddr_storage addrBind = {};
-    socklen_t sizeaddrBind;
     HRESULT hr = S_OK;
+    int enable = fEnable?1:0;
+    int ret = -1;
     
-    ChkIfA(pStunSocketShared == NULL, E_INVALIDARG);
     
-    sock = socket(addrlocal.GetFamily(), SOCK_DGRAM, 0);
-    ChkIf(sock < 0, ERRNOHR);
+    ChkIfA((option1 == -1) && (option2 == -1), E_FAIL);
     
-    ret = bind(sock, addrlocal.GetSockAddr(), addrlocal.GetSockAddrLength());
-    ChkIf(ret < 0, ERRNOHR);
-    
-    // call get sockname to find out what port we just binded to.  (Useful for when addrLocal.port is 0)
-    sizeaddrBind = sizeof(addrBind);
-    ret = ::getsockname(sock, (sockaddr*)&addrBind, &sizeaddrBind);
-    ChkIf(ret < 0, ERRNOHR);
-    
-    pSocket = new CStunSocket();
-    pSocket->_sock = sock;
-    pSocket->_addrlocal = CSocketAddress(*(sockaddr*)&addrBind);
-    pSocket->_role = role;
-    sock = -1;
-    
+    if (option1 != -1)
     {
-        boost::shared_ptr<CStunSocket> spTmp(pSocket);
-        pStunSocketShared->swap(spTmp);
+        ret = setsockopt(_sock, level, option1, &enable, sizeof(enable));
+    }
+    
+    if ((ret < 0) && (option2 != -1))
+    {
+        enable = fEnable?1:0;
+        ret = setsockopt(_sock, level, option2, &enable, sizeof(enable));
+    }
+    
+    ChkIfA(ret < 0, ERRNOHR);
+    
+Cleanup:
+    return hr;
+}
+
+HRESULT CStunSocket::EnablePktInfo_IPV4(bool fEnable)
+{
+    int level = IPPROTO_IP;
+    int option1 = -1;
+    int option2 = -1;
+    
+#ifdef IP_PKTINFO
+    option1 = IP_PKTINFO;
+#endif
+    
+#ifdef IP_RECVDSTADDR
+    option2 = IP_RECVDSTADDR;
+#endif
+    
+    return EnablePktInfoImpl(level, option1, option2, fEnable);
+}
+
+HRESULT CStunSocket::EnablePktInfo_IPV6(bool fEnable)
+{
+    int level = IPPROTO_IPV6;
+    int option1 = -1;
+    int option2 = -1;
+    
+#ifdef IPV6_RECVPKTINFO
+    option1 = IPV6_RECVPKTINFO;
+#endif
+    
+#ifdef IPV6_PKTINFO
+    option2 = IPV6_PKTINFO;
+#endif
+    
+    return EnablePktInfoImpl(level, option1, option2, fEnable);
+}
+
+
+HRESULT CStunSocket::EnablePktInfoOption(bool fEnable)
+{
+    int family = _addrlocal.GetFamily();
+    HRESULT hr;
+    
+    if (family == AF_INET)
+    {
+        hr = EnablePktInfo_IPV4(fEnable);
+    }
+    else
+    {
+        hr = EnablePktInfo_IPV6(fEnable);
+    }
+    
+    return hr;
+}
+
+HRESULT CStunSocket::SetNonBlocking(bool fEnable)
+{
+    HRESULT hr = S_OK;
+    int result;
+    int flags;
+    
+    flags = ::fcntl(_sock, F_GETFL, 0);
+    
+    ChkIf(flags == -1, ERRNOHR);
+    
+    flags |= O_NONBLOCK;
+    
+    result = fcntl(_sock , F_SETFL , flags);
+    
+    ChkIf(result == -1, ERRNOHR);
+    
+Cleanup:
+    return hr;
+}
+
+void CStunSocket::UpdateAddresses()
+{
+    sockaddr_storage addrLocal = {};
+    sockaddr_storage addrRemote = {};
+    socklen_t len;
+    int ret;
+    
+    ASSERT(_sock != -1);
+    if (_sock == -1)
+    {
+        return;
     }
     
     
-Cleanup:
+    len = sizeof(addrLocal);
+    ret = ::getsockname(_sock, (sockaddr*)&addrLocal, &len);
+    if (ret != -1)
+    {
+        _addrlocal = addrLocal;
+    }
+    
+    len = sizeof(addrRemote);
+    ret = ::getpeername(_sock, (sockaddr*)&addrRemote, &len);
+    if (ret != -1)
+    {
+        _addrremote = addrRemote;
+    }
+}
 
+
+
+HRESULT CStunSocket::InitCommon(int socktype, const CSocketAddress& addrlocal, SocketRole role, bool fSetReuseFlag)
+{
+    int sock = -1;
+    int ret;
+    HRESULT hr = S_OK;
+    
+    ASSERT((socktype == SOCK_DGRAM)||(socktype==SOCK_STREAM));
+    
+    sock = socket(addrlocal.GetFamily(), socktype, 0);
+    ChkIf(sock < 0, ERRNOHR);
+    
+    if (fSetReuseFlag)
+    {
+        int fAllow = 1;
+        ret = ::setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &fAllow, sizeof(fAllow));
+        ChkIf(ret == -1, ERRNOHR);
+    }
+    
+    ret = bind(sock, addrlocal.GetSockAddr(), addrlocal.GetSockAddrLength());
+    ChkIf(ret == -1, ERRNOHR);
+    
+    Attach(sock);
+    sock = -1;
+    
+    SetRole(role);
+    
+Cleanup:
     if (sock != -1)
     {
         close(sock);
         sock = -1;
     }
-
     return hr;
+}
+
+
+
+HRESULT CStunSocket::UDPInit(const CSocketAddress& local, SocketRole role)
+{
+    return InitCommon(SOCK_DGRAM, local, role, false);
+}
+
+HRESULT CStunSocket::TCPInit(const CSocketAddress& local, SocketRole role, bool fSetReuseFlag)
+{
+    return InitCommon(SOCK_STREAM, local, role, fSetReuseFlag);
 }
 
 

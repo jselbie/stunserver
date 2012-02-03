@@ -113,6 +113,8 @@ bool CBasicBindingTest::IsReadyToRun()
 
 HRESULT CBasicBindingTest::GetMessage(CRefCountedBuffer& spMsg, CSocketAddress* pAddrDest)
 {
+    StunChangeRequestAttribute attribChangeRequest = {};
+        
     HRESULT hr = S_OK;
     ASSERT(spMsg->GetAllocatedSize() > 0);
     ASSERT(pAddrDest);
@@ -122,6 +124,9 @@ HRESULT CBasicBindingTest::GetMessage(CRefCountedBuffer& spMsg, CSocketAddress* 
     builder.GetStream().Attach(spMsg, true);
 
     Chk(StartBindingRequest(builder));
+    
+    builder.AddChangeRequest(attribChangeRequest); // adding a blank CHANGE-REQUEST, because a JSTUN server will not respond if the request doesn't have one
+    
     builder.FixLengthField();
 
     *pAddrDest = _pConfig->addrServer;
@@ -234,10 +239,15 @@ HRESULT CBehaviorTest::GetMessage(CRefCountedBuffer& spMsg, CSocketAddress* pAdd
     HRESULT hr = S_OK;
     ASSERT(spMsg->GetAllocatedSize() > 0);
     ASSERT(pAddrDest);
+    
+    StunChangeRequestAttribute attribChangeRequest = {};
 
     CStunMessageBuilder builder;
     builder.GetStream().Attach(spMsg, true);
     StartBindingRequest(builder);
+    
+    builder.AddChangeRequest(attribChangeRequest); // adding a blank CHANGE-REQUEST, because a JSTUN server will not respond if the request doesn't have one
+    
     builder.FixLengthField();
 
     if (_fIsTest3 == false)

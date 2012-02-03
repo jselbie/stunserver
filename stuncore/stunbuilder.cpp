@@ -32,9 +32,15 @@ static int g_sequence_number = 0xaaaaaaaa;
 
 
 CStunMessageBuilder::CStunMessageBuilder() :
-_transactionid()
+_transactionid(),
+_fLegacyMode(false)
 {
     ;
+}
+
+void CStunMessageBuilder::SetLegacyMode(bool fLegacyMode)
+{
+    _fLegacyMode = fLegacyMode;
 }
 
 
@@ -151,17 +157,27 @@ Cleanup:
 HRESULT CStunMessageBuilder::AddAttribute(uint16_t attribType, const void* data, uint16_t size)
 {
     uint8_t padBytes[4] = {0};
-    size_t padding;
+    size_t padding = 0;
     HRESULT hr = S_OK;
+    uint16_t sizeheader = size;
 
     if (data == NULL)
     {
         size = 0;
     }
-
+    
+    // attributes always start on a 4-byte boundary
+    padding = (size % 4) ? (4 - (size % 4)) : 0;
+    
+    if (_fLegacyMode)
+    {
+        // in legacy mode (RFC 3489), the header size of the attribute includes the padding
+        // in RFC 5389, the attribute header is the exact size of the data, and extra padding bytes are implicitly assumed
+        sizeheader += padding;
+    }
+    
     // I suppose you can have zero length attributes as an indicator of something
-    Chk(AddAttributeHeader(attribType, size));
-
+    Chk(AddAttributeHeader(attribType, sizeheader));
 
     if (size > 0)
     {
@@ -169,9 +185,8 @@ HRESULT CStunMessageBuilder::AddAttribute(uint16_t attribType, const void* data,
     }
 
     // pad with zeros to get the 4-byte alignment
-    if (size%4)
+    if (padding > 0)
     {
-        padding = 4 - size%4;
         Chk(_stream.Write(padBytes, padding));
     }
 
@@ -196,16 +211,33 @@ Cleanup:
 HRESULT CStunMessageBuilder::AddErrorCode(uint16_t errorNumber, const char* pszReason)
 {
     HRESULT hr = S_OK;
+    uint8_t padBytes[4] = {0};
     size_t strsize = (pszReason==NULL) ? 0 : strlen(pszReason);
     size_t size = strsize + 4;
+    size_t sizeheader = size;
+    size_t padding = 0;
     uint8_t cl = 0;
     uint8_t ernum = 0;
 
     ChkIf(strsize >= 128, E_INVALIDARG);
     ChkIf(errorNumber < 300, E_INVALIDARG);
     ChkIf(errorNumber > 600, E_INVALIDARG);
+    
+    padding = (size%4) ? (4-size%4) : 0;
 
-    Chk(AddAttributeHeader(STUN_ATTRIBUTE_ERRORCODE, size));
+    // fix for RFC 3489 clients - explicitly do the 4-byte padding alignment on the string with spaces instead of
+    // padding the message with zeros. Adjust the length field to always be a multiple of 4.
+    if ((size % 4) && _fLegacyMode)
+    {
+        padding = 4 - (size % 4);
+    }
+    
+    if (_fLegacyMode)
+    {
+        sizeheader += padding;
+    }
+
+    Chk(AddAttributeHeader(STUN_ATTRIBUTE_ERRORCODE, sizeheader));
 
     Chk(_stream.WriteInt16(0));
 
@@ -218,27 +250,50 @@ HRESULT CStunMessageBuilder::AddErrorCode(uint16_t errorNumber, const char* pszR
     if (strsize > 0)
     {
         _stream.Write(pszReason, strsize);
-
-        if (strsize % 4)
-        {
-            const uint32_t c_zero = 0;
-            uint16_t paddingSize = 4 - (strsize % 4);
-            _stream.Write(&c_zero, paddingSize);
-        }
+    }
+    
+    if (padding > 0)
+    {
+        Chk(_stream.Write(padBytes, padding));
     }
 
 Cleanup:
-
     return hr;
 }
 
 HRESULT CStunMessageBuilder::AddUnknownAttributes(const uint16_t* arr, size_t count)
 {
     HRESULT hr = S_OK;
+    uint16_t size = count * sizeof(uint16_t);
+    uint16_t unpaddedsize = size;
+    bool fPad = false;
     
     ChkIfA(arr == NULL, E_INVALIDARG);
-    ChkIfA(count <= 0, E_INVALIDARG)
-    Chk(AddAttribute(STUN_ATTRIBUTE_UNKNOWNATTRIBUTES, arr, count*sizeof(arr[0])));
+    ChkIfA(count <= 0, E_INVALIDARG);
+    
+    // fix for RFC 3489. Since legacy clients can't understand implicit padding rules
+    // of rfc 5389, then we do what rfc 3489 suggests.  If there are an odd number of attributes
+    // that would make the length of the attribute not a multiple of 4, then repeat one
+    // attribute.
+    
+    fPad = _fLegacyMode && (!!(count % 2));
+    
+    if (fPad)
+    {
+        size += sizeof(uint16_t);
+    }
+    
+    Chk(AddAttributeHeader(STUN_ATTRIBUTE_UNKNOWNATTRIBUTES, size));
+    
+    Chk(_stream.Write(arr, unpaddedsize));
+    
+    if (fPad)
+    {
+        // repeat the last attribute in the array to get an even alignment of 4 bytes
+        _stream.Write(&arr[count-1], sizeof(arr[0]));
+    }
+    
+    
 Cleanup:
     return hr;
 }
@@ -246,10 +301,11 @@ Cleanup:
 HRESULT CStunMessageBuilder::AddXorMappedAddress(const CSocketAddress& addr)
 {
     CSocketAddress addrxor(addr);
+    uint16_t attributeID = _fLegacyMode ? STUN_ATTRIBUTE_XORMAPPEDADDRESS_OPTIONAL : STUN_ATTRIBUTE_XORMAPPEDADDRESS;
 
     addrxor.ApplyStunXorMap(_transactionid);
 
-    return AddMappedAddressImpl(STUN_ATTRIBUTE_XORMAPPEDADDRESS, addrxor);
+    return AddMappedAddressImpl(attributeID, addrxor);
 }
 
 HRESULT CStunMessageBuilder::AddMappedAddress(const CSocketAddress& addr)
@@ -259,12 +315,14 @@ HRESULT CStunMessageBuilder::AddMappedAddress(const CSocketAddress& addr)
 
 HRESULT CStunMessageBuilder::AddResponseOriginAddress(const CSocketAddress& addr)
 {
-    return AddMappedAddressImpl(STUN_ATTRIBUTE_RESPONSE_ORIGIN, addr);
+    uint16_t attribid = _fLegacyMode ? STUN_ATTRIBUTE_SOURCEADDRESS : STUN_ATTRIBUTE_RESPONSE_ORIGIN;
+    
+    return AddMappedAddressImpl(attribid, addr);
 }
 
-HRESULT CStunMessageBuilder::AddOtherAddress(const CSocketAddress& addr, bool fLegacy)
+HRESULT CStunMessageBuilder::AddOtherAddress(const CSocketAddress& addr)
 {
-    uint16_t attribid = fLegacy ? STUN_ATTRIBUTE_CHANGEDADDRESS : STUN_ATTRIBUTE_OTHER_ADDRESS;
+    uint16_t attribid = _fLegacyMode ? STUN_ATTRIBUTE_CHANGEDADDRESS : STUN_ATTRIBUTE_OTHER_ADDRESS;
     return AddMappedAddressImpl(attribid, addr);
 }
 
@@ -437,7 +495,7 @@ HRESULT CStunMessageBuilder::AddMessageIntegrityImpl(uint8_t* key, size_t keysiz
     length = length-24;
     
     
-    // now do a little so that HMAC can write exactly to where the hash bytes will appear
+    // now do a little pointer math so that HMAC can write exactly to where the hash bytes will appear
     pDstBuf = ((uint8_t*)pData) + length + 4;
     pHashResult = HMAC(EVP_sha1(), key, keysize, (uint8_t*)pData, length, pDstBuf, &resultlength);
     

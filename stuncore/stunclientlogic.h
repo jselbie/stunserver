@@ -21,10 +21,14 @@
 
 #include "stunclienttests.h"
 
+
+
 struct StunClientLogicConfig
 {
     CSocketAddress addrServer;
-    uint32_t timeoutSeconds;
+    
+    bool fTimeoutIsInstant;  // if true, then timeoutSeconds is ignored and assumed to be zero
+    uint32_t timeoutSeconds; // if fTimeoutIsInstant is false, then "0" implies to use the default
     uint32_t uMaxAttempts;
     
     bool fBehaviorTest;

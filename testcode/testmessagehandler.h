@@ -17,38 +17,6 @@
 #ifndef _TEST_MESSAGE_HANDLER_H
 #define _TEST_MESSAGE_HANDLER_H
 
-class CMockTransport : 
-     public CBasicRefCount,
-     public CObjectFactory<CMockTransport>,
-     public IStunResponder
-{
-private:
-    CSocketAddress m_addrs[4];
-
-public:
-    virtual HRESULT SendResponse(SocketRole roleOutput, const CSocketAddress& addr, CRefCountedBuffer& spResponse);
-    virtual bool HasAddress(SocketRole role);
-    virtual HRESULT GetSocketAddressForRole(SocketRole role, /*out*/ CSocketAddress* pAddr);
-
-    CMockTransport();
-    ~CMockTransport();
-
-    HRESULT Reset();
-    HRESULT ClearStream();
-    
-    CDataStream& GetOutputStream() {return m_outputstream;}
-
-    HRESULT AddPP(const CSocketAddress& addr);
-    HRESULT AddPA(const CSocketAddress& addr);
-    HRESULT AddAP(const CSocketAddress& addr);
-    HRESULT AddAA(const CSocketAddress& addr);
-
-    CDataStream m_outputstream;
-    SocketRole m_outputRole;
-    CSocketAddress m_addrDestination;
-    
-    ADDREF_AND_RELEASE_IMPL();
-};
 
 
 
@@ -75,18 +43,42 @@ public:
 
 
 
+
+
 class CTestMessageHandler : public IUnitTest
 {
 private:
-    CRefCountedPtr<CMockTransport> _spTransport;
     CRefCountedPtr<CMockAuthShort> _spAuthShort;
     CRefCountedPtr<CMockAuthLong> _spAuthLong;
     
     
+    CSocketAddress _addrLocal;
+    CSocketAddress _addrMapped;
+    CSocketAddress _addrServerPP;
+    CSocketAddress _addrServerPA;
+    CSocketAddress _addrServerAP;
+    CSocketAddress _addrServerAA;
+    
+    
+    CSocketAddress _addrDestination;
+    CSocketAddress _addrMappedExpected;
+    CSocketAddress _addrOriginExpected;
+    
+    
+    
+    
+    void ToAddr(const char* pszIP, uint16_t port, CSocketAddress* pAddr);
+    
+    void InitTransportAddressSet(TransportAddressSet& tas, bool fRolePP, bool fRolePA, bool fRoleAP, bool fRoleAA);
+    
     HRESULT InitBindingRequest(CStunMessageBuilder& builder);
-    HRESULT ValidateMappedAddress(CStunMessageReader& reader, const CSocketAddress& addr);
-    HRESULT ValidateOriginAddress(CStunMessageReader& reader, SocketRole socketExpected);
-    HRESULT ValidateResponseAddress(const CSocketAddress& addr);
+
+    HRESULT ValidateMappedAddress(CStunMessageReader& reader, const CSocketAddress& addrExpected, bool fLegacyOnly);
+    HRESULT ValidateResponseOriginAddress(CStunMessageReader& reader, const CSocketAddress& addrExpected);
+    
+    HRESULT ValidateOtherAddress(CStunMessageReader& reader, const CSocketAddress& addrExpected);
+    
+    HRESULT SendHelper(CStunMessageBuilder& builderRequest, CStunMessageReader* pReaderResponse, IStunAuth* pAuth);
     
 public:
     CTestMessageHandler();

@@ -22,6 +22,7 @@
 #include "testreader.h"
 
 
+// the following request block is from RFC 5769, section 2.1
 // static
 const unsigned char c_requestbytes[] =
  "\x00\x01\x00\x58"
@@ -41,10 +42,18 @@ const unsigned char c_requestbytes[] =
  "\x80\x28\x00\x04"
    "\xe5\x7a\x3b\xcf";
 
+const char c_password[] = "VOkJxbRl1RmTxUk/WvJxBt";
+const char c_username[] = "evtj:h6vY";
+const char c_software[] = "STUN test client";
+
 
 HRESULT CTestReader::Run()
 {
-    return Test1();
+    HRESULT hr = S_OK;
+    Chk(Test1());
+    Chk(Test2());
+Cleanup:
+    return hr;
 }
 
 
@@ -64,7 +73,6 @@ HRESULT CTestReader::Test1()
     CStunMessageReader reader;
     CStunMessageReader::ReaderParseState state;
 
-
     // reader is expecting at least enough bytes to fill the header
     ChkIfA(reader.AddBytes(NULL, 0) != CStunMessageReader::HeaderNotRead, E_FAIL);
     ChkIfA(reader.HowManyBytesNeeded() != STUN_HEADER_SIZE, E_FAIL);
@@ -80,27 +88,108 @@ HRESULT CTestReader::Test1()
 
     ChkIfA(reader.GetMessageType() != StunMsgTypeBinding, E_FAIL);
 
-    Chk(reader.GetAttributeByType(STUN_ATTRIBUTE_SOFTWARE, &attrib));
+    ChkA(reader.GetAttributeByType(STUN_ATTRIBUTE_SOFTWARE, &attrib));
 
-    ChkIf(attrib.attributeType != STUN_ATTRIBUTE_SOFTWARE, E_FAIL);
+    ChkIfA(attrib.attributeType != STUN_ATTRIBUTE_SOFTWARE, E_FAIL);
 
-    ChkIf(0 != ::strncmp(pszExpectedSoftwareAttribute, (const char*)(spBuffer->GetData() + attrib.offset), attrib.size), E_FAIL);
+    ChkIfA(0 != ::strncmp(pszExpectedSoftwareAttribute, (const char*)(spBuffer->GetData() + attrib.offset), attrib.size), E_FAIL);
 
-    Chk(reader.GetAttributeByType(STUN_ATTRIBUTE_USERNAME, &attrib));
+    ChkA(reader.GetAttributeByType(STUN_ATTRIBUTE_USERNAME, &attrib));
 
-    ChkIf(attrib.attributeType != STUN_ATTRIBUTE_USERNAME, E_FAIL);
+    ChkIfA(attrib.attributeType != STUN_ATTRIBUTE_USERNAME, E_FAIL);
 
-    ChkIf(0 != ::strncmp(pszExpectedUserName, (const char*)(spBuffer->GetData() + attrib.offset), attrib.size), E_FAIL);
+    ChkIfA(0 != ::strncmp(pszExpectedUserName, (const char*)(spBuffer->GetData() + attrib.offset), attrib.size), E_FAIL);
     
     
-    Chk(reader.GetStringAttributeByType(STUN_ATTRIBUTE_SOFTWARE, szStringValue, ARRAYSIZE(szStringValue)));
-    ChkIf(0 != ::strcmp(pszExpectedSoftwareAttribute, szStringValue), E_FAIL);
+    ChkA(reader.GetStringAttributeByType(STUN_ATTRIBUTE_SOFTWARE, szStringValue, ARRAYSIZE(szStringValue)));
+    ChkIfA(0 != ::strcmp(pszExpectedSoftwareAttribute, szStringValue), E_FAIL);
 
-    ChkIf(reader.HasFingerprintAttribute() == false, E_FAIL);
+    ChkIfA(reader.HasFingerprintAttribute() == false, E_FAIL);
 
-    ChkIf(reader.IsFingerprintAttributeValid() == false, E_FAIL);
+    ChkIfA(reader.IsFingerprintAttributeValid() == false, E_FAIL);
+    
+    ChkIfA(reader.HasMessageIntegrityAttribute() == false, E_FAIL);
+    
+    ChkA(reader.ValidateMessageIntegrityShort(c_password));
 
 Cleanup:
     return hr;
  }
+
+HRESULT CTestReader::Test2()
+{
+    HRESULT hr = S_OK;
+
+   // this test is to validate an extreme case for TCP scenarios.
+   // what if the bytes only arrived "one at a time"? 
+   // or if the byte chunks straddled across logical parse segments (i.e. the header and the body)
+   // Can CStunMessageReader::AddBytes handle and parse out the correct result
+
+    for (size_t chunksize = 1; chunksize <= 30; chunksize++)
+    {
+        Chk(TestFixedReadSizes(chunksize));
+    }
+
+    srand(888);
+    for (size_t i = 0; i < 200; i++)
+    {
+        Chk(TestFixedReadSizes(0));
+    }
+Cleanup:
+    return hr;
+}
+
+HRESULT CTestReader::TestFixedReadSizes(size_t chunksize)
+{
+
+    HRESULT hr = S_OK;
+    CStunMessageReader reader;
+    CStunMessageReader::ReaderParseState prevState, state;
+    size_t bytesread = 0;
+    bool fRandomChunkSizing = (chunksize==0);
+    
+    
+    prevState = CStunMessageReader::HeaderNotRead;
+    state = prevState;
+    size_t msgSize = sizeof(c_requestbytes)-1; // c_requestbytes is a string, hence the -1
+    while (bytesread < msgSize)
+    {
+        size_t remaining, toread;
+        
+        if (fRandomChunkSizing)
+        {
+            chunksize = (rand() % 17) + 1;
+        }
+        
+        remaining = msgSize - bytesread;
+        toread = (remaining > chunksize) ? chunksize : remaining;
+        
+        state = reader.AddBytes(&c_requestbytes[bytesread], toread);
+        bytesread += toread;
+        
+        ChkIfA(state == CStunMessageReader::ParseError, E_UNEXPECTED);
+        
+        if ((state == CStunMessageReader::HeaderValidated) && (prevState != CStunMessageReader::HeaderValidated))
+        {
+            ChkIfA(bytesread < STUN_HEADER_SIZE, E_UNEXPECTED);
+        }
+        
+        if ((state == CStunMessageReader::BodyValidated) && (prevState != CStunMessageReader::BodyValidated))
+        {
+            ChkIfA(prevState != CStunMessageReader::HeaderValidated, E_UNEXPECTED);
+            ChkIfA(bytesread != msgSize, E_UNEXPECTED);
+        }
+        
+        prevState = state;
+    }
+    
+    ChkIfA(reader.GetState() != CStunMessageReader::BodyValidated, E_UNEXPECTED);
+    
+    // just validate the integrity and fingerprint, that should cover all the attributes
+    ChkA(reader.ValidateMessageIntegrityShort(c_password));
+    ChkIfA(reader.IsFingerprintAttributeValid() == false, E_FAIL);
+    
+Cleanup:
+    return hr;
+}
 

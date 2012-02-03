@@ -20,6 +20,8 @@ copybin: everything
 debug: T := debug
 debug: all
 
+profile: T := profile
+profile: all
 
 clean:	T := clean
 clean: everything

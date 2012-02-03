@@ -30,7 +30,11 @@ const option* CCmdLineParser::GenerateOptions()
     {
         option opt = {};
         opt.has_arg = _listOptionDetails[index].has_arg;
-        opt.name = _listOptionDetails[index].strName.c_str();
+        
+        // Solaris 11 (released in 2011), only sees fit to include header files from 2004 where "option::name" is just a char* and not const char*
+        opt.name = (char*)(_listOptionDetails[index].strName.c_str());
+        
+        
         _options.push_back(opt);
     }
     

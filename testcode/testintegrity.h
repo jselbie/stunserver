@@ -24,6 +24,8 @@ class CTestIntegrity : public IUnitTest
 {
 private:
     HRESULT TestMessageIntegrity(bool fWithFingerprint, bool fLongCredentials);        
+    
+    HRESULT Test2();
 
 public:
     

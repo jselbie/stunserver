@@ -179,32 +179,32 @@ uint16_t CSocketAddress::GetFamily() const
 
 void CSocketAddress::ApplyStunXorMap(const StunTransactionId& transid)
 {
-
-
-    // XOR Mapped address is only understood by clients written for RFC 5389 compliance
-    // If we're attempting to map a xor address to an RFC 3489 client, it's transaction id
-    // won't start with the stun cookie
-
-    ASSERT(transid.id[0] == STUN_COOKIE_B1);
-    ASSERT(transid.id[1] == STUN_COOKIE_B2);
-    ASSERT(transid.id[2] == STUN_COOKIE_B3);
-    ASSERT(transid.id[3] == STUN_COOKIE_B4);
+    const size_t iplen = (_address.addr.sa_family == AF_INET) ? STUN_IPV4_LENGTH : STUN_IPV6_LENGTH;
+    uint8_t* pPort;
+    uint8_t* pIP;
 
     if (_address.addr.sa_family == AF_INET)
     {
-        _address.addr4.sin_port = _address.addr4.sin_port ^ htons(STUN_XOR_PORT_COOKIE);
-        _address.addr4.sin_addr.s_addr = _address.addr4.sin_addr.s_addr ^ htonl(STUN_COOKIE);
+        COMPILE_TIME_ASSERT(sizeof(_address.addr4.sin_addr) == STUN_IPV4_LENGTH); // 4
+        COMPILE_TIME_ASSERT(sizeof(_address.addr4.sin_port) == 2);
+
+        pPort = (uint8_t*)&(_address.addr4.sin_port);
+        pIP = (uint8_t*)&(_address.addr4.sin_addr);
     }
     else
     {
-        _address.addr6.sin6_port = _address.addr6.sin6_port ^ htons(STUN_XOR_PORT_COOKIE);
-
-        uint8_t* ip6 = (uint8_t*)&(_address.addr6.sin6_addr);
-
-        for (int x = 0; x < STUN_IPV6_LENGTH; x++)
-        {
-            ip6[x] = ip6[x] ^ transid.id[x];
-        }
+        COMPILE_TIME_ASSERT(sizeof(_address.addr6.sin6_addr) == STUN_IPV6_LENGTH); // 16
+        COMPILE_TIME_ASSERT(sizeof(_address.addr6.sin6_port) == 2);
+        pPort = (uint8_t*)&(_address.addr6.sin6_port);
+        pIP = (uint8_t*)&(_address.addr6.sin6_addr);
+    }
+    
+    pPort[0] = pPort[0] ^ transid.id[0];
+    pPort[1] = pPort[1] ^ transid.id[1];
+    
+    for (size_t i = 0; i < iplen; i++)
+    {
+        pIP[i] = pIP[i] ^ transid.id[i];
     }
 }
 
