@@ -1,0 +1,7 @@
+
+Version 1.0 - Initial release.
+
+Version 1.1.0 - TCP support added.  Better interop support
+
+Version 1.1.1 - Fix for padding and response-port attribute id values.
+
