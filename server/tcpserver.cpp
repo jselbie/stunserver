@@ -19,15 +19,7 @@
 #include "server.h"
 #include "stunsocket.h"
 
-
-
 #include "stunsocketthread.h"
-
-
-
-
-
-
 
 // client sockets are edge triggered
 const uint32_t EPOLL_CLIENT_READ_EVENT_SET = IPOLLING_EDGETRIGGER | IPOLLING_READ | IPOLLING_RDHUP;

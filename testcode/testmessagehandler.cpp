@@ -144,6 +144,8 @@ void CTestMessageHandler::ToAddr(const char* pszIP, uint16_t port, CSocketAddres
 {
     sockaddr_in addr={};
     int result;
+
+    UNREFERENCED_VARIABLE(result);
     
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);

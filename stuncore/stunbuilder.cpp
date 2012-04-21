@@ -524,6 +524,8 @@ HRESULT CStunMessageBuilder::AddMessageIntegrityLongTerm(const char* pszUserName
     size_t lenRealm = pszRealm ? strlen(pszRealm) : 0;
     size_t lenPassword = pszPassword ? strlen(pszPassword) : 0;
     size_t lenTotal = lenUserName + lenRealm + lenPassword + 2; // +2 for the two colons
+
+    UNREFERENCED_VARIABLE(pResult);
     
     ChkIfA(lenTotal > MAX_KEY_SIZE, E_INVALIDARG); // if we ever hit this limit, just increase MAX_STUN_AUTH_STRING_SIZE
     

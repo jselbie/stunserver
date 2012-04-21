@@ -42,7 +42,7 @@ const option* CCmdLineParser::GenerateOptions()
     _options.push_back(zero);
 
 
-    return _options.data();
+    return &_options.front();
 }
 
 

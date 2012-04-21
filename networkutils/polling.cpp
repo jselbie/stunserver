@@ -86,7 +86,9 @@ uint32_t CEpoll::ToNativeFlags(uint32_t eventflags)
     if (eventflags & IPOLLING_READ)        result |= EPOLLIN;
     if (eventflags & IPOLLING_WRITE)       result |= EPOLLOUT;
     if (eventflags & IPOLLING_EDGETRIGGER) result |= EPOLLET;
+#ifdef EPOLLRDHUP
     if (eventflags & IPOLLING_RDHUP)       result |= EPOLLRDHUP;
+#endif
     if (eventflags & IPOLLING_HUP)         result |= EPOLLHUP;
     if (eventflags & IPOLLING_PRI)         result |= EPOLLPRI;
     if (eventflags & IPOLLING_ERROR)       result |= EPOLLERR;
@@ -102,7 +104,9 @@ uint32_t CEpoll::FromNativeFlags(uint32_t eventflags)
     if (eventflags & EPOLLIN)    result |= IPOLLING_READ;
     if (eventflags & EPOLLOUT)   result |= IPOLLING_WRITE;
     if (eventflags & EPOLLET)    result |= IPOLLING_EDGETRIGGER;
+#ifdef EPOLLRDHUP
     if (eventflags & EPOLLRDHUP) result |= IPOLLING_RDHUP;
+#endif
     if (eventflags & EPOLLHUP)   result |= IPOLLING_HUP;
     if (eventflags & EPOLLPRI)   result |= IPOLLING_PRI;
     if (eventflags & EPOLLERR)   result |= IPOLLING_ERROR;
@@ -328,9 +332,6 @@ uint32_t CPoll::FromNativeFlags(uint32_t eventflags)
 
 HRESULT CPoll::Initialize(size_t maxSockets)
 {
-    pollfd pfd = {};
-    pfd.fd = -1;
-    
     _fds.reserve(maxSockets);
     _rotation = 0;
     _unreadcount = 0;
@@ -338,8 +339,6 @@ HRESULT CPoll::Initialize(size_t maxSockets)
     _hashtable.InitTable(maxSockets, 0);
     
     _fInitialized = true;
-    
-    
 
     return S_OK;
 }
@@ -465,7 +464,7 @@ HRESULT CPoll::WaitForNextEvent(PollEvent* pPollEvent, int timeoutMilliseconds)
         
         _unreadcount = 0;
         
-        list = _fds.data();
+        list = &_fds.front();
     
         ret = poll(list, size, timeoutMilliseconds);
     
@@ -488,7 +487,7 @@ bool CPoll::FindNextEvent(PollEvent* pEvent)
 {
     size_t size = _fds.size();
     ASSERT(size > 0);
-    pollfd* list = _fds.data();
+    pollfd* list = &_fds.front();
     bool fFound = false;
     
     if (_unreadcount == 0)
