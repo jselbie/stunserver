@@ -5,3 +5,7 @@ Version 1.1.0 - TCP support added.  Better interop support
 
 Version 1.1.1 - Fix for padding and response-port attribute id values.
 
+Version 1.1.2 - Fix compile issues for older linux and macos distributions
+
+
+
