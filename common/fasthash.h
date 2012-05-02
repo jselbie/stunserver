@@ -497,7 +497,7 @@ public:
             return -1;
         }
         
-        Init(fsize, tsize, _nodesarray, _itemnodesarray, _lookuptablearray, _indexarray);
+        this->Init(fsize, tsize, _nodesarray, _itemnodesarray, _lookuptablearray, _indexarray);
         return 1;
     }
     
