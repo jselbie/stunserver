@@ -203,8 +203,15 @@ HRESULT CStunSocket::SetNonBlocking(bool fEnable)
     flags = ::fcntl(_sock, F_GETFL, 0);
     
     ChkIf(flags == -1, ERRNOHR);
-    
-    flags |= O_NONBLOCK;
+
+    if (fEnable)
+    {    
+        flags |= O_NONBLOCK;
+    }
+    else
+    {
+        flags &= ~(O_NONBLOCK);
+    }
     
     result = fcntl(_sock , F_SETFL , flags);
     
