@@ -61,6 +61,33 @@ Cleanup:
 
 }
 
+HRESULT NumericIPToAddress(int family, const char* pszIP, CSocketAddress* pAddr)
+{
+    HRESULT hr = S_OK;
+    
+    ChkIf((family != AF_INET) && (family != AF_INET6), E_INVALIDARG);
+
+    if (family == AF_INET)
+    {
+        sockaddr_in addr4 = {};
+        ChkIf(0 == ::inet_pton(family, pszIP, &addr4.sin_addr), E_FAIL);
+        addr4.sin_family = family;
+        *pAddr = CSocketAddress(addr4);
+    }
+    else
+    {
+        sockaddr_in6 addr6 = {};
+        ChkIf(0 == ::inet_pton(family, pszIP, &addr6.sin6_addr), E_FAIL);
+        addr6.sin6_family = family;
+        *pAddr = CSocketAddress(addr6);
+    }
+    
+Cleanup:
+
+    return hr;
+    
+}
+
 
 
 

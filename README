@@ -1,6 +1,6 @@
 STUNTMAN - An open source STUN server
-Version 1.1.0
-February 1, 2012
+Version 1.2.0
+December 5, 2012
 ---------------------------------------------------------
 
 
@@ -18,6 +18,10 @@ Features:
   requests. Full mode configures the service to listen on two different IP
   address interfaces (if available) and provide NAT behavior and filtering
   detection support for clients.
+
+  Support for running a full mode STUN service on an Amazon EC2 instance. Run
+  "stunserver --help" for visit www.stunprotocol.org on how to configure this
+  mode.
 
   Open source Apache license. See LICENSE file fore more details.
 ---------------------------------------------------------
@@ -58,9 +62,12 @@ Testing:
 
   Fedora 15 with gcc/g++ 4.6.0
   Ubuntu 11 with gcc/g++ 4.5.2
+  Ubuntu 12 with gcc/g++ 4.6.3
+  Ubuntu 12 with clang/clang++ 3.0
   Amazon AWS with gcc/g++ 4.4
   MacOS Snow Leopard (will not compile on earlier versions without updating to
   a newer version of gcc/g++)
+  MacOS Lion (with Clang compiler)
   FreeBSD 9.0 with gcc/g++ 4.2.1
   Solaris 11 with gcc/g++ 4.5.2
 
@@ -123,9 +130,6 @@ Firewall
 
 
 Feature roadmap (the features I want to implement in a subsequent release)
-
-  Host a full server across two separate machines (such that two ip addresses
-  on a single machine will not be required for full mode).
 
   Cleanup Makefile and add "configure" and autotools support
 

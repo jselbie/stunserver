@@ -46,7 +46,7 @@ void CStunSocketThread::ClearSocketArray()
     _socks.clear();
 }
 
-HRESULT CStunSocketThread::Init(CStunSocket* arrayOfFourSockets, IStunAuth* pAuth, SocketRole rolePrimaryRecv)
+HRESULT CStunSocketThread::Init(CStunSocket* arrayOfFourSockets, TransportAddressSet* pTSA, IStunAuth* pAuth, SocketRole rolePrimaryRecv)
 {
     HRESULT hr = S_OK;
     
@@ -55,6 +55,7 @@ HRESULT CStunSocketThread::Init(CStunSocket* arrayOfFourSockets, IStunAuth* pAut
     ChkIfA(_fThreadIsValid, E_UNEXPECTED);
 
     ChkIfA(arrayOfFourSockets == NULL, E_INVALIDARG);
+    ChkIfA(pTSA == NULL, E_INVALIDARG);
     
     // if this thread was configured to listen on a single socket (aka "multi-threaded mode"), then 
     // validate that it exists
@@ -66,18 +67,7 @@ HRESULT CStunSocketThread::Init(CStunSocket* arrayOfFourSockets, IStunAuth* pAut
     _arrSendSockets = arrayOfFourSockets;
     
     // initialize the TSA thing
-    memset(&_tsa, '\0', sizeof(_tsa));
-    for (size_t i = 0; i < 4; i++)
-    {
-        if (_arrSendSockets[i].IsValid())
-        {
-        
-            SocketRole role = _arrSendSockets[i].GetRole();
-            ASSERT(role == (SocketRole)i);
-            _tsa.set[role].fValid = true;
-            _tsa.set[role].addr = _arrSendSockets[i].GetLocalAddress();
-        }
-    }
+    _tsa = *pTSA;
     
     if (fSingleSocketRecv)
     {
@@ -275,10 +265,12 @@ void CStunSocketThread::Run()
     int ret;
     
     int sendsocketcount = 0;
+
     sendsocketcount += (int)(_tsa.set[RolePP].fValid);
     sendsocketcount += (int)(_tsa.set[RolePA].fValid);
     sendsocketcount += (int)(_tsa.set[RoleAP].fValid);
     sendsocketcount += (int)(_tsa.set[RoleAA].fValid);
+
     Logging::LogMsg(LL_DEBUG, "Starting listener thread (%d recv sockets, %d send sockets)", _socks.size(), sendsocketcount);
 
     while (_fNeedToExit == false)

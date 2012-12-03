@@ -21,6 +21,7 @@
 #include "stunsocket.h"
 #include "stunsocketthread.h"
 #include "stunauth.h"
+#include "messagehandler.h"
 
 
 
@@ -43,6 +44,9 @@ public:
     CSocketAddress addrPA; // address for PA
     CSocketAddress addrAP; // address for AP
     CSocketAddress addrAA; // address for AA
+    
+    CSocketAddress addrPrimaryAdvertised;    // public-IP for PP and PA (port is ignored)
+    CSocketAddress addrAlternateAdvertised;  // public-IP for AP and AA (port is ignored)
 
     CStunServerConfig();
 };
@@ -68,6 +72,8 @@ private:
     friend class CObjectFactory<CStunServer>;
 
     CRefCountedPtr<IStunAuth> _spAuth;
+    
+    HRESULT AddSocket(TransportAddressSet* pTSA, SocketRole role, const CSocketAddress& addrListen, const CSocketAddress& addrAdvertise);
 
 public:
 

@@ -31,6 +31,7 @@
 // these are auto-generated files made from markdown sources.  See ../resources
 #include "stunserver.txtcode"
 #include "stunserver_lite.txtcode"
+#include "resolvehostname.h"
 
 
 void PrintUsage(bool fSummaryUsage)
@@ -104,11 +105,14 @@ struct StartupArgs
     std::string strAltInterface;
     std::string strPrimaryPort;
     std::string strAltPort;
+    std::string strPrimaryAdvertised;
+    std::string strAlternateAdvertised;
     std::string strFamily;
     std::string strProtocol;
     std::string strHelp;
     std::string strVerbosity;
     std::string strMaxConnections;
+    
 };
 
 #define PRINTARG(member) Logging::LogMsg(LL_DEBUG, "%s = %s", #member, args.member.length() ? args.member.c_str() : "<empty>");
@@ -119,6 +123,8 @@ void DumpStartupArgs(StartupArgs& args)
     PRINTARG(strMode);
     PRINTARG(strPrimaryInterface);
     PRINTARG(strAltInterface);
+    PRINTARG(strPrimaryAdvertised);
+    PRINTARG(strAlternateAdvertised);
     PRINTARG(strPrimaryPort);
     PRINTARG(strAltPort);
     PRINTARG(strFamily);
@@ -155,6 +161,18 @@ void DumpConfig(CStunServerConfig &config)
     {
         config.addrAA.ToString(&strSocket);
         Logging::LogMsg(LL_DEBUG, "AA = %s", strSocket.c_str());
+    }
+    
+    if (config.addrPrimaryAdvertised.IsIPAddressZero() == false)
+    {
+        config.addrPrimaryAdvertised.ToString(&strSocket);
+        Logging::LogMsg(LL_DEBUG, "Primary IP will be advertised as %s", strSocket.c_str());
+    }
+    
+    if (config.addrAlternateAdvertised.IsIPAddressZero() == false)
+    {
+        config.addrAlternateAdvertised.ToString(&strSocket);
+        Logging::LogMsg(LL_DEBUG, "Alternate IP will be advertised as %s", strSocket.c_str());
     }
     
     Logging::LogMsg(LL_DEBUG, "Protocol = %s", config.fTCP ? "TCP" : "UDP");
@@ -206,6 +224,8 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
     bool fHasAtLeastTwoAdapters = false;
     CStunServerConfig config;
     int nMaxConnections = 0;
+    const char* pszPrimaryAdvertised = argsIn.strPrimaryAdvertised.c_str();
+    const char* pszAltAdvertised = argsIn.strAlternateAdvertised.c_str();
 
     enum ServerMode
     {
@@ -221,7 +241,7 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
     ChkIfA(pConfigOut == NULL, E_INVALIDARG);
 
 
-    // normalize the args.  The "trim" is not needed for command line args, but will be useful when we have an "init file" for intializing the server
+    // normalize the args.  The "trim" is not needed for command line args, but will be useful when we have an "init file" for initializing the server
     StringHelper::ToLower(args.strMode);
     StringHelper::Trim(args.strMode);
 
@@ -237,6 +257,9 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
 
     StringHelper::ToLower(args.strProtocol);
     StringHelper::Trim(args.strProtocol);
+    
+    StringHelper::Trim(args.strPrimaryAdvertised);
+    StringHelper::Trim(args.strAlternateAdvertised);
 
 
 
@@ -338,7 +361,7 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
 
     if (nPrimaryPort == nAltPort)
     {
-        Logging::LogMsg(LL_ALWAYS, "Primary port and altnernate port must be different values");
+        Logging::LogMsg(LL_ALWAYS, "Primary port and alternate port must be different values");
         Chk(E_INVALIDARG);
     }
 
@@ -435,6 +458,37 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
 
     }
 
+
+    // ---- Address advertisement --------------------------------------------------------
+    // handle the advertised address parameters and make sure they are valid IP address strings
+    
+    if (!StringHelper::IsNullOrEmpty(pszPrimaryAdvertised))
+    {
+        hr = ::NumericIPToAddress(family, pszPrimaryAdvertised, &config.addrPrimaryAdvertised);
+        if (FAILED(hr))
+        {
+            Logging::LogMsg(LL_ALWAYS, "Error with --primaryadvertised. %s is not a valid IP address string", pszPrimaryAdvertised);
+            Chk(hr);
+        }
+    }
+    
+    if (!StringHelper::IsNullOrEmpty(pszAltAdvertised))
+    {
+        if (mode != Full)
+        {
+            Logging::LogMsg(LL_ALWAYS, "Error. --altadvertised was specified, but --mode param was not set to FULL.");
+            ChkIf(config.fHasAA, E_INVALIDARG);
+        }
+        
+        hr = ::NumericIPToAddress(family, pszAltAdvertised, &config.addrAlternateAdvertised);
+        if (FAILED(hr))
+        {
+            Logging::LogMsg(LL_ALWAYS, "Error with --altadvertised. %s is not a valid IP address string", pszAltAdvertised);
+            Chk(hr);
+        }
+    }
+    
+
     *pConfigOut = config;
     hr = S_OK;
 
@@ -452,6 +506,8 @@ HRESULT ParseCommandLineArgs(int argc, char** argv, int startindex, StartupArgs*
     cmdline.AddOption("mode", required_argument, &pStartupArgs->strMode);
     cmdline.AddOption("primaryinterface", required_argument, &pStartupArgs->strPrimaryInterface);
     cmdline.AddOption("altinterface", required_argument, &pStartupArgs->strAltInterface);
+    cmdline.AddOption("primaryadvertised", required_argument, &pStartupArgs->strPrimaryAdvertised);
+    cmdline.AddOption("altadvertised", required_argument, &pStartupArgs->strAlternateAdvertised);
     cmdline.AddOption("primaryport", required_argument, &pStartupArgs->strPrimaryPort);
     cmdline.AddOption("altport", required_argument, &pStartupArgs->strAltPort);
     cmdline.AddOption("family", required_argument, &pStartupArgs->strFamily);

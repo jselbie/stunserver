@@ -32,7 +32,7 @@ public:
     CStunSocketThread();
     ~CStunSocketThread();
     
-    HRESULT Init(CStunSocket* arrayOfFourSockets, IStunAuth* pAuth, SocketRole rolePrimaryRecv);
+    HRESULT Init(CStunSocket* arrayOfFourSockets, TransportAddressSet* pTSA, IStunAuth* pAuth, SocketRole rolePrimaryRecv);
     HRESULT Start();
 
     HRESULT SignalForStop(bool fPostMessages);
@@ -52,19 +52,15 @@ private:
     CStunSocket* _arrSendSockets;  // matches CStunServer::_arrSockets
     std::vector<CStunSocket*> _socks; // sockets for receiving on
     
-    
     bool _fNeedToExit;
     pthread_t _pthread;
     bool _fThreadIsValid;
     
     int _rotation;
     
-    
-    
     TransportAddressSet _tsa;
     
     CRefCountedPtr<IStunAuth> _spAuth;
-    
     
     // pre-allocated objects for the thread
     CStunMessageReader _reader;

@@ -26,6 +26,8 @@ The following options are supported.
     --protocol PROTO
     --maxconn MAXCONN
     --verbosity LOGLEVEL
+    --primaryadvertised
+    --altadvertised
     --help
 
 Details of each option are as follows.
@@ -67,7 +69,7 @@ a configured IP address.
 ____
 
 
-**--altinterface** INTERFACE OR IPADDRESS
+**--altinterface** INTERFACE
 
 Where INTERFACE specified is either a local IP address (e.g. "192.168.1.3") 
 of the host or the name of a network interface (e.g. "eth1").
@@ -145,6 +147,31 @@ very minimal amount of output.  A value of 1 shows slightly more. A value of
 2 shows even more. Specifying 3 will show a lot more.
 
 The default is 0.
+
+____
+
+**--primaryadvertised** PRIMARY-IP
+
+**--altadvertised** ALT-IP
+
+Where PRIMARY-IP and ALT-IP are valid numeric IP address strings (e.g. "101.23.45.67") that
+are the public IP addresses of the --primaryinterface and --altinterface addresses discussed
+above.
+
+These two parameters are for advanced usage only. It is intended for support of
+running a STUN server in full mode on Amazon EC2 or other hosted environment
+where the server is running behind a NAT. Do not set this parameter unless you
+know specifically the effect it creates.
+
+Normally, without these parameters being set, the ORIGIN attribute, OTHER-ADDRESS attribute, and
+CHANGED-ADDRESS attributes are are determined by querying the local adapters or sockets
+for the IP address they are listening on. When running the server in a NAT environment,
+binding responses will still contain a correct set of mapping address attributes, such that P2P
+connectivity may succeed.  However, the the ORIGIN, OTHER-ADDRESS,
+and CHANGED-ADDRESS attributes sent by the server will be incorrect. The impact of sending an incorrect OTHER-ADDRESS or CHANGED-ADDRESS
+will result in a client attempting to do NAT Behavior tests or NAT filtering tests to report an incorrect result.
+
+For more details, visit www.stunprotocol.org for details on how to correctly set these parameters for use within Amazon EC2.
 
 ____
 

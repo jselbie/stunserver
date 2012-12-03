@@ -243,7 +243,7 @@ HRESULT CTCPStunThread::Init(const TransportAddressSet& tsaListen, const Transpo
     // Max sure we didn't accidently pass in anything crazy
     ChkIfA(_maxConnections >= 100000, E_INVALIDARG);
     
-    for (size_t i = 0; i <= ARRAYSIZE(_tsa.set); i++)
+    for (size_t i = 0; i < ARRAYSIZE(_tsa.set); i++)
     {
         countListen += tsaListen.set[i].fValid ? 1 : 0;
         countHandler += tsaHandler.set[i].fValid ? 1 : 0;
@@ -825,10 +825,34 @@ CTCPServer::~CTCPServer()
 }
 
 
+void CTCPServer::InitTSA(TransportAddressSet* pTSA, SocketRole role, bool fValid, const CSocketAddress& addrListen, const CSocketAddress& addrAdvertise)
+{
+    if (fValid == false)
+    {
+        pTSA->set[role].fValid = false;
+        pTSA->set[role].addr = CSocketAddress();
+    }
+    else
+    {
+        pTSA->set[role].fValid = true;
+        
+        if (addrAdvertise.IsIPAddressZero())
+        {
+            pTSA->set[role].addr = addrListen;
+        }
+        else
+        {
+            pTSA->set[role].addr = addrAdvertise;
+            pTSA->set[role].addr.SetPort(addrListen.GetPort());
+        }
+    }
+
+}
+
 HRESULT CTCPServer::Initialize(const CStunServerConfig& config)
 {
     HRESULT hr = S_OK;
-    TransportAddressSet tsaListen;
+    TransportAddressSet tsaListenAll;
     TransportAddressSet tsaHandler;
     
     ChkIfA(_threads[0] != NULL, E_UNEXPECTED); // we can't already be initialized, right?
@@ -838,39 +862,45 @@ HRESULT CTCPServer::Initialize(const CStunServerConfig& config)
     // Chk(CYourAuthProvider::CreateInstanceNoInit(&_spAuth));    
 
     // tsaHandler is sort of a hack for TCP.  It's really just a glorified indication to the the
-    // CStunRequestHandler code to figure out if can offer a CHANGED-ADDRESS attribute.
+    // CStunRequestHandler code to figure out if it can offer a CHANGED-ADDRESS attribute.
     
-    tsaHandler.set[RolePP].fValid = config.fHasPP;
-    tsaHandler.set[RolePP].addr = config.addrPP;
-
-    tsaHandler.set[RolePA].fValid = config.fHasPA;
-    tsaHandler.set[RolePA].addr = config.addrPA;
-
-    tsaHandler.set[RoleAP].fValid = config.fHasAP;
-    tsaHandler.set[RoleAP].addr = config.addrAP;
-
-    tsaHandler.set[RoleAA].fValid = config.fHasAA;
-    tsaHandler.set[RoleAA].addr = config.addrAA;    
+    InitTSA(&tsaHandler, RolePP, config.fHasPP, config.addrPP, config.addrPrimaryAdvertised);
+    InitTSA(&tsaHandler, RolePA, config.fHasPA, config.addrPA, config.addrPrimaryAdvertised);
+    InitTSA(&tsaHandler, RoleAP, config.fHasAP, config.addrAP, config.addrAlternateAdvertised);
+    InitTSA(&tsaHandler, RoleAA, config.fHasAA, config.addrAA, config.addrAlternateAdvertised);
+    
+    InitTSA(&tsaListenAll, RolePP, config.fHasPP, config.addrPP, CSocketAddress());
+    InitTSA(&tsaListenAll, RolePA, config.fHasPA, config.addrPA, CSocketAddress());
+    InitTSA(&tsaListenAll, RoleAP, config.fHasAP, config.addrAP, CSocketAddress());
+    InitTSA(&tsaListenAll, RoleAA, config.fHasAA, config.addrAA, CSocketAddress());
     
     if (config.fMultiThreadedMode == false)
     {
-        tsaListen = tsaHandler;
         _threads[0] = new CTCPStunThread();
         
-        ChkA(_threads[0]->Init(tsaListen, tsaHandler, _spAuth, config.nMaxConnections));
+        ChkA(_threads[0]->Init(tsaListenAll, tsaHandler, _spAuth, config.nMaxConnections));
     }
     else
     {
         for (int threadindex = 0; threadindex < 4; threadindex++)
         {
-            memset(&tsaListen, '\0', sizeof(tsaListen));
             
             if (tsaHandler.set[threadindex].fValid)
             {
-                tsaListen.set[threadindex] = tsaHandler.set[threadindex];
-                
+                TransportAddressSet tsaListen = tsaListenAll;
+                // Since we already initialized tsaListenAll above,
+                // make a copy and uninit each one that isn't going to be managed
+                // by the thread we are about to create
+                for (int temp = 0; temp < 4; temp++)
+                {
+                    if (temp != threadindex)
+                    {
+                        tsaListen.set[temp].fValid = false;
+                        tsaListen.set[temp].addr = CSocketAddress();
+                    }
+                }
+               
                 _threads[threadindex] = new CTCPStunThread();
-                
 
                 Chk(_threads[threadindex]->Init(tsaListen, tsaHandler, _spAuth, config.nMaxConnections));
             }

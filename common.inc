@@ -1,7 +1,10 @@
-# BOOST_INCLUDE := -I/home/jselbie/boost_1_48_0
+# BOOST_INCLUDE := -I/home/jselbie/boost_1_51_0
 # OPENSSL_INCLUDE := -I/home/jselbie/lib/openssl
 
 DEFINES := -DNDEBUG
+
+# CLANG compiler works fine
+# CXX := /usr/bin/clang++
 
 STANDARD_FLAGS := -Wall -Wuninitialized 
 
@@ -16,6 +19,7 @@ UNAME := $(shell uname -s)
 ifeq ($(UNAME),SunOS)
   SOCKET_LIBS := -lsocket -lnsl
 endif
+
 
 
 

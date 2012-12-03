@@ -49,11 +49,54 @@ CStunServer::~CStunServer()
     Shutdown();
 }
 
+HRESULT CStunServer::AddSocket(TransportAddressSet* pTSA, SocketRole role, const CSocketAddress& addrListen, const CSocketAddress& addrAdvertise)
+{
+    HRESULT hr = S_OK;
+    
+    ASSERT(IsValidSocketRole(role));
+    
+    Chk(_arrSockets[role].UDPInit(addrListen, role));
+    ChkA(_arrSockets[role].EnablePktInfoOption(true));
+
+
+#ifdef DEBUG
+    {
+        CSocketAddress addrLocal = _arrSockets[role].GetLocalAddress();
+
+        // addrListen is the address we asked the socket to listen on via a call to bind()
+        // addrLocal is the socket address returned by getsockname after the socket is binded
+
+        // I can't think of any case where addrListen != addrLocal
+        // the ports will be different if addrListen.GetPort() is 0, but that
+        // should never happen.
+        
+        // but if the assert below fails, I want to know about it
+        ASSERT(addrLocal.IsSameIP_and_Port(addrListen));
+    }
+#endif
+
+    pTSA->set[role].fValid = true;    
+    if (addrAdvertise.IsIPAddressZero() == false)
+    {
+        // set the TSA for this socket to what the configuration wants us to advertise this address for in ORIGIN and OTHER address attributes
+        pTSA->set[role].addr = addrAdvertise;
+        pTSA->set[role].addr.SetPort(addrListen.GetPort()); // use the original port
+    }
+    else
+    {
+        pTSA->set[role].addr = addrListen; // use the socket's IP and port (OK if this is INADDR_ANY)
+    }
+    
+Cleanup:
+    return hr;
+}
+
 HRESULT CStunServer::Initialize(const CStunServerConfig& config)
 {
     HRESULT hr = S_OK;
     int socketcount = 0;
     CRefCountedPtr<IStunAuth> _spAuth;
+    TransportAddressSet tsa = {};
 
     // cleanup any thing that's going on now
     Shutdown();
@@ -61,38 +104,33 @@ HRESULT CStunServer::Initialize(const CStunServerConfig& config)
     // optional code: create an authentication provider and initialize it here (if you want authentication)
     // set the _spAuth member to reference it
     // Chk(CYourAuthProvider::CreateInstanceNoInit(&_spAuth));
-
-    // Create the sockets
+    
+    // Create the sockets and initialize the TSA thing
     if (config.fHasPP)
     {
-        Chk(_arrSockets[RolePP].UDPInit(config.addrPP, RolePP));
-        ChkA(_arrSockets[RolePP].EnablePktInfoOption(true));
+        Chk(AddSocket(&tsa, RolePP, config.addrPP, config.addrPrimaryAdvertised));
         socketcount++;
     }
 
     if (config.fHasPA)
     {
-        Chk(_arrSockets[RolePA].UDPInit(config.addrPA, RolePA));
-        ChkA(_arrSockets[RolePA].EnablePktInfoOption(true));
+        Chk(AddSocket(&tsa, RolePA, config.addrPA, config.addrPrimaryAdvertised));
         socketcount++;
     }
 
     if (config.fHasAP)
     {
-        Chk(_arrSockets[RoleAP].UDPInit(config.addrAP, RoleAP));
-        ChkA(_arrSockets[RoleAP].EnablePktInfoOption(true));
+        Chk(AddSocket(&tsa, RoleAP, config.addrAP, config.addrAlternateAdvertised));
         socketcount++;
     }
 
     if (config.fHasAA)
     {
-        Chk(_arrSockets[RoleAA].UDPInit(config.addrAA, RoleAA));
-        ChkA(_arrSockets[RoleAA].EnablePktInfoOption(true));
+        Chk(AddSocket(&tsa, RoleAA, config.addrAA, config.addrAlternateAdvertised));
         socketcount++;
     }
 
     ChkIf(socketcount == 0, E_INVALIDARG);
-
 
     if (config.fMultiThreadedMode == false)
     {
@@ -104,7 +142,7 @@ HRESULT CStunServer::Initialize(const CStunServerConfig& config)
 
         _threads.push_back(pThread);
         
-        Chk(pThread->Init(_arrSockets,  _spAuth, (SocketRole)-1));
+        Chk(pThread->Init(_arrSockets, &tsa, _spAuth, (SocketRole)-1));
     }
     else
     {
@@ -121,7 +159,7 @@ HRESULT CStunServer::Initialize(const CStunServerConfig& config)
                 pThread = new CStunSocketThread();
                 ChkIf(pThread==NULL, E_OUTOFMEMORY);
                 _threads.push_back(pThread);
-                Chk(pThread->Init(_arrSockets, _spAuth, rolePrimaryRecv));
+                Chk(pThread->Init(_arrSockets, &tsa, _spAuth, rolePrimaryRecv));
             }
         }
     }
@@ -161,8 +199,7 @@ HRESULT CStunServer::Shutdown()
     _threads.clear();
     
     _spAuth.ReleaseAndClear();
-
-
+    
     return S_OK;
 }
 

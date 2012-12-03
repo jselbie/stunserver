@@ -126,7 +126,9 @@ private:
     
     CTCPStunThread* _threads[4];
     
-    CRefCountedPtr<IStunAuth> _spAuth;    
+    CRefCountedPtr<IStunAuth> _spAuth;
+    
+    void InitTSA(TransportAddressSet* pTSA, SocketRole role, bool fValid, const CSocketAddress& addrListen, const CSocketAddress& addrAdvertise);
     
 public:
     

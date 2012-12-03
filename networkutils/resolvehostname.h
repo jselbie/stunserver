@@ -29,6 +29,8 @@
  */
 HRESULT ResolveHostName(const char* pszHostName, int family, bool fNumericOnly, CSocketAddress* pAddr);
 
+HRESULT NumericIPToAddress(int family, const char* pszIP, CSocketAddress* pAddr);
+
 
 
 #endif	/* RESOLVEHOSTNAME_H */

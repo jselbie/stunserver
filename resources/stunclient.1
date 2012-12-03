@@ -7,94 +7,93 @@ stunclient - command line app for the STUN protocol
 \f[B]stunclient\f[] [OPTIONS] server [port]
 .SH DESCRIPTION
 .PP
-stunclient attempts to discover the local host's own external IP
-address, obtain a port mapping, and optionally discover properties
-of the Network Address Translator (NAT) between the host and the
-the server.
+stunclient attempts to discover the local host\[aq]s own external IP
+address, obtain a port mapping, and optionally discover properties of
+the Network Address Translator (NAT) between the host and the the
+server.
 .SH OPTIONS
 .PP
 The following options are supported.
-.PP
-\f[CR]
-      --mode\ MODE
-      --localaddr\ INTERFACE
-      --localport\ PORTNUMBER
-      --family\ IPVERSION
-      --protocol\ PROTO
-      --verbosity\ LOGLEVEL
-      --help
+.IP
+.nf
+\f[C]
+--mode\ MODE
+--localaddr\ INTERFACE
+--localport\ PORTNUMBER
+--family\ IPVERSION
+--protocol\ PROTO
+--verbosity\ LOGLEVEL
+--help
 \f[]
+.fi
 .PP
 Details of each option and paramters are as follows.
 .PP
 \f[B]server\f[]
 .PP
-The \f[B]server\f[] parameter is the IP address or FQDN of the
-remote server to befrom the binding tests with.
+The \f[B]server\f[] parameter is the IP address or FQDN of the remote
+server to befrom the binding tests with.
 It is the only required parameter.
 .PP
    *   *   *   *   *
 .PP
 \f[B]port\f[]
 .PP
-The \f[B]port\f[] parameter is an optional parameter that can
-follow the server parameter.
+The \f[B]port\f[] parameter is an optional parameter that can follow the
+server parameter.
 The default is 3478 for UDP and TCP.
 .PP
    *   *   *   *   *
 .PP
-\f[B]\[em]mode\f[] MODE
+\f[B]--mode\f[] MODE
 .PP
-Where MODE is either \[lq]basic\[rq] or \[lq]full\[rq].
-\[lq]basic\[rq] mode is the default and indicates that the client
-should perform a STUN binding test only.
-\[lq]full\[rq] mode indicates that the client should attempt to
-diagnose NAT behavior and filtering methodologies if the server
-supports this mode.
+Where MODE is either "basic" or "full".
+"basic" mode is the default and indicates that the client should perform
+a STUN binding test only.
+"full" mode indicates that the client should attempt to diagnose NAT
+behavior and filtering methodologies if the server supports this mode.
 The NAT filtering test is only supported for UDP.
 .PP
    *   *   *   *   *
 .PP
-\f[B]\[em]localaddr\f[] INTERFACE or IPADDRESS
+\f[B]--localaddr\f[] INTERFACE or IPADDRESS
 .PP
-The value for this option may the name of an interface (such as
-\[lq]eth0\[rq] or \[lq]lo\[rq]).
-Or it may be one of the available IP addresses assigned to a
-network interface present on the host (such as
-\[lq]128.23.45.67\[rq]).
+The value for this option may the name of an interface (such as "eth0"
+or "lo").
+Or it may be one of the available IP addresses assigned to a network
+interface present on the host (such as "128.23.45.67").
 The interface chosen will be the preferred address for sending and
 receiving responses with the remote server.
-The default is to let the system decide which address to send on
-and to listen for responses on all addresses (INADDR_ANY).
+The default is to let the system decide which address to send on and to
+listen for responses on all addresses (INADDR_ANY).
 .PP
    *   *   *   *   *
 .PP
-\f[B]\[em]localport\f[] PORTNUM
+\f[B]--localport\f[] PORTNUM
 .PP
 PORTNUM is a value between 1 to 65535.
-This is the UDP or TCP port that the primary and alternate
-interfaces listen on as the primary port for binding requests.
+This is the UDP or TCP port that the primary and alternate interfaces
+listen on as the primary port for binding requests.
 If not specified, a randomly available port chosen by the system is
 used.
 .PP
    *   *   *   *   *
 .PP
-\f[B]\[em]family\f[] IPVERSION
+\f[B]--family\f[] IPVERSION
 .PP
-IPVERSION is either \[lq]4\[rq] or \[lq]6\[rq] to specify the usage
-of IPV4 or IPV6.
-If not specified, the default value is \[lq]4\[rq].
-.PP
-   *   *   *   *   *
-.PP
-\f[B]\[em]protocol\f[] PROTO
-.PP
-PROTO is either \[lq]udp\[rq] or \[lq]tcp\[rq].
-\[lq]udp\[rq] is the default if this parameter is not specified
+IPVERSION is either "4" or "6" to specify the usage of IPV4 or IPV6.
+If not specified, the default value is "4".
 .PP
    *   *   *   *   *
 .PP
-\f[B]\[em]verbosity\f[] LOGLEVEL
+\f[B]--protocol\f[] PROTO
+.PP
+PROTO is either "udp" or "tcp".
+"udp" is the default if this parameter is not specified
+.PP
+   *   *   *   *   *
+.PP
+\f[B]--verbosity\f[] LOGLEVEL
 .PP
 Sets the verbosity of the logging level.
 0 is the default (minimal output and logging).
@@ -103,22 +102,22 @@ Sets the verbosity of the logging level.
 .PP
    *   *   *   *   *
 .PP
-\f[B]\[em]help\f[] Prints this help page
+\f[B]--help\f[] Prints this help page
 .SH EXAMPLES
 .TP
 .B stunclient stunserver.org 3478
 Performs a simple binding test request with the server listening at
-\[lq]stunserver.org\[rq]
+"stunserver.org"
 .RS
 .RE
 .TP
-.B stunclient \[em]mode full \[em]localport 9999 12.34.56.78
-Performs a full set of UDP NAT behavior tests from local port 9999
-to the server listening at IP Address 12.34.56.78 (port 3478)
+.B stunclient --mode full --localport 9999 12.34.56.78
+Performs a full set of UDP NAT behavior tests from local port 9999 to
+the server listening at IP Address 12.34.56.78 (port 3478)
 .RS
 .RE
 .TP
-.B stunclient \[em]protocol tcp stun.selbie.com
+.B stunclient --protocol tcp stun.selbie.com
 Performs a simple binding test using TCP to server listening on the
 default port of 3478 at stun.selbie.com
 .RS
@@ -126,4 +125,3 @@ default port of 3478 at stun.selbie.com
 .SH AUTHOR
 .PP
 john selbie (jselbie\@gmail.com)
-
