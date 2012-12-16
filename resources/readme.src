@@ -37,6 +37,7 @@ Known issues:
 Testing:
 
   Fedora 15 with gcc/g++ 4.6.0
+  Fedora 17 with gcc/g++ 4.72
   Ubuntu 11 with gcc/g++ 4.5.2
   Ubuntu 12 with gcc/g++ 4.6.3
   Ubuntu 12 with clang/clang++ 3.0
@@ -52,13 +53,32 @@ Testing:
 
 Prerequisites before compiling and running.
 
-  Boost header files. www.boost.org (sudo yum install boost-devel). The compiled Boost runtime is not necessary. Just unpacking the Boost source code distribution will suffice. If you do not have the adminstrative privaleges to install the Boost distribution into a standard system include path, you may uncomment and edit the top line of the common.inc file for the BOOST_INCLUDE variable.  The common.inc file is in the same folder as this README file.
+  The short summary is that you need a C++ compiler (g++ preferred or clang++), GNU make, Boost header files, and the OpenSSL development files in order to compile the code.  Below are the set of package installer commands that you can type from the command line to get the tools and libraries you need.
 
-  OpenSSL development files and runtime. www.openssl.org (sudo yum install openssl-devel). On most systems with development tools already installed, OpenSSL include files are already installed in the standard include path. If this is not the case, you can uncomment and edit the common.inc file to have the OPENSSL_INCLUDE variable defined. 
+  Debian/Ubuntu/Mint
+      sudo apt-get install g++
+      sudo apt-get install make
+      sudo apt-get install libboost-dev      # For Boost
+      sudo apt-get install libssl-dev        # For OpenSSL
 
-  pthreads header and libs (I haven't seen a distribution where this wasn't already installed)
+  RedHat/Fedora and EC2 Amazon Linux AMI
+      sudo yum groupinstall "Development Tools"  # For g++, make, et. al.
+      sudo yum install boost-devel           # For Boost
+      sudo yum install openssl-devel         # For OpenSSL
 
-  perl. Only needed if you rebuild the content in the resources directory. Otherwise, not needed.
+  Solaris and Mac
+      OpenSSL is already installed.
+
+      Install Boost locally as per instructions below, then uncomment and edit the top line of the common.inc file.
+
+  Manual Boost install
+    The compiled Boost runtime is not necessary. Just obtaining and unpacking the Boost source code distribution from www.boost.org will suffice. If you do not have the adminstrative privaleges to install the Boost distribution into a standard system include path, you may uncomment and edit the top line of the common.inc file for the BOOST_INCLUDE variable.  The common.inc file is in the same folder as this README file.
+
+  Manual OpenSSL install
+    You can obtain the OpenSSL development files and runtime from www.openssl.org. On most systems with development tools already installed, OpenSSL include files are already installed in the standard include path. If this is not the case, you can uncomment and edit the common.inc file to have the OPENSSL_INCLUDE variable defined.
+
+  Other prerequisites
+     pthreads and perl. I've never come across a system where this wasn't already pre-installed.
 
 ---------------------------------------------------------
 
