@@ -23,15 +23,23 @@
 
 #include "unittest.h"
 
-class CTestRecvFromEx : public IUnitTest
+class CTestRecvFromEx
 {
 public:
-    HRESULT DoTest(bool fUseIPV6);
-    
-    HRESULT Run();
-
-    UT_DECLARE_TEST_NAME("CTestRecvFromEx");
-    
+    static HRESULT DoTest(bool fUseIPV6);
 };
+
+class CTestRecvFromExIPV4  : public IUnitTest
+{
+    HRESULT Run();
+    UT_DECLARE_TEST_NAME("CTestRecvFromEx(IPV4)");
+};
+
+class CTestRecvFromExIPV6  : public IUnitTest
+{
+    HRESULT Run();
+    UT_DECLARE_TEST_NAME("CTestRecvFromEx(IPV6)");
+};
+
 
 #endif
