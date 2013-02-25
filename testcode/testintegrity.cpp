@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-#include "commonincludes.h"
+#include "commonincludes.hpp"
 #include "stuncore.h"
 #include "testintegrity.h"
 

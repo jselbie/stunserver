@@ -15,7 +15,7 @@
 */
 
 
-#include "commonincludes.h"
+#include "commonincludes.hpp"
 #include "refcountobject.h"
 
 int AtomicIncrement(int* pInt)

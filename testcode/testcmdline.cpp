@@ -15,7 +15,7 @@
 */
 
 
-#include "commonincludes.h"
+#include "commonincludes.hpp"
 #include "cmdlineparser.h"
 #include "unittest.h"
 #include "testcmdline.h"

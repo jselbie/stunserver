@@ -15,7 +15,7 @@
 */
 
 
-#include "commonincludes.h"
+#include "commonincludes.hpp"
 #include <getopt.h>
 
 #include "cmdlineparser.h"

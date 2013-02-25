@@ -25,7 +25,7 @@ endif
 
 .PHONY: all clean debug
 
-%.h.gch: %.h
+%.hpp.gch: %.hpp
 	echo Building precompiled header: $@
 	$(COMPILE.cpp) $(INCLUDES) $(DEFINES) $(STANDARD_FLAGS) $(FLAVOR_FLAGS) $^
 

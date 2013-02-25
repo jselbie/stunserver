@@ -4,7 +4,7 @@ PROJECT_TARGET := libcommon.a
 PROJECT_SRCS := cmdlineparser.cpp common.cpp fasthash.cpp getconsolewidth.cpp getmillisecondcounter.cpp logger.cpp prettyprint.cpp refcountobject.cpp stringhelper.cpp
 PROJECT_OBJS := $(subst .cpp,.o,$(PROJECT_SRCS))
 INCLUDES := $(BOOST_INCLUDE)
-PRECOMP_H_GCH := commonincludes.h.gch
+PRECOMP_H_GCH := commonincludes.hpp.gch
 
 
 

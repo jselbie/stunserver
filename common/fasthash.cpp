@@ -15,7 +15,7 @@
    limitations under the License.
 */
 
-#include "commonincludes.h"
+#include "commonincludes.hpp"
 
 #define IS_DIVISIBLE_BY(x, y)  ((x % y)==0)
 

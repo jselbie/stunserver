@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-#include "commonincludes.h"
+#include "commonincludes.hpp"
 #include "testfasthash.h"
 #include "fasthash.h"
 
