@@ -16,6 +16,7 @@
 
 
 #include "commonincludes.hpp"
+#include "atomichelpers.h"
 
 
 
