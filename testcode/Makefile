@@ -1,7 +1,7 @@
 include ../common.inc
 
 PROJECT_TARGET := stuntestcode
-PROJECT_OBJS := testbuilder.o testclientlogic.o testcmdline.o testcode.o testdatastream.o testfasthash.o testintegrity.o testmessagehandler.o testpolling.o testreader.o testrecvfromex.o
+PROJECT_OBJS := testatomichelpers.o testbuilder.o testclientlogic.o testcmdline.o testcode.o testdatastream.o testfasthash.o testintegrity.o testmessagehandler.o testpolling.o testreader.o testrecvfromex.o
  
 INCLUDES := $(BOOST_INCLUDE) $(OPENSSL_INCLUDE) -I../common -I../stuncore -I../networkutils
 LIB_PATH := -L../networkutils -L../stuncore -L../common

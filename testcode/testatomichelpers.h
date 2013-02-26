@@ -1,5 +1,5 @@
 /*
-   Copyright 2011 John Selbie
+   Copyright 2013 John Selbie
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -15,42 +15,19 @@
 */
 
 
-#include "commonincludes.hpp"
-#include "refcountobject.h"
+#ifndef TESTATOMICHELPERS_H
+#define	TESTATOMICHELPERS_H
 
+#include "unittest.h"
 
-#include "atomichelpers.h"
-
-
-CBasicRefCount::CBasicRefCount()
+class CTestAtomicHelpers : public IUnitTest
 {
-    m_nRefs = 0;
-}
-
-CBasicRefCount::~CBasicRefCount()
-{
-    ;
-}
-
-int CBasicRefCount::InternalAddRef()
-{
-    return AtomicIncrement(&m_nRefs);
-}
-
-int CBasicRefCount::InternalRelease()
-{
-    int refcount = AtomicDecrement(&m_nRefs);
-    if (refcount == 0)
-    {
-        OnFinalRelease();
-    }
-    return refcount;
-}
-
-void CBasicRefCount::OnFinalRelease()
-{
-    delete this;
-}
+public:
+    virtual HRESULT Run();
+    UT_DECLARE_TEST_NAME("CTestAtomicHelpers");
+};
 
 
+
+#endif	/* TESTATOMICHELPERS_H */
 

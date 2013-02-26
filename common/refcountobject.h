@@ -21,8 +21,6 @@
 
 
 
-int AtomicIncrement(int* pInt);
-int AtomicDecrement(int* pInt);
 
 
 class IRefCounted

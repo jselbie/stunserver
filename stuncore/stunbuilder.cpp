@@ -19,6 +19,7 @@
 #include "commonincludes.hpp"
 
 #include "stringhelper.h"
+#include "atomichelpers.h"
 
 #include "stunbuilder.h"
 #include <boost/crc.hpp>
@@ -118,7 +119,7 @@ HRESULT CStunMessageBuilder::AddRandomTransactionId(StunTransactionId* pTransId)
         entropy ^= getpid();
         entropy ^= reinterpret_cast<uintptr_t>(this);
         entropy ^= time(NULL);
-        entropy ^= __sync_fetch_and_add(&g_sequence_number, 1);
+        entropy ^= AtomicIncrement(&g_sequence_number);
     }
 
 #endif
