@@ -10,3 +10,6 @@ Version 1.1.2 - Fix compile issues for older linux and macos distributions
 Version 1.1.3 - Fix compile issue for clang on MacOSX
 
 Version 1.2.0 - Amazon EC2 support added
+
+Version 1.2.1 - Fixed various compile and test issues, including the sync_add_fetch_4 linker error
+
