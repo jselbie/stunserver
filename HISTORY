@@ -13,3 +13,7 @@ Version 1.2.0 - Amazon EC2 support added
 
 Version 1.2.1 - Fixed various compile and test issues, including the sync_add_fetch_4 linker error
 
+Version 1.2.2 - Fixed regression with regards to compiling with 32-bit clang++
+
+
+
