@@ -18,20 +18,6 @@
 #ifndef ATOMICHELPERS_H
 #define	ATOMICHELPERS_H
 
-typedef unsigned int (*xaddFunctionType)(volatile void*, unsigned int);
-
-
-#if defined(i386) || defined(__i386__) || defined(__i386)
-#define ATOMICS_ARE_DEFINED
-
-
-extern "C" unsigned int xadd_4(volatile void* pVal, unsigned int inc);
-extern "C" unsigned int __sync_add_and_fetch_4(volatile void* pVal, unsigned int inc);
-extern "C" unsigned int __sync_sub_and_fetch_4(volatile void* pVal, unsigned int inc);
-extern "C" unsigned int __sync_fetch_and_add_4(volatile void* pVal, unsigned int inc);
-extern "C" unsigned int __sync_fetch_and_sub_4(volatile void* pVal, unsigned int inc);
-#endif
-
 
 int AtomicIncrement(int* pInt);
 int AtomicDecrement(int* pInt);

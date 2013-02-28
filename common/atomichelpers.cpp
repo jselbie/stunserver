@@ -20,9 +20,14 @@
 
 
 
-#ifdef ATOMICS_ARE_DEFINED
+#if defined(i386) || defined(__i386) || defined(__i386__)
+#define ATOMICS_USE_XADD
+#endif
 
-extern "C" unsigned int xadd_4(volatile void* pVal, unsigned int inc)
+
+#ifdef ATOMICS_USE_XADD
+
+unsigned int xadd_4(volatile void* pVal, unsigned int inc)
 {
     unsigned int result;
     unsigned int* pValInt = (unsigned int*)pVal;
@@ -34,40 +39,28 @@ extern "C" unsigned int xadd_4(volatile void* pVal, unsigned int inc)
         :"memory" );
 
     return (result);
-
 }
-
-extern "C" unsigned int __sync_add_and_fetch_4(volatile void* pVal, unsigned int inc)
-{
-    return (xadd_4(pVal, inc) + inc);
-}
-
-extern "C" unsigned int __sync_sub_and_fetch_4(volatile void* pVal, unsigned int inc)
-{
-    return (xadd_4(pVal, -inc) - inc);
-}
-
-extern "C" unsigned int __sync_fetch_and_add_4(volatile void* pVal, unsigned int inc)
-{
-    return xadd_4(pVal, inc);
-}
-
-extern "C" unsigned int __sync_fetch_and_sub_4(volatile void* pVal, unsigned int inc)
-{
-    return xadd_4(pVal, -inc);
-}
-
-#ifdef __GNUC__
-    #pragma message "atomichelpers.cpp: Defining sync_add_and_fetch helpers for i386 compile"
-#endif
-
-#endif
-
-
 
 int AtomicIncrement(int* pInt)
 {
     COMPILE_TIME_ASSERT(sizeof(int)==4);   
+    // InterlockedIncrement
+    unsigned int result = xadd_4(pInt, 1) + 1;
+    return (int)result;
+}
+
+int AtomicDecrement(int* pInt)
+{
+    // InterlockedDecrement
+    unsigned int result = xadd_4(pInt, -1) - 1;
+    return (int)result;
+}
+
+#else
+
+int AtomicIncrement(int* pInt)
+{
+    COMPILE_TIME_ASSERT(sizeof(int)==4);
     // InterlockedIncrement
     return __sync_add_and_fetch(pInt, 1);
 }
@@ -77,4 +70,10 @@ int AtomicDecrement(int* pInt)
     // InterlockedDecrement
     return __sync_sub_and_fetch(pInt, 1);
 }
+
+#endif
+
+
+
+
 
