@@ -26,11 +26,11 @@ The following options are supported.
     --verbosity LOGLEVEL
     --help
 
-Details of each option and paramters are as follows.
+Details of each option and parameters are as follows.
 
 **server**
 
-The **server** parameter is the IP address or FQDN of the remote server to befrom the binding tests with. It is the only required parameter.
+The **server** parameter is the IP address or FQDN of the remote server to perform the binding tests with. It is the only required parameter.
 
 _____
 
