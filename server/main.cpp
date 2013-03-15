@@ -672,6 +672,12 @@ int main(int argc, char** argv)
 
     DumpConfig(config);
 
+    // For now, just swallow sigpipe events globally so TCP server won't blow up
+    // on a send() call to a disconnected client
+    // There's other ways to do this (sigaction on each thread, MSG_NOSIGNAL, SO_NOSIGPIPE, etc...)
+    // This seems just as good, and is the most portable
+    signal(SIGPIPE, SIG_IGN);
+    
     InitAppExitListener();
     
     if (config.fTCP == false)
