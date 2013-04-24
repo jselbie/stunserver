@@ -45,7 +45,9 @@ public:
 
     CSocketAddress(const sockaddr_in& addr);
     CSocketAddress(const sockaddr_in6& addr6);
-    CSocketAddress(uint32_t ip, uint16_t port);
+    
+    // both IP and PORT are passed in HOST BYTE ORDER 
+    CSocketAddress(uint32_t ipHostByteOrder, uint16_t port);
 
 
     uint16_t GetPort() const;
@@ -73,6 +75,8 @@ public:
 
     void ToString(std::string* pStr) const;
     HRESULT ToStringBuffer(char* pszAddrBytes, size_t length) const;
+    
+    static HRESULT GetLocalHost(uint16_t family, CSocketAddress* pAddr);
 
 
 };

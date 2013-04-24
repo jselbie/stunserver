@@ -169,7 +169,20 @@ HRESULT CStunSocketThread::SignalForStop(bool fPostMessages)
             
             ASSERT(_socks[index] != NULL);
             
-            ::CSocketAddress addr(_socks[index]->GetLocalAddress());
+            CSocketAddress addr(_socks[index]->GetLocalAddress());
+            
+
+            // If no specific adapter was binded to, IP will be 0.0.0.0
+            // Linux evidently treats 0.0.0.0 IP as loopback (and works)
+            // On Windows you can't send to 0.0.0.0. sendto will fail - switch to sending to localhost
+            if (addr.IsIPAddressZero())
+            {
+                CSocketAddress addrLocal;
+                CSocketAddress::GetLocalHost(addr.GetFamily(), &addrLocal);
+                addrLocal.SetPort(addr.GetPort());
+                addr = addrLocal;
+            }
+            
             ::sendto(_socks[index]->GetSocketHandle(), &data, 1, 0, addr.GetSockAddr(), addr.GetSockAddrLength());
         }
     }

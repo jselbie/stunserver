@@ -17,5 +17,5 @@ Version 1.2.2 - Fixed regression with regards to compiling with 32-bit clang++
 
 Version 1.2.3 - Globally disable SIGPIPE
 
-
+Version 1.2.4 - Fix a socket bug unique to Windows.
 

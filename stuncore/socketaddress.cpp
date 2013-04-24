@@ -66,12 +66,12 @@ CSocketAddress::CSocketAddress(const sockaddr_in& addr4)
     _address.addr4 = addr4;
 }
 
-CSocketAddress::CSocketAddress(uint32_t ip, uint16_t port)
+CSocketAddress::CSocketAddress(uint32_t ipHostByteOrder, uint16_t port)
 {
     sockaddr_in addr = {};
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
-    addr.sin_addr.s_addr = htonl(ip);
+    addr.sin_addr.s_addr = htonl(ipHostByteOrder);
 
     _address.addr4 = addr;
 }
@@ -332,4 +332,37 @@ Cleanup:
 }
 
 
+
+HRESULT CSocketAddress::GetLocalHost(uint16_t family, CSocketAddress* pAddr)
+{
+    
+    if (  ((family != AF_INET) && (family != AF_INET6)) || 
+          (pAddr == NULL))
+    {
+        ASSERT(false);
+        return E_FAIL;
+    }
+    
+    if (family == AF_INET)
+    {
+        uint32_t ip = 0x7f000001; // 127.0.0.1 in host byte order
+        *pAddr = CSocketAddress(ip, 0);
+    }
+    else
+    {
+        sockaddr_in6 addr6;
+        COMPILE_TIME_ASSERT(sizeof(addr6.sin6_addr) == 16);
+        
+        // ::1
+        uint8_t ip6[16] = {};
+        ip6[15] = 1;
+        
+        
+        addr6.sin6_family = AF_INET6;
+        memcpy(&addr6.sin6_addr, ip6, 16);
+        *pAddr = CSocketAddress(addr6);
+    }
+    
+    return S_OK;
+}
 
