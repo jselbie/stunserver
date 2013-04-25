@@ -350,14 +350,13 @@ HRESULT CSocketAddress::GetLocalHost(uint16_t family, CSocketAddress* pAddr)
     }
     else
     {
-        sockaddr_in6 addr6;
+        sockaddr_in6 addr6 = {};
         COMPILE_TIME_ASSERT(sizeof(addr6.sin6_addr) == 16);
         
         // ::1
         uint8_t ip6[16] = {};
         ip6[15] = 1;
-        
-        
+
         addr6.sin6_family = AF_INET6;
         memcpy(&addr6.sin6_addr, ip6, 16);
         *pAddr = CSocketAddress(addr6);
