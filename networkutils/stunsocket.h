@@ -38,6 +38,8 @@ private:
     HRESULT EnablePktInfo_IPV4(bool fEnable);
     HRESULT EnablePktInfo_IPV6(bool fEnable);
     
+    HRESULT SetV6Only(int sock);
+    
 public:
 
     CStunSocket();
@@ -59,6 +61,7 @@ public:
     
     HRESULT EnablePktInfoOption(bool fEnable);
     HRESULT SetNonBlocking(bool fEnable);
+    
     
     void UpdateAddresses();
     

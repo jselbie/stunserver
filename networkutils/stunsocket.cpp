@@ -176,7 +176,6 @@ HRESULT CStunSocket::EnablePktInfo_IPV6(bool fEnable)
     return EnablePktInfoImpl(level, option1, option2, fEnable);
 }
 
-
 HRESULT CStunSocket::EnablePktInfoOption(bool fEnable)
 {
     int family = _addrlocal.GetFamily();
@@ -191,6 +190,27 @@ HRESULT CStunSocket::EnablePktInfoOption(bool fEnable)
         hr = EnablePktInfo_IPV6(fEnable);
     }
     
+    return hr;
+}
+
+HRESULT CStunSocket::SetV6Only(int sock)
+{
+    int optname = -1;
+    int result = 0;
+    HRESULT hr = S_OK;
+    int enabled = 1;
+    
+#ifdef IPV6_BINDV6ONLY
+    optname = IPV6_BINDV6ONLY;
+#elif IPV6_V6ONLY
+    optname = IPV6_V6ONLY;
+#else
+    return E_NOTIMPL;
+#endif
+    
+    result = setsockopt(sock, IPPROTO_IPV6, optname, (char *)&enabled, sizeof(enabled));
+    hr = (result == 0) ? S_OK : ERRNOHR ;
+         
     return hr;
 }
 
@@ -220,6 +240,7 @@ HRESULT CStunSocket::SetNonBlocking(bool fEnable)
 Cleanup:
     return hr;
 }
+
 
 void CStunSocket::UpdateAddresses()
 {
@@ -262,6 +283,15 @@ HRESULT CStunSocket::InitCommon(int socktype, const CSocketAddress& addrlocal, S
     
     sock = socket(addrlocal.GetFamily(), socktype, 0);
     ChkIf(sock < 0, ERRNOHR);
+    
+    if (addrlocal.GetFamily() == AF_INET6)
+    {
+        // Don't allow IPv6 socket to receive binding request from IPv4 client
+        // Because if we don't then an IPv4 client will get an IPv6 mapped address in the binding response
+        // I'm pretty sure you have to call this before bind()
+        // Intentionally ignoring result
+        (void)SetV6Only(sock);
+    }
     
     if (fSetReuseFlag)
     {
