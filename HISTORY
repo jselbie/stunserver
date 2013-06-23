@@ -19,3 +19,7 @@ Version 1.2.3 - Globally disable SIGPIPE
 
 Version 1.2.4 - Fix a socket bug unique to Windows.
 
+Version 1.2.5 - Block IPv6 sockets from receiving IPv4 traffic
+
+
+
