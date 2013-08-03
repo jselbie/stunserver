@@ -63,7 +63,7 @@ The interface or address specified will be used by the service as the primary
 listening address.
 
 In basic mode, the default is to bind to all available adapters (INADDR_ANY).
-In full mode, the default is to bing to the first non-localhost adapter with
+In full mode, the default is to bind to the first non-localhost adapter with
 a configured IP address.
 
 ____
