@@ -23,4 +23,7 @@ Version 1.2.5 - Block IPv6 sockets from receiving IPv4 traffic
 
 Version 1.2.5a - Rebuilt Windows binaries with new CygWin DLL. Code signing applied to EXE files. 
 
+Version 1.2.6 - Fix compiler warning around unused local typedefs.
+
+
 
