@@ -470,9 +470,6 @@ public:
     
     int InitTable(size_t fsize, size_t tsize)
     {
-        typedef FastHashBase<K,V> itemnode;
-        typedef FastHashBase<K,V>* itemnodeptr;
-        
         
         if (fsize <= 0)
         {
