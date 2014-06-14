@@ -309,8 +309,8 @@ void DumpResults(StunClientLogicConfig& config, StunClientResults& results)
 
     if (config.fFilteringTest)
     {
-        Logging::LogMsg(LL_ALWAYS, "Filtering test: %s", results.fBehaviorTestSuccess?"success":"fail");
-        if (results.fBehaviorTestSuccess)
+        Logging::LogMsg(LL_ALWAYS, "Filtering test: %s", results.fFilteringTestSuccess?"success":"fail");
+        if (results.fFilteringTestSuccess)
         {
             NatFilteringToString(results.filtering, &strResult);
             Logging::LogMsg(LL_ALWAYS, "Nat filtering: %s", strResult.c_str());

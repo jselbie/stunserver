@@ -26,8 +26,6 @@ HRESULT CTestCmdLineParser::Run()
 {
     HRESULT hr = S_OK;
 
-    typedef const char* PCSTR;
-
     //char* argv[] = {(char*)"app", (char*)"--zebra", (char*)"--yak=123", (char*)"--walrus=456", (char*)"--vulture"};
     const char* argv[5] = {};
     argv[0] = "app";
