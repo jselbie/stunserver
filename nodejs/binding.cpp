@@ -98,7 +98,7 @@ Handle<Value> StartServer(const Arguments& args)
   {
     int nn;
     pri_and_alt_map[n] = Object::New();
-    if(!(argslen > n))
+    if(!(argslen > n) || args[n]->IsUndefined())
     {
       printf("Stun[%d] will be defaults \n", n);
     }else if(args[n]->IsObject())
@@ -129,10 +129,6 @@ Handle<Value> StartServer(const Arguments& args)
     {
       printf("Only setting port for Stun[%d] \n", n);
       pri_and_alt_map[n]->Set(port_options[0], args[n]);
-    }
-    else if(args[n]->IsUndefined())
-    {
-      printf("Stun[%d] will be defaults \n", n);
     }
     else
     {
@@ -166,7 +162,7 @@ Handle<Value> StartServer(const Arguments& args)
     }
 
   }
-  if(args.Length() < 3)
+  if(args.Length() < 3 || args[2]->IsUndefined())
   {
     printf("Extra Options will be defaults \n");
   }
@@ -189,7 +185,7 @@ Handle<Value> StartServer(const Arguments& args)
   }
   else if(args[2]->IsString())
   {
-    printf("Only setting protocol in Extras");
+    printf("Only setting protocol in Extras \n");
     option_map->Set(option_names[0], args[2]);
   }
   else
