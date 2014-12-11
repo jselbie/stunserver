@@ -146,7 +146,7 @@ Handle<Value> StartServer(const Arguments& args)
       else
       {
         nn = pri_and_alt_map[n-1]->Get(port_options[0])->Int32Value();
-        pri_and_alt_map[n]->Set(port_options[0], Number::New((nn+1)%65535));
+        pri_and_alt_map[n]->Set(port_options[0], Number::New((nn+1)%65536));
       }
     }
     else if(!pri_and_alt_map[n]->Get(port_options[0])->IsNumber())
