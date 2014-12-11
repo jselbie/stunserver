@@ -57,74 +57,160 @@ bool startGlobalServer(int port)
 
 using namespace v8;
 
+
+std::string v8str2stdstr(Handle<String> ori){
+  String::Utf8Value param1(ori);
+  std::string to = std::string(*param1);
+  return to;
+}
+
 Handle<Value> StartServer(const Arguments& args)
 {
   HandleScope scope;
+  Local<Object> pri_and_alt_map [2];
+
   Local<Object> option_map = Object::New();
+
   int n;
-  int len = 11;
+  int argslen = args.Length();
   Local<Value> temp;
-  std::string option_names [11] = {
-    "primaryport",
-    "primaryinterface",
-    "primaryadvertised",
-    "altport",
-    "altinterface",
-    "altadvertised",
-    "mode",
-    "family",
-    "protocol",
-    "maxconn",
-    "verbosity"
+
+  Local<String> port_options [3] = {
+    String::NewSymbol("port"),
+    String::NewSymbol("interface"),
+    String::NewSymbol("advertised")
   };
 
+  Local<String> option_names [5] = {
+    String::NewSymbol("protocol"),
+    String::NewSymbol("mode"),
+    String::NewSymbol("family"),
+    String::NewSymbol("maxconn"),
+    String::NewSymbol("verbosity")
+  };
 
-  if (args.Length() > 11)
-  {
+  if(argslen > 3){
     ThrowException(Exception::TypeError(String::New("Wrong number of arguments")));
     return scope.Close(False());
   }
 
-  if(args.Length() == 1 && args[0]->IsObject())
+  if(argslen == 0)
   {
-    printf("Handling Options Argument \n");
-    Handle<Object> opt = args[0]->ToObject();
-    char* sym;
-    for (n=0; n<len; ++n)
-    {
-      sym = (char*)option_names[n].c_str();
-      temp = opt->Get( String::NewSymbol(sym));
-      if(!temp->IsUndefined())
-      {
-        option_map->Set(String::NewSymbol(sym), temp);
-      }
-    }
-  }
-  else if(args.Length() > 0)
-  {
-    printf("Handling Arguments as Array \n");
-    len = args.Length();
-    for (n=0; n<len; ++n)
-    {
-      printf("%s\n",(char*)option_names[n].c_str());
-      option_map->Set(String::NewSymbol((char*)option_names[n].c_str()), args[n]);
-    }
+    printf("Handling Defaults for all \n");
   }
   else
   {
-    printf("Handling Defaults \n");
-    //defaults
+    for(n=0;n<2;n++)
+    {
+      int nn;
+      pri_and_alt_map[n] = Object::New();
+      if(argslen < n)
+      {
+        printf("Stun[%d] will be defaults \n", n);
+      }else if(args[n]->IsObject())
+      {
+        printf("Stun[%d] is detailed \n", n);
+        Handle<Object> opt = args[n]->ToObject();
+        for (nn=0; nn<3; ++nn)
+        {
+          temp = opt->Get(port_options[nn]);
+          if(!temp->IsUndefined())
+          {
+            printf(
+              "Stun[%d].detail[%s] will be set \n",
+              n,
+              v8str2stdstr(port_options[nn]).c_str()
+            );
+            pri_and_alt_map[n]->Set(port_options[nn], temp);
+          }else{
+            printf(
+              "Stun[%d].detail[%s] will be default \n",
+              n,
+              v8str2stdstr(port_options[nn]).c_str()
+            );
+          }
+        }
+      }
+      else if(args[n]->IsNumber())
+      {
+        printf("Only setting port for Stun[%d] \n", n);
+        pri_and_alt_map[n]->Set(port_options[0], args[n]);
+      }
+      else if(args[n]->IsUndefined())
+      {
+        printf("Stun[%d] will be defaults \n", n);
+      }
+      else
+      {
+        ThrowException(Exception::TypeError(
+          String::New("Primary can only be an object, an integer or undefined")
+        ));
+        return scope.Close(False());
+      }
+      if(pri_and_alt_map[n]->Get(port_options[0])->IsUndefined())
+      {
+        if(n==0)
+        {
+          pri_and_alt_map[n]->Set(port_options[0], Number::New(3478));
+        }
+        else
+        {
+          nn = pri_and_alt_map[n-1]->Get(port_options[0])->Int32Value();
+          pri_and_alt_map[n]->Set(port_options[0], Number::New((nn+1)%65535));
+        }
+      }
+      else if(!pri_and_alt_map[n]->Get(port_options[0])->IsNumber())
+      {
+        ThrowException(Exception::TypeError(String::New("Port can only be a number")));
+        return scope.Close(False());
+      }
+      nn = pri_and_alt_map[n]->Get(port_options[0])->Int32Value();
+      if ((nn < 0) || (nn > 65535))
+      {
+        ThrowException(Exception::TypeError(String::New("Invalid value for port")));
+        return scope.Close(False());
+      }
+
+    }
+    if(args.Length() < 3)
+    {
+      printf("Extra Options will be defaults \n");
+    }
+    else if(args[2]->IsObject())
+    {
+      Handle<Object> opt = args[2]->ToObject();
+      printf("Extra Options is detailed \n");
+      for (n=0; n<5; ++n)
+      {
+        temp = opt->Get(option_names[n]);
+        if(!temp->IsUndefined())
+        {
+          printf(
+            "Extra.detail[%s] \n",
+            v8str2stdstr(option_names[n]).c_str()
+          );
+          option_map->Set(option_names[n], temp);
+        }
+      }
+    }
+    else if(args[2]->IsString())
+    {
+      printf("Only setting protocol in Extras");
+      option_map->Set(option_names[0], args[2]);
+    }
+    else
+    {
+      ThrowException(Exception::TypeError(String::New("Extra Options can only be an object or a string")));
+      return scope.Close(False());
+    }
   }
 
-  int port = option_map->Get(String::NewSymbol("primaryport"))->Int32Value();
-  if ((port < 0) || (port > 65535))
-  {
-    ThrowException(Exception::TypeError(String::New("Invalid value for port")));
-    return scope.Close(False());
-  }
-  printf("Port: %d \n",port);
 
-  bool result = startGlobalServer(port);
+  n = pri_and_alt_map[0]->Get(port_options[0])->Int32Value();
+
+  printf("Port: %d \n",n);
+
+  bool result = startGlobalServer(n);
 
   return scope.Close(Boolean::New(result));
 }
