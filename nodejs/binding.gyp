@@ -6,6 +6,7 @@
       "include_dirs" : ["../stuncore", "../server", "../common","../networkutils", "../resources", "/home/jselbie/boost_1_57_0"],
       "sources" : [
        "binding.cpp",
+       "nodestun_args.cpp",
        "../common/logger.cpp",
        "../common/common.cpp",
        "../common/getmillisecondcounter.cpp",
@@ -39,4 +40,3 @@
     }
   ]
 }
-
