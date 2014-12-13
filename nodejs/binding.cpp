@@ -7,6 +7,8 @@
 #include <node.h>
 #include "stuncore.h"
 #include "server.h"
+#include "nodestun_args.h"
+#include "stdio.h"
 
 CStunServer* g_pServer = NULL;
 
@@ -22,22 +24,17 @@ void stopGlobalServer()
   }
 }
 
-bool startGlobalServer(int port)
+
+bool startGlobalServer(CStunServerConfig config)
 {
     HRESULT hr = S_OK;
     bool result = true;
 
-    // stop any previous instance    
+    // stop any previous instance
     stopGlobalServer();
-    
-    
-    // single port mode
-    CStunServerConfig config;
-    config.fHasPP = true;
-    config.addrPP.SetPort(port);
-    
+
     hr = CStunServer::CreateInstance(config, &g_pServer);
-    
+
     if (SUCCEEDED(hr))
     {
         hr = g_pServer->Start();
@@ -48,8 +45,8 @@ bool startGlobalServer(int port)
         stopGlobalServer();
         result = false;
     }
-    
-    return true;
+
+    return result;
 }
 
 
@@ -58,25 +55,53 @@ using namespace v8;
 Handle<Value> StartServer(const Arguments& args)
 {
   HandleScope scope;
-  int port = 0;
 
-  if (args.Length() != 1)
-  {
-    ThrowException(Exception::TypeError(String::New("Wrong number of arguments")));
-    return scope.Close(False());
-  }
-  
-  port = args[0]->Int32Value();
-  if ((port < 0) || (port > 65535))
-  {
-    ThrowException(Exception::TypeError(String::New("Invalid value for port")));
-    return scope.Close(False());
-  }
-  
-  bool result = startGlobalServer(port);
-  
-  return scope.Close(Boolean::New(result));
+  Local<Object> option_map = Object::New();
 
+  /*
+  if(NodeStun_Args::ThreeArgs(args,option_map)){
+    return scope.Close(Boolean::New(false));
+  }
+  */
+  if(NodeStun_Args::OneArgs(args,option_map)){
+    return scope.Close(Boolean::New(false));
+  }
+  if(option_map->Get(String::New("verbosity"))->IsNumber()){
+    int temp = option_map->Get(String::New("verbosity"))->Int32Value();
+    Logging::SetLogLevel(temp);
+  }
+
+  CStunServerConfig config;
+
+  if(NodeStun_Args::Object2Config(option_map, config)){
+    return scope.Close(Boolean::New(false));
+  }
+
+  //  printf("Port: %d \n",n);
+  HRESULT hr = S_OK;
+
+  // stop any previous instance
+  stopGlobalServer();
+
+  hr = CStunServer::CreateInstance(config, &g_pServer);
+
+  if (FAILED(hr))
+  {
+    ThrowException(Exception::TypeError(String::New("server was not initialized")));
+    stopGlobalServer();
+    return scope.Close(Boolean::New(false));
+  }
+
+  hr = g_pServer->Start();
+
+  if (FAILED(hr))
+  {
+    ThrowException(Exception::TypeError(String::New("server did not start")));
+    stopGlobalServer();
+    return scope.Close(Boolean::New(false));
+  }
+
+  return scope.Close(Boolean::New(true));
 }
 
 Handle<Value> StopServer(const Arguments& args) {
@@ -92,13 +117,12 @@ void Init(Handle<Object> exports) {
   exports->Set(String::NewSymbol("startserver"),
       FunctionTemplate::New(StartServer)->GetFunction());
 
-  
+
     exports->Set(String::NewSymbol("stopserver"),
       FunctionTemplate::New(StopServer)->GetFunction());
 
-    
+
 
 }
 
 NODE_MODULE(stunserver, Init)
-
