@@ -79,25 +79,25 @@ bool NodeStun_Args::ThreeArgs(const Arguments& args, Local<Object> &option_map){
     int nn;
     if(!(argslen > n) || args[n]->IsUndefined())
     {
-      printf("Stun[%d] will be defaults \n", n);
+      Logging::LogMsg(LL_DEBUG,"Stun[%d] will be defaults", n);
     }else if(args[n]->IsObject())
     {
-      printf("Stun[%d] is detailed \n", n);
+      Logging::LogMsg(LL_DEBUG,"Stun[%d] is detailed", n);
       Handle<Object> opt = args[n]->ToObject();
       for (nn=0; nn<3; ++nn)
       {
         temp = opt->Get(port_options[nn]);
         if(!temp->IsUndefined())
         {
-          printf(
-          "Stun[%d].detail[%s] will be set \n",
+          Logging::LogMsg(LL_DEBUG,
+          "Stun[%d].detail[%s] will be set",
           n,
           NodeStun_Args::v8str2stdstr(port_options[nn]).c_str()
           );
           option_map->Set(port_keys[n*3+nn], temp);
         }else{
-          printf(
-          "Stun[%d].detail[%s] will be default \n",
+          Logging::LogMsg(LL_DEBUG,
+          "Stun[%d].detail[%s] will be default",
           n,
           NodeStun_Args::v8str2stdstr(port_options[nn]).c_str()
           );
@@ -106,7 +106,7 @@ bool NodeStun_Args::ThreeArgs(const Arguments& args, Local<Object> &option_map){
     }
     else if(args[n]->IsNumber())
     {
-      printf("Only setting port for Stun[%d] \n", n);
+      Logging::LogMsg(LL_DEBUG,"Only setting port for Stun[%d]", n);
       option_map->Set(port_keys[n*3], args[n]);
     }
     else
@@ -136,19 +136,19 @@ bool NodeStun_Args::ThreeArgs(const Arguments& args, Local<Object> &option_map){
   }
   if(args.Length() < 3 || args[2]->IsUndefined())
   {
-    printf("Extra Options will be defaults \n");
+    Logging::LogMsg(LL_DEBUG,"Extra Options will be defaults");
   }
   else if(args[2]->IsObject())
   {
     Handle<Object> opt = args[2]->ToObject();
-    printf("Extra Options is detailed \n");
+    Logging::LogMsg(LL_DEBUG,"Extra Options is detailed");
     for (n=0; n<5; ++n)
     {
       temp = opt->Get(option_names[n]);
       if(!temp->IsUndefined())
       {
-        printf(
-        "Extra.detail[%s] \n",
+        Logging::LogMsg(LL_DEBUG,
+        "Extra.detail[%s]",
         NodeStun_Args::v8str2stdstr(option_names[n]).c_str()
         );
         option_map->Set(option_names[n], temp);
@@ -157,7 +157,7 @@ bool NodeStun_Args::ThreeArgs(const Arguments& args, Local<Object> &option_map){
   }
   else if(args[2]->IsString())
   {
-    printf("Only setting protocol in Extras \n");
+    Logging::LogMsg(LL_DEBUG,"Only setting protocol in Extras");
     option_map->Set(option_names[0], args[2]);
   }
   else
@@ -214,11 +214,11 @@ bool NodeStun_Args::Object2Config(Local<Object> &option_map, CStunServerConfig& 
     {
       return NodeStun_Args::throwErr("Mode must be \"full\" or \"basic\".");
     }
-    printf("Setting mode to: %s \n",tempstr.c_str());
+    Logging::LogMsg(LL_DEBUG,"Setting mode to: %s",tempstr.c_str());
   }
   else
   {
-    printf("mode will be default \n");
+    Logging::LogMsg(LL_DEBUG,"mode will be default");
   }
 
 
@@ -244,11 +244,11 @@ bool NodeStun_Args::Object2Config(Local<Object> &option_map, CStunServerConfig& 
     {
       return NodeStun_Args::throwErr("IP Family argument must be 4 or 6");
     }
-    printf("Setting IP Family to: %d \n",tempint);
+    Logging::LogMsg(LL_DEBUG,"Setting IP Family to: %d",tempint);
   }
   else
   {
-    printf("IP Family will be default \n");
+    Logging::LogMsg(LL_DEBUG,"IP Family will be default");
   }
 
   // ---- PROTOCOL --------------------------------------------------------
@@ -265,11 +265,11 @@ bool NodeStun_Args::Object2Config(Local<Object> &option_map, CStunServerConfig& 
       return NodeStun_Args::throwErr("Protocol argument must be 'udp' or 'tcp'. 'tls' is not supported yet");
     }
     config.fTCP = (tempstr == "tcp");
-    printf("Setting Protocol to: %s \n",tempstr.c_str());
+    Logging::LogMsg(LL_DEBUG,"Setting Protocol to: %s",tempstr.c_str());
   }
   else
   {
-    printf("Protocol will be default \n");
+    Logging::LogMsg(LL_DEBUG,"Protocol will be default");
   }
 
 
@@ -294,11 +294,11 @@ bool NodeStun_Args::Object2Config(Local<Object> &option_map, CStunServerConfig& 
       }
     }
     config.nMaxConnections = tempint;
-    printf("Setting Maximum connections to: %d \n",tempint);
+    Logging::LogMsg(LL_DEBUG,"Setting Maximum connections to: %d",tempint);
   }
   else
   {
-    printf("Maximum connections will be default \n");
+    Logging::LogMsg(LL_DEBUG,"Maximum connections will be default");
   }
 
 
@@ -317,11 +317,11 @@ bool NodeStun_Args::Object2Config(Local<Object> &option_map, CStunServerConfig& 
       return NodeStun_Args::throwErr("Primary port value is invalid.  Value must be between 1-65535");
     }
     nPrimaryPort = tempint;
-    printf("Setting Primary Port to: %d \n",tempint);
+    Logging::LogMsg(LL_DEBUG,"Setting Primary Port to: %d",tempint);
   }
   else
   {
-    printf("Primary Port will be default \n");
+    Logging::LogMsg(LL_DEBUG,"Primary Port will be default");
   }
 
   // ---- ALT PORT --------------------------------------------------------
@@ -339,11 +339,11 @@ bool NodeStun_Args::Object2Config(Local<Object> &option_map, CStunServerConfig& 
       return NodeStun_Args::throwErr("Alternative port value is invalid.  Value must be between 1-65535");
     }
     nAltPort = tempint;
-    printf("Setting Alternate Port to: %d \n",tempint);
+    Logging::LogMsg(LL_DEBUG,"Setting Alternate Port to: %d",tempint);
   }
   else
   {
-    printf("Alternate Port will be default \n");
+    Logging::LogMsg(LL_DEBUG,"Alternate Port will be default");
   }
 
   if (nPrimaryPort == nAltPort)
@@ -376,7 +376,7 @@ bool NodeStun_Args::Object2Config(Local<Object> &option_map, CStunServerConfig& 
         config.addrPP.SetPort(port);
         config.fHasPP = true;
       }
-      printf("Primary Interface will be default \n");
+      Logging::LogMsg(LL_DEBUG,"Primary Interface will be default");
     }
     else
     {
@@ -395,7 +395,7 @@ bool NodeStun_Args::Object2Config(Local<Object> &option_map, CStunServerConfig& 
       }
       config.addrPP = addr;
       config.fHasPP = true;
-      printf("Setting Primary Interface to: %s \n",tempstr.c_str());
+      Logging::LogMsg(LL_DEBUG,"Setting Primary Interface to: %s",tempstr.c_str());
     }
   }
   else  // Full mode
@@ -424,7 +424,7 @@ bool NodeStun_Args::Object2Config(Local<Object> &option_map, CStunServerConfig& 
       {
         return NodeStun_Args::throwErr("Failed to get Socket address for Primary Interface");
       }
-      printf("Setting Primary Interface to: %s \n",tempstr.c_str());
+      Logging::LogMsg(LL_DEBUG,"Setting Primary Interface to: %s",tempstr.c_str());
     }
     else
     {
@@ -444,7 +444,7 @@ bool NodeStun_Args::Object2Config(Local<Object> &option_map, CStunServerConfig& 
       {
         return NodeStun_Args::throwErr("Failed to find a Socket for Primary Interface");
       }
-      printf("Primary Interface will be default \n");
+      Logging::LogMsg(LL_DEBUG,"Primary Interface will be default");
     }
 
     tempv8 = option_map->Get(String::NewSymbol("alternate_interface"));
@@ -460,7 +460,7 @@ bool NodeStun_Args::Object2Config(Local<Object> &option_map, CStunServerConfig& 
       {
         return NodeStun_Args::throwErr("Failed to get Socket address for Alternate Interface");
       }
-      printf("Setting Alternate Interface to: %s \n",tempstr.c_str());
+      Logging::LogMsg(LL_DEBUG,"Setting Alternate Interface to: %s",tempstr.c_str());
     }
     else
     {
@@ -477,7 +477,7 @@ bool NodeStun_Args::Object2Config(Local<Object> &option_map, CStunServerConfig& 
         }
         return NodeStun_Args::throwErr("Failed to find a Socket for Alternate Interface");
       }
-      printf("Alternate Interface will be default \n");
+      Logging::LogMsg(LL_DEBUG,"Alternate Interface will be default");
     }
 
     if  (addrPrimary.IsSameIP(addrAlternate))
@@ -521,11 +521,11 @@ bool NodeStun_Args::Object2Config(Local<Object> &option_map, CStunServerConfig& 
     {
       return NodeStun_Args::throwErr("Primary Advertised is not a valid IP address string");
     }
-    printf("Setting Primary Advertised to: %s \n",tempstr.c_str());
+    Logging::LogMsg(LL_DEBUG,"Setting Primary Advertised to: %s",tempstr.c_str());
   }
   else
   {
-    printf("Primary Advertised will be default \n");
+    Logging::LogMsg(LL_DEBUG,"Primary Advertised will be default");
   }
 
   tempv8 = option_map->Get(String::NewSymbol("alternate_advertised"));
@@ -545,11 +545,11 @@ bool NodeStun_Args::Object2Config(Local<Object> &option_map, CStunServerConfig& 
     {
       return NodeStun_Args::throwErr("Alternate Advertised is not a valid IP address string");
     }
-    printf("Setting Alternate Advertised to: %d \n",tempint);
+    Logging::LogMsg(LL_DEBUG,"Setting Alternate Advertised to: %d",tempint);
   }
   else
   {
-    printf("Alternate Advertised will be default \n");
+    Logging::LogMsg(LL_DEBUG,"Alternate Advertised will be default");
   }
   configOut = config;
 

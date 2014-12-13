@@ -66,6 +66,10 @@ Handle<Value> StartServer(const Arguments& args)
   if(NodeStun_Args::OneArgs(args,option_map)){
     return scope.Close(Boolean::New(false));
   }
+  if(option_map->Get(String::New("verbosity"))->IsNumber()){
+    int temp = option_map->Get(String::New("verbosity"))->Int32Value();
+    Logging::SetLogLevel(temp);
+  }
 
   CStunServerConfig config;
 
@@ -73,11 +77,31 @@ Handle<Value> StartServer(const Arguments& args)
     return scope.Close(Boolean::New(false));
   }
 
-//  printf("Port: %d \n",n);
+  //  printf("Port: %d \n",n);
+  HRESULT hr = S_OK;
 
-  bool result = startGlobalServer(config);
+  // stop any previous instance
+  stopGlobalServer();
 
-  return scope.Close(Boolean::New(result));
+  hr = CStunServer::CreateInstance(config, &g_pServer);
+
+  if (FAILED(hr))
+  {
+    ThrowException(Exception::TypeError(String::New("server was not initialized")));
+    stopGlobalServer();
+    return scope.Close(Boolean::New(false));
+  }
+
+  hr = g_pServer->Start();
+
+  if (FAILED(hr))
+  {
+    ThrowException(Exception::TypeError(String::New("server did not start")));
+    stopGlobalServer();
+    return scope.Close(Boolean::New(false));
+  }
+
+  return scope.Close(Boolean::New(true));
 }
 
 Handle<Value> StopServer(const Arguments& args) {
