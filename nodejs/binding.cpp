@@ -8,6 +8,7 @@
 #include "stuncore.h"
 #include "server.h"
 #include "nodestun_args.h"
+#include "nodestun_object.h"
 #include "stdio.h"
 
 CStunServer* g_pServer = NULL;
@@ -111,14 +112,13 @@ Handle<Value> StopServer(const Arguments& args) {
   return scope.Close(True());
 }
 
-
-
 void Init(Handle<Object> exports) {
-  exports->Set(String::NewSymbol("startserver"),
+  NodeStun::Init(exports);
+  exports->Set(String::NewSymbol("startGlobal"),
       FunctionTemplate::New(StartServer)->GetFunction());
 
 
-    exports->Set(String::NewSymbol("stopserver"),
+    exports->Set(String::NewSymbol("stopGlobal"),
       FunctionTemplate::New(StopServer)->GetFunction());
 
 

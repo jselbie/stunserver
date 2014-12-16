@@ -62,7 +62,7 @@ function addtest(arg,item,msg){
       var result = 0;
       console.log(msg+": {"+item+":"+arg[item]+"}");
       try{
-        stun.startserver(arg);
+        stun.startGlobal(arg);
       }catch(e){
         result = 1
         console.log("recieved error: "+e);
@@ -73,12 +73,12 @@ function addtest(arg,item,msg){
       }
     }else{
       console.log(msg+": {"+item+":"+arg[item]+"}");
-      var result = stun.startserver(arg);
+      var result = stun.startGlobal(arg);
       if(!result){
         throw new Error("uncaught problem");
       }
     }
-    stun.stopserver();
+    stun.stopGlobal();
     console.log("\n")
   })
 }
