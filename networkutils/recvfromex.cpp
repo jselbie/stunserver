@@ -20,32 +20,6 @@
 #include "socketaddress.h"
 
 
-static void GetLocalPortNumberFromSocket(int sockfd, CSocketAddress* pAddr)
-{
-
-    sockaddr_storage addr = {};
-    socklen_t len = sizeof(addr);
-    int ret;
-
-    ret = ::getsockname(sockfd, (sockaddr*)&addr, &len);
-
-    if (ret != -1)
-    {
-        uint16_t port=0;
-
-        if (addr.ss_family == AF_INET)
-        {
-            port = ntohs(((sockaddr_in*)&addr)->sin_port);
-        }
-        else if (addr.ss_family == AF_INET6)
-        {
-            port = ntohs(((sockaddr_in6*)&addr)->sin6_port);
-        }
-
-        pAddr->SetPort(port);
-    }
-}
-
 static void InitSocketAddress(int family, CSocketAddress* pAddr)
 {
     if (family == AF_INET)
@@ -112,7 +86,6 @@ ssize_t recvfromex(int sockfd, void* buf, size_t len, int flags, CSocketAddress*
                     addr.sin6_family = AF_INET6;
                     addr.sin6_addr = pInfo->ipi6_addr;
                     *pDstAddr = CSocketAddress(addr);
-                    GetLocalPortNumberFromSocket(sockfd, pDstAddr);
                     break;
                 }
 
@@ -129,7 +102,6 @@ ssize_t recvfromex(int sockfd, void* buf, size_t len, int flags, CSocketAddress*
                     addr.sin_family = AF_INET;
                     addr.sin_addr = pInfo->ipi_addr;
                     *pDstAddr = CSocketAddress(addr);
-                    GetLocalPortNumberFromSocket(sockfd, pDstAddr);
                     break;
                 }
 #endif
@@ -142,7 +114,6 @@ ssize_t recvfromex(int sockfd, void* buf, size_t len, int flags, CSocketAddress*
                     addr.sin_family = AF_INET;
                     addr.sin_addr = *(in_addr*)CMSG_DATA(pCmsg);
                     *pDstAddr = CSocketAddress(addr);
-                    GetLocalPortNumberFromSocket(sockfd, pDstAddr);
                     break;
                 }
 #endif

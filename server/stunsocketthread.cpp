@@ -314,6 +314,12 @@ void CStunSocketThread::Run()
 
         ret = ::recvfromex(pSocket->GetSocketHandle(), _spBufferIn->GetData(), _spBufferIn->GetAllocatedSize(), recvflags, &_msgIn.addrRemote, &_msgIn.addrLocal);
 
+        // recvfromex no longer sets the port value on the local address
+        if (ret >= 0)
+        {
+            _msgIn.addrLocal.SetPort(pSocket->GetLocalAddress().GetPort());
+        }
+
         if (Logging::GetLogLevel() >= LL_VERBOSE)
         {
             char szIPRemote[100];
@@ -333,7 +339,7 @@ void CStunSocketThread::Run()
         {
             break;
         }
-
+        
         _spBufferIn->SetSize(ret);
         
         _msgIn.socketrole = pSocket->GetRole();

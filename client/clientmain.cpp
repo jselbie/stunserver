@@ -473,8 +473,7 @@ Cleanup:
 HRESULT UdpClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& socketconfig)
 {
     HRESULT hr = S_OK;
-    CRefCountedStunSocket spStunSocket;
-    CStunSocket stunSocket;;
+    CStunSocket stunSocket;
     CRefCountedBuffer spMsg(new CBuffer(MAX_STUN_MESSAGE_SIZE));
     int sock = -1;
     CSocketAddress addrDest;   // who we send to
@@ -566,6 +565,7 @@ HRESULT UdpClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& s
             ret = ::recvfromex(sock, spMsg->GetData(), spMsg->GetAllocatedSize(), MSG_DONTWAIT, &addrRemote, &addrLocal);
             if (ret > 0)
             {
+                addrLocal.SetPort(stunSocket.GetLocalAddress().GetPort()); // recvfromex doesn't fill in the dest port value, only dest IP
                 addrRemote.ToString(&strAddr);
                 addrLocal.ToString(&strAddrLocal);
                 Logging::LogMsg(LL_DEBUG, "Got response (%d bytes) from %s on interface %s", ret, strAddr.c_str(), strAddrLocal.c_str());
