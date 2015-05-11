@@ -339,7 +339,7 @@ void CStunSocketThread::Run()
         {
             break;
         }
-        
+
         _spBufferIn->SetSize(ret);
         
         _msgIn.socketrole = pSocket->GetRole();
