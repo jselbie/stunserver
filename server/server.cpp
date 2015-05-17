@@ -21,6 +21,7 @@
 #include "stunsocket.h"
 #include "stunsocketthread.h"
 #include "server.h"
+#include "ratelimiter.h"
 
 
 
@@ -31,7 +32,8 @@ fHasAP(false),
 fHasAA(false),
 fMultiThreadedMode(false),
 fTCP(false),
-nMaxConnections(0) // zero means default
+nMaxConnections(0), // zero means default
+fEnableDosProtection(false)
 {
     ;
 }
@@ -97,6 +99,7 @@ HRESULT CStunServer::Initialize(const CStunServerConfig& config)
     int socketcount = 0;
     CRefCountedPtr<IStunAuth> _spAuth;
     TransportAddressSet tsa = {};
+    boost::shared_ptr<RateLimiter> spLimiter;
 
     // cleanup any thing that's going on now
     Shutdown();
@@ -132,17 +135,24 @@ HRESULT CStunServer::Initialize(const CStunServerConfig& config)
 
     ChkIf(socketcount == 0, E_INVALIDARG);
 
+    if (config.fEnableDosProtection)
+    {
+        Logging::LogMsg(LL_DEBUG, "Creating rate limiter for ddos protection\n");
+        // hard coding to 25000 ip addresses
+        spLimiter = boost::shared_ptr<RateLimiter>(new RateLimiter(25000, config.fMultiThreadedMode));
+    }
+
     if (config.fMultiThreadedMode == false)
     {
         Logging::LogMsg(LL_DEBUG, "Configuring single threaded mode\n");
-
+        
         // create one thread for all the sockets
         CStunSocketThread* pThread = new CStunSocketThread();
         ChkIf(pThread==NULL, E_OUTOFMEMORY);
 
         _threads.push_back(pThread);
         
-        Chk(pThread->Init(_arrSockets, &tsa, _spAuth, (SocketRole)-1));
+        Chk(pThread->Init(_arrSockets, &tsa, _spAuth, (SocketRole)-1, spLimiter));
     }
     else
     {
@@ -159,7 +169,7 @@ HRESULT CStunServer::Initialize(const CStunServerConfig& config)
                 pThread = new CStunSocketThread();
                 ChkIf(pThread==NULL, E_OUTOFMEMORY);
                 _threads.push_back(pThread);
-                Chk(pThread->Init(_arrSockets, &tsa, _spAuth, rolePrimaryRecv));
+                Chk(pThread->Init(_arrSockets, &tsa, _spAuth, rolePrimaryRecv, spLimiter));
             }
         }
     }

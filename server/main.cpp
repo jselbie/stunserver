@@ -112,6 +112,7 @@ struct StartupArgs
     std::string strHelp;
     std::string strVerbosity;
     std::string strMaxConnections;
+    std::string strDosProtect;
     
 };
 
@@ -132,6 +133,7 @@ void DumpStartupArgs(StartupArgs& args)
     PRINTARG(strHelp);
     PRINTARG(strVerbosity);
     PRINTARG(strMaxConnections);
+    PRINTARG(strDosProtect);
     Logging::LogMsg(LL_DEBUG, "--------------------------\n");
 }
 
@@ -487,7 +489,9 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
             Chk(hr);
         }
     }
-    
+
+    // ---- DDOS PROTECTION SWITCH -------------------------------------------
+    config.fEnableDosProtection = (argsIn.strDosProtect.length() > 0);
 
     *pConfigOut = config;
     hr = S_OK;
@@ -515,6 +519,7 @@ HRESULT ParseCommandLineArgs(int argc, char** argv, int startindex, StartupArgs*
     cmdline.AddOption("maxconn", required_argument, &pStartupArgs->strMaxConnections);
     cmdline.AddOption("help", no_argument, &pStartupArgs->strHelp);
     cmdline.AddOption("verbosity", required_argument, &pStartupArgs->strVerbosity);
+    cmdline.AddOption("ddp", no_argument, &pStartupArgs->strDosProtect);
 
     cmdline.ParseCommandLine(argc, argv, startindex, &fError);
 

@@ -21,6 +21,7 @@
 #include "stunsocket.h"
 #include "stunsocketthread.h"
 #include "recvfromex.h"
+#include "ratelimiter.h"
 
 
 CStunSocketThread::CStunSocketThread() :
@@ -46,7 +47,7 @@ void CStunSocketThread::ClearSocketArray()
     _socks.clear();
 }
 
-HRESULT CStunSocketThread::Init(CStunSocket* arrayOfFourSockets, TransportAddressSet* pTSA, IStunAuth* pAuth, SocketRole rolePrimaryRecv)
+HRESULT CStunSocketThread::Init(CStunSocket* arrayOfFourSockets, TransportAddressSet* pTSA, IStunAuth* pAuth, SocketRole rolePrimaryRecv, boost::shared_ptr<RateLimiter>& spLimiter)
 {
     HRESULT hr = S_OK;
     
@@ -94,6 +95,8 @@ HRESULT CStunSocketThread::Init(CStunSocket* arrayOfFourSockets, TransportAddres
     _rotation = 0;
     
     _spAuth.Attach(pAuth);
+    
+    _spLimiter = spLimiter;
 
 Cleanup:
     return hr;
@@ -206,7 +209,7 @@ HRESULT CStunSocketThread::WaitForStopAndClose()
     ClearSocketArray();
     
     UninitThreadBuffers();
-
+    
     return S_OK;
 }
 
@@ -276,6 +279,10 @@ void CStunSocketThread::Run()
     int recvflags = fMultiSocketMode ? MSG_DONTWAIT : 0;
     CStunSocket* pSocket = _socks[0];
     int ret;
+    char szIPRemote[100] = {};
+    char szIPLocal[100] = {};
+    bool allowed_to_pass = true;
+
     
     int sendsocketcount = 0;
 
@@ -319,17 +326,29 @@ void CStunSocketThread::Run()
         {
             _msgIn.addrLocal.SetPort(pSocket->GetLocalAddress().GetPort());
         }
+        
 
         if (Logging::GetLogLevel() >= LL_VERBOSE)
         {
-            char szIPRemote[100];
-            char szIPLocal[100];
             _msgIn.addrRemote.ToStringBuffer(szIPRemote, 100);
             _msgIn.addrLocal.ToStringBuffer(szIPLocal, 100);
-            Logging::LogMsg(LL_VERBOSE, "recvfrom returns %d from %s on local interface %s", ret, szIPRemote, szIPLocal);
-        } 
+        }
+        else
+        {
+            szIPRemote[0] = '\0';
+            szIPLocal[0] = '\0';
+        }
+        
+        Logging::LogMsg(LL_VERBOSE, "recvfrom returns %d from %s on local interface %s", ret, szIPRemote, szIPLocal);
 
-        if (ret < 0)
+        allowed_to_pass = (_spLimiter.get() != NULL) ? _spLimiter->RateCheck(_msgIn.addrRemote) : true;
+        
+        if (allowed_to_pass == false)
+        {
+            Logging::LogMsg(LL_VERBOSE, "RateLimiter signals false for packet from %s", szIPRemote);
+        }
+
+        if ((ret < 0) || (allowed_to_pass == false))
         {
             // error
             continue;

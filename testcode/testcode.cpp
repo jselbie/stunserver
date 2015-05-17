@@ -33,6 +33,7 @@
 #include "polling.h"
 #include "testpolling.h"
 #include "testatomichelpers.h"
+#include "testratelimiter.h"
 
 void ReaderFuzzTest()
 {
@@ -84,6 +85,7 @@ void RunUnitTests()
     boost::shared_ptr<CTestFastHash> spTestFastHash(new CTestFastHash);
     boost::shared_ptr<CTestPolling> spTestPolling(new CTestPolling);
     boost::shared_ptr<CTestAtomicHelpers> spTestAtomicHelpers(new CTestAtomicHelpers);
+    boost::shared_ptr<CTestRateLimiter> spTestRateLimiter(new CTestRateLimiter);
 
     vecTests.push_back(spTestDataStream.get());
     vecTests.push_back(spTestReader.get());
@@ -97,6 +99,7 @@ void RunUnitTests()
     vecTests.push_back(spTestFastHash.get());
     vecTests.push_back(spTestPolling.get());
     vecTests.push_back(spTestAtomicHelpers.get());
+    vecTests.push_back(spTestRateLimiter.get());
 
 
     for (size_t index = 0; index < vecTests.size(); index++)

@@ -1,10 +1,10 @@
-.TH STUNCLIENT 1 "" "January 22, 2012" "User Manual"
+.TH "STUNCLIENT" "1" "" "January 22, 2012" "User Manual"
 .SH NAME
 .PP
-stunclient - command line app for the STUN protocol
+stunclient \- command line app for the STUN protocol
 .SH SYNOPSIS
 .PP
-\f[B]stunclient\f[] [OPTIONS] server [port]
+\f[B]stunclient\f[] OPTIONS (#options) server [port]
 .SH DESCRIPTION
 .PP
 stunclient attempts to discover the local host\[aq]s own external IP
@@ -17,13 +17,13 @@ The following options are supported.
 .IP
 .nf
 \f[C]
---mode\ MODE
---localaddr\ INTERFACE
---localport\ PORTNUMBER
---family\ IPVERSION
---protocol\ PROTO
---verbosity\ LOGLEVEL
---help
+\-\-mode\ MODE
+\-\-localaddr\ INTERFACE
+\-\-localport\ PORTNUMBER
+\-\-family\ IPVERSION
+\-\-protocol\ PROTO
+\-\-verbosity\ LOGLEVEL
+\-\-help
 \f[]
 .fi
 .PP
@@ -45,7 +45,7 @@ The default is 3478 for UDP and TCP.
 .PP
    *   *   *   *   *
 .PP
-\f[B]--mode\f[] MODE
+\f[B]\-\-mode\f[] MODE
 .PP
 Where MODE is either "basic" or "full".
 "basic" mode is the default and indicates that the client should perform
@@ -56,7 +56,7 @@ The NAT filtering test is only supported for UDP.
 .PP
    *   *   *   *   *
 .PP
-\f[B]--localaddr\f[] INTERFACE or IPADDRESS
+\f[B]\-\-localaddr\f[] INTERFACE or IPADDRESS
 .PP
 The value for this option may the name of an interface (such as "eth0"
 or "lo").
@@ -69,7 +69,7 @@ listen for responses on all addresses (INADDR_ANY).
 .PP
    *   *   *   *   *
 .PP
-\f[B]--localport\f[] PORTNUM
+\f[B]\-\-localport\f[] PORTNUM
 .PP
 PORTNUM is a value between 1 to 65535.
 This is the UDP or TCP port that the primary and alternate interfaces
@@ -79,21 +79,21 @@ used.
 .PP
    *   *   *   *   *
 .PP
-\f[B]--family\f[] IPVERSION
+\f[B]\-\-family\f[] IPVERSION
 .PP
 IPVERSION is either "4" or "6" to specify the usage of IPV4 or IPV6.
 If not specified, the default value is "4".
 .PP
    *   *   *   *   *
 .PP
-\f[B]--protocol\f[] PROTO
+\f[B]\-\-protocol\f[] PROTO
 .PP
 PROTO is either "udp" or "tcp".
 "udp" is the default if this parameter is not specified
 .PP
    *   *   *   *   *
 .PP
-\f[B]--verbosity\f[] LOGLEVEL
+\f[B]\-\-verbosity\f[] LOGLEVEL
 .PP
 Sets the verbosity of the logging level.
 0 is the default (minimal output and logging).
@@ -102,7 +102,7 @@ Sets the verbosity of the logging level.
 .PP
    *   *   *   *   *
 .PP
-\f[B]--help\f[] Prints this help page
+\f[B]\-\-help\f[] Prints this help page
 .SH EXAMPLES
 .TP
 .B stunclient stunserver.org 3478
@@ -111,13 +111,13 @@ Performs a simple binding test request with the server listening at
 .RS
 .RE
 .TP
-.B stunclient --mode full --localport 9999 12.34.56.78
+.B stunclient \-\-mode full \-\-localport 9999 12.34.56.78
 Performs a full set of UDP NAT behavior tests from local port 9999 to
 the server listening at IP Address 12.34.56.78 (port 3478)
 .RS
 .RE
 .TP
-.B stunclient --protocol tcp stun.selbie.com
+.B stunclient \-\-protocol tcp stun.selbie.com
 Performs a simple binding test using TCP to server listening on the
 default port of 3478 at stun.selbie.com
 .RS

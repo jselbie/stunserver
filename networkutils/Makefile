@@ -1,7 +1,7 @@
 include ../common.inc
 
 PROJECT_TARGET := libnetworkutils.a
-PROJECT_OBJS := adapters.o polling.o recvfromex.o resolvehostname.o stunsocket.o
+PROJECT_OBJS := adapters.o polling.o ratelimiter.o recvfromex.o resolvehostname.o stunsocket.o
 INCLUDES := $(BOOST_INCLUDE) -I../common -I../stuncore
 
 

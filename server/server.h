@@ -47,13 +47,11 @@ public:
     
     CSocketAddress addrPrimaryAdvertised;    // public-IP for PP and PA (port is ignored)
     CSocketAddress addrAlternateAdvertised;  // public-IP for AP and AA (port is ignored)
+    
+    bool fEnableDosProtection; // enable denial of service protection
 
     CStunServerConfig();
 };
-
-
-
-
 
 
 class CStunServer :
@@ -74,7 +72,7 @@ private:
     CRefCountedPtr<IStunAuth> _spAuth;
     
     HRESULT AddSocket(TransportAddressSet* pTSA, SocketRole role, const CSocketAddress& addrListen, const CSocketAddress& addrAdvertise);
-
+    
 public:
 
     HRESULT Initialize(const CStunServerConfig& config);

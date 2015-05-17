@@ -227,7 +227,7 @@ CStunSocket* CTCPStunThread::GetListenSocket(int sock)
 
 
 
-HRESULT CTCPStunThread::Init(const TransportAddressSet& tsaListen, const TransportAddressSet& tsaHandler, IStunAuth* pAuth, int maxConnections)
+HRESULT CTCPStunThread::Init(const TransportAddressSet& tsaListen, const TransportAddressSet& tsaHandler, IStunAuth* pAuth, int maxConnections, boost::shared_ptr<RateLimiter>& spLimiter)
 {
     HRESULT hr = S_OK;
     int ret;
@@ -281,6 +281,8 @@ HRESULT CTCPStunThread::Init(const TransportAddressSet& tsaListen, const Transpo
     
     _pNewConnList = &_hashConnections1;
     _pOldConnList = &_hashConnections2;
+    
+    _spLimiter = spLimiter;
     
     _fNeedToExit = false;
     
@@ -480,12 +482,30 @@ StunConnection* CTCPStunThread::AcceptConnection(CStunSocket* pListenSocket)
     ASSERT(::IsValidSocketRole(role));
 
     socktmp = ::accept(listensock, (sockaddr*)&addrClient, &socklen);
-    
 
     err = errno;
     Logging::LogMsg(LL_VERBOSE, "accept returns %d (errno == %d)", socktmp, (socktmp<0)?err:0);
-
     ChkIfA(socktmp == -1, E_FAIL);
+    
+    // --- rate limit check-------
+    if (_spLimiter.get())
+    {
+        CSocketAddress addr = CSocketAddress(addrClient);
+        bool allowed_to_pass = _spLimiter->RateCheck(addr);
+        
+        if (allowed_to_pass == false)
+        {
+            if (Logging::GetLogLevel() >= LL_VERBOSE)
+            {
+                char szIP[100];
+                addr.ToStringBuffer(szIP, 100);
+                Logging::LogMsg(LL_VERBOSE, "Rate Limiter has blocked incoming connection from IP %s", szIP);
+            }
+            ChkIf(false, E_FAIL); // this will trigger the socket to be immediately closed
+        }
+    }
+    // --------------------------
+    
     
     clientsock = socktmp;
     
@@ -854,6 +874,7 @@ HRESULT CTCPServer::Initialize(const CStunServerConfig& config)
     HRESULT hr = S_OK;
     TransportAddressSet tsaListenAll;
     TransportAddressSet tsaHandler;
+    boost::shared_ptr<RateLimiter> spLimiter;
     
     ChkIfA(_threads[0] != NULL, E_UNEXPECTED); // we can't already be initialized, right?
     
@@ -874,11 +895,16 @@ HRESULT CTCPServer::Initialize(const CStunServerConfig& config)
     InitTSA(&tsaListenAll, RoleAP, config.fHasAP, config.addrAP, CSocketAddress());
     InitTSA(&tsaListenAll, RoleAA, config.fHasAA, config.addrAA, CSocketAddress());
     
+    if (config.fEnableDosProtection)
+    {
+        spLimiter = boost::shared_ptr<RateLimiter>(new RateLimiter(20000, config.fMultiThreadedMode));
+    }
+    
     if (config.fMultiThreadedMode == false)
     {
         _threads[0] = new CTCPStunThread();
         
-        ChkA(_threads[0]->Init(tsaListenAll, tsaHandler, _spAuth, config.nMaxConnections));
+        ChkA(_threads[0]->Init(tsaListenAll, tsaHandler, _spAuth, config.nMaxConnections, spLimiter));
     }
     else
     {
@@ -902,7 +928,7 @@ HRESULT CTCPServer::Initialize(const CStunServerConfig& config)
                
                 _threads[threadindex] = new CTCPStunThread();
 
-                Chk(_threads[threadindex]->Init(tsaListen, tsaHandler, _spAuth, config.nMaxConnections));
+                Chk(_threads[threadindex]->Init(tsaListen, tsaHandler, _spAuth, config.nMaxConnections, spLimiter));
             }
         }
     }

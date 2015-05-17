@@ -150,6 +150,15 @@ The default is 0.
 
 ____
 
+**--ddp**
+
+The --ddp switch is for "Distributed Denial (of service) Protection".  Any client IP address that
+floods the service with too many packets in a short interval is put into a "penalty box" that
+will result in subsequent packets received from this IP to be dropped. The result is that
+the client receives no response.
+
+____
+
 **--primaryadvertised** PRIMARY-IP
 
 **--altadvertised** ALT-IP

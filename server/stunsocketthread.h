@@ -20,6 +20,7 @@
 #define	STUNSOCKETTHREAD_H
 
 #include "stunsocket.h"
+#include "ratelimiter.h"
 
 
 class CStunServer;
@@ -32,7 +33,7 @@ public:
     CStunSocketThread();
     ~CStunSocketThread();
     
-    HRESULT Init(CStunSocket* arrayOfFourSockets, TransportAddressSet* pTSA, IStunAuth* pAuth, SocketRole rolePrimaryRecv);
+    HRESULT Init(CStunSocket* arrayOfFourSockets, TransportAddressSet* pTSA, IStunAuth* pAuth, SocketRole rolePrimaryRecv, boost::shared_ptr<RateLimiter>& _spRateLimiter);
     HRESULT Start();
 
     HRESULT SignalForStop(bool fPostMessages);
@@ -69,6 +70,8 @@ private:
     CRefCountedBuffer _spBufferOut;    // buffer we send response on
     StunMessageIn _msgIn;
     StunMessageOut _msgOut;
+    
+    boost::shared_ptr<RateLimiter> _spLimiter;
     
     HRESULT InitThreadBuffers();
     void UninitThreadBuffers();
