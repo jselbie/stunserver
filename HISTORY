@@ -27,6 +27,6 @@ Version 1.2.6 - Fix compiler warning around unused local typedefs.
 
 Version 1.2.7 - Fix compiler warning around unused local variable. Fixed the case where filtering test would report failure if the behavior test failed before it.
 
-Version 1.28  - New command line parameter, --ddp, which enables DDOS (distributed denial of service) protection
+Version 1.2.8  - New command line parameter, --ddp, which enables DDOS (distributed denial of service) protection
 
 
