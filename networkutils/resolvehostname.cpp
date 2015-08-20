@@ -55,7 +55,9 @@ HRESULT ResolveHostName(const char* pszHostName, int family, bool fNumericOnly, 
     
 Cleanup:
 
-    ::freeaddrinfo(pResultList);
+    if (pResultList != NULL) {
+        ::freeaddrinfo(pResultList);
+    }
 
     return hr;
 
