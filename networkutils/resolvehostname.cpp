@@ -55,7 +55,8 @@ HRESULT ResolveHostName(const char* pszHostName, int family, bool fNumericOnly, 
     
 Cleanup:
 
-    if (pResultList != NULL) {
+    if (pResultList != NULL) // android will crash if passed NULL
+    {
         ::freeaddrinfo(pResultList);
     }
 
