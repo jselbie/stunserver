@@ -191,7 +191,7 @@ HRESULT CDataStream::SeekDirect(size_t pos)
 
     // seeking is allowed anywhere between 0 and stream size
 
-    if ((pos >= 0) && (pos <= currentSize))
+    if (pos <= currentSize)
     {
         _pos = pos;
     }
