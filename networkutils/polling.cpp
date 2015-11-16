@@ -18,7 +18,7 @@
 #include "polling.h"
 #include "fasthash.h"
 
-#ifdef __GNUC__
+#ifdef IS_LINUX
     #ifndef HAS_EPOLL
     #pragma message "polling.cpp: WARNING - EPOLL IS NOT AVAILABLE"
     #endif
