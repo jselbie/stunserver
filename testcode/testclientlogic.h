@@ -45,9 +45,6 @@ private:
     
     TransportAddressSet _tsa;
     
-    NatBehavior _behavior;
-    NatFiltering _filtering;
-    
     
     boost::shared_ptr<CStunClientLogic> _spClientLogic;
     
