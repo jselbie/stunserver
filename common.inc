@@ -1,4 +1,4 @@
-BOOST_INCLUDE := -I/Users/jselbie/boost_1_52_0
+#BOOST_INCLUDE := -I/Users/jselbie/boost_1_52_0
 #OPENSSL_INCLUDE := -I/Users/jselbie/openssl/include
 
 DEFINES := -DNDEBUG
