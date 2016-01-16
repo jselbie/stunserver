@@ -156,6 +156,7 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
     HMAC_CTX ctx = {};
 #else
     CCHmacContext ctx = {};
+    UNREFERENCED_VARIABLE(hmaclength);
 #endif
     uint32_t chunk32;
     uint16_t chunk16;
@@ -329,12 +330,7 @@ HRESULT CStunMessageReader::ValidateMessageIntegrityLong(const char* pszUser, co
 #ifndef __APPLE__
     ChkIfA(NULL == MD5(key, totallength, hash), E_FAIL);
 #else
-    {
-        CC_MD5_CTX context = {};
-        CC_MD5_Init(&context);
-        CC_MD5_Update(&context, key, totallength);
-        CC_MD5_Final(hash, &context);
-    }
+        CC_MD5(key, totallength, hash);
 #endif
     
     
