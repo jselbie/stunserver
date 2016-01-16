@@ -24,8 +24,15 @@
 #include "stunbuilder.h"
 #include <boost/crc.hpp>
 
+#ifndef __APPLE__
 #include <openssl/md5.h>
 #include <openssl/hmac.h>
+#else
+#define COMMON_DIGEST_FOR_OPENSSL
+#include <CommonCrypto/CommonCrypto.h>
+#endif
+
+
 #include "stunauth.h"
 
 
@@ -498,11 +505,17 @@ HRESULT CStunMessageBuilder::AddMessageIntegrityImpl(uint8_t* key, size_t keysiz
     
     // now do a little pointer math so that HMAC can write exactly to where the hash bytes will appear
     pDstBuf = ((uint8_t*)pData) + length + 4;
-    pHashResult = HMAC(EVP_sha1(), key, keysize, (uint8_t*)pData, length, pDstBuf, &resultlength);
     
+#ifndef __APPLE__
+    pHashResult = HMAC(EVP_sha1(), key, keysize, (uint8_t*)pData, length, pDstBuf, &resultlength);
     ASSERT(resultlength == 20);
     ASSERT(pHashResult != NULL);
-Cleanup: 
+#else
+    CCHmac(kCCHmacAlgSHA1, key, keysize,(uint8_t*)pData, length, pDstBuf);
+    UNREFERENCED_VARIABLE(resultlength);
+#endif
+    
+Cleanup:
     return hr;
 }
 
@@ -557,7 +570,12 @@ HRESULT CStunMessageBuilder::AddMessageIntegrityLongTerm(const char* pszUserName
     
     ASSERT((pDst-key) == lenTotal);
 
+#ifndef __APPLE__
     pResult = MD5(key, lenTotal, hash);
+#else
+    pResult = CC_MD5(key, lenTotal, hash);
+#endif
+    
     ASSERT(pResult != NULL);
     hr= AddMessageIntegrityImpl(hash, MD5_DIGEST_LENGTH);
     

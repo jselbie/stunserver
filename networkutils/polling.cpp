@@ -18,13 +18,6 @@
 #include "polling.h"
 #include "fasthash.h"
 
-#ifdef __GNUC__
-    #ifndef HAS_EPOLL
-    #pragma message "polling.cpp: WARNING - EPOLL IS NOT AVAILABLE"
-    #endif
-#endif
-
-
 
 // --------------------------------------------------------------------------
 

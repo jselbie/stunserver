@@ -22,9 +22,16 @@
 #include "stunutils.h"
 #include "socketaddress.h"
 #include <boost/crc.hpp>
+
+#ifndef __APPLE__
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 #include <openssl/md5.h>
+#else
+#define COMMON_DIGEST_FOR_OPENSSL
+#include <CommonCrypto/CommonCrypto.h>
+#endif
+
 #include "stunauth.h"
 #include "fasthash.h"
 
@@ -145,7 +152,11 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
     const size_t c_hmacsize = 20;
     uint8_t hmaccomputed[c_hmacsize] = {}; // zero-init
     unsigned int hmaclength = c_hmacsize;
+#ifndef __APPLE__
     HMAC_CTX ctx = {};
+#else
+    CCHmacContext ctx = {};
+#endif
     uint32_t chunk32;
     uint16_t chunk16;
     size_t len, nChunks;
@@ -182,13 +193,21 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
     stream.Attach(spBuffer, false);
     
     // Here comes the fun part.  If there is a fingerprint attribute, we have to adjust the length header in computing the hash
+#ifndef __APPLE__
     HMAC_CTX_init(&ctx);
-    fContextInit = true;
     HMAC_Init(&ctx, key, keylength, EVP_sha1());
+#else
+    CCHmacInit(&ctx, kCCHmacAlgSHA1, key, keylength);
+#endif
+    fContextInit = true;
     
     // message type
     Chk(stream.ReadUint16(&chunk16));
+#ifndef __APPLE__
     HMAC_Update(&ctx, (unsigned char*)&chunk16, sizeof(chunk16));
+#else
+    CCHmacUpdate(&ctx, &chunk16, sizeof(chunk16));
+#endif
     
     // message length
     Chk(stream.ReadUint16(&chunk16));
@@ -203,7 +222,12 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
         
         chunk16 = htons(adjustedlengthHeader);
     }
+    
+#ifndef __APPLE__
     HMAC_Update(&ctx, (unsigned char*)&chunk16, sizeof(chunk16));
+#else
+    CCHmacUpdate(&ctx, &chunk16, sizeof(chunk16));
+#endif
     
     // now include everything up to the hash attribute itself.
     len = pAttribIntegrity->offset;
@@ -217,10 +241,19 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
     for (size_t count = 0; count < nChunks; count++)
     {
         Chk(stream.ReadUint32(&chunk32));
+#ifndef __APPLE__
         HMAC_Update(&ctx, (unsigned char*)&chunk32, sizeof(chunk32));
+#else
+        CCHmacUpdate(&ctx, &chunk32, sizeof(chunk32));
+#endif
     }
     
+#ifndef __APPLE__
     HMAC_Final(&ctx, hmaccomputed, &hmaclength);
+#else
+    CCHmacFinal(&ctx, hmaccomputed);
+#endif
+    
     
     // now compare the bytes
     cmp = memcmp(hmaccomputed, spBuffer->GetData() + pAttribIntegrity->offset, c_hmacsize);
@@ -230,7 +263,11 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
 Cleanup:
     if (fContextInit)
     {
+#ifndef __APPLE__
         HMAC_CTX_cleanup(&ctx);
+#else
+        UNREFERENCED_VARIABLE(fContextInit);
+#endif
     }
         
     return hr;
@@ -289,7 +326,19 @@ HRESULT CStunMessageReader::ValidateMessageIntegrityLong(const char* pszUser, co
     
     ASSERT((pDst-key) == totallength);
     
+#ifndef __APPLE__
     ChkIfA(NULL == MD5(key, totallength, hash), E_FAIL);
+#else
+    {
+        CC_MD5_CTX context = {};
+        CC_MD5_Init(&context);
+        CC_MD5_Update(&context, key, totallength);
+        CC_MD5_Final(hash, &context);
+    }
+#endif
+    
+    
+    
     Chk(ValidateMessageIntegrity(hash, ARRAYSIZE(hash)));
     
 Cleanup:

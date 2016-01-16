@@ -62,8 +62,6 @@ HRESULT CTestReader::Test1()
     HRESULT hr = S_OK;
 
     StunAttribute attrib;
-    const char* pszExpectedSoftwareAttribute = "STUN test client";
-    const char* pszExpectedUserName = "evtj:h6vY";
     CRefCountedBuffer spBuffer;
     char szStringValue[100];
     
@@ -92,17 +90,17 @@ HRESULT CTestReader::Test1()
 
     ChkIfA(attrib.attributeType != STUN_ATTRIBUTE_SOFTWARE, E_FAIL);
 
-    ChkIfA(0 != ::strncmp(pszExpectedSoftwareAttribute, (const char*)(spBuffer->GetData() + attrib.offset), attrib.size), E_FAIL);
+    ChkIfA(0 != ::strncmp(c_software, (const char*)(spBuffer->GetData() + attrib.offset), attrib.size), E_FAIL);
 
     ChkA(reader.GetAttributeByType(STUN_ATTRIBUTE_USERNAME, &attrib));
 
     ChkIfA(attrib.attributeType != STUN_ATTRIBUTE_USERNAME, E_FAIL);
 
-    ChkIfA(0 != ::strncmp(pszExpectedUserName, (const char*)(spBuffer->GetData() + attrib.offset), attrib.size), E_FAIL);
+    ChkIfA(0 != ::strncmp(c_username, (const char*)(spBuffer->GetData() + attrib.offset), attrib.size), E_FAIL);
     
     
     ChkA(reader.GetStringAttributeByType(STUN_ATTRIBUTE_SOFTWARE, szStringValue, ARRAYSIZE(szStringValue)));
-    ChkIfA(0 != ::strcmp(pszExpectedSoftwareAttribute, szStringValue), E_FAIL);
+    ChkIfA(0 != ::strcmp(c_software, szStringValue), E_FAIL);
 
     ChkIfA(reader.HasFingerprintAttribute() == false, E_FAIL);
 
