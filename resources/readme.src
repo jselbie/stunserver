@@ -42,8 +42,7 @@ Testing:
   Ubuntu 12 with gcc/g++ 4.6.3
   Ubuntu 12 with clang/clang++ 3.0
   Amazon AWS with gcc/g++ 4.4
-  MacOS Snow Leopard (will not compile on earlier versions without updating to a newer version of gcc/g++)
-  MacOS Lion (with Clang compiler)
+  MacOS with XCode 7 and command line tools
   FreeBSD 9.0 with gcc/g++ 4.2.1
   Solaris 11 with gcc/g++ 4.5.2
 
@@ -67,7 +66,7 @@ Prerequisites before compiling and running.
       sudo yum install openssl-devel         # For OpenSSL
 
   Solaris and Mac
-      OpenSSL is already installed.
+      OpenSSL is already installed on Solaris and is not needed on Mac.
 
       Install Boost locally as per instructions below, then uncomment and edit the top line of the common.inc file.
 
