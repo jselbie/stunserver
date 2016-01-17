@@ -29,4 +29,5 @@ Version 1.2.7 - Fix compiler warning around unused local variable. Fixed the cas
 
 Version 1.2.8  - New command line parameter, --ddp, which enables DDOS (distributed denial of service) protection
 
+Version 1.2.9  - Merged github pull requests, Mac now uses CommonCrypto instead of OpenSSL
 
