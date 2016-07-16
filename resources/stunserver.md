@@ -26,6 +26,7 @@ The following options are supported.
     --protocol PROTO
     --maxconn MAXCONN
     --verbosity LOGLEVEL
+    --ddp
     --primaryadvertised
     --altadvertised
     --help
@@ -210,7 +211,7 @@ running the service.
 
 stunserver --mode full --primaryinterface eth0 --altinterface eth1
 :   Same as above, except the interfaces are specified by their names as
-    enumerated by the system. (The "ifconfig" or "ipconfig" command will
+    enumerated by the system. The "ifconfig" or "ipconfig" command will
     enumerate available interface names.
 
 # AUTHOR

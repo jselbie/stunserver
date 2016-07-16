@@ -25,6 +25,7 @@ The following options are supported.
 \-\-protocol\ PROTO
 \-\-maxconn\ MAXCONN
 \-\-verbosity\ LOGLEVEL
+\-\-ddp
 \-\-primaryadvertised
 \-\-altadvertised
 \-\-help
@@ -211,7 +212,8 @@ With no options, starts a basic STUN binding service on UDP port 3478.
 .RS
 .RE
 .TP
-.B stunserver \-\-mode full \-\-primaryinterface 128.34.56.78 \-\-altinterface 128.34.56.79
+.B stunserver \-\-mode full \-\-primaryinterface 128.34.56.78
+\-\-altinterface 128.34.56.79
 Above example starts a dual\-host STUN service on the the interfaces
 identified by the IP address "128.34.56.78" and "128.34.56.79".
 There are four UDP socket listeners
@@ -225,10 +227,11 @@ IP, Alternate Port) 128.34.56.79:3478 (Primary IP, Primary Port)
 An error occurs if the addresses specified do not exist on the local
 host running the service.
 .TP
-.B stunserver \-\-mode full \-\-primaryinterface eth0 \-\-altinterface eth1
+.B stunserver \-\-mode full \-\-primaryinterface eth0 \-\-altinterface
+eth1
 Same as above, except the interfaces are specified by their names as
 enumerated by the system.
-(The "ifconfig" or "ipconfig" command will enumerate available interface
+The "ifconfig" or "ipconfig" command will enumerate available interface
 names.
 .RS
 .RE
