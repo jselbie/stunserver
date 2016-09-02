@@ -436,6 +436,7 @@ void TcpClientLoop(StunClientLogicConfig& config, ClientSocketConfig& socketconf
             {
                 // server cut us off before we got all the bytes we thought we were supposed to get?
                 ASSERT(false);
+                Logging::LogMsg(LL_ALWAYS, "Lost connection");
                 break;
             }
             if (ret < 0)

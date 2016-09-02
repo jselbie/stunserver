@@ -9,8 +9,7 @@ enum StunConnectionState
 {
     ConnectionState_Idle,
     ConnectionState_Receiving,
-    ConnectionState_Transmitting,
-    ConnectionState_Closing,     // shutdown has been called, waiting for close notification on other end
+    ConnectionState_Transmitting
 };
 
 
@@ -44,6 +43,10 @@ public:
     
     StunConnection* GetConnection(int sock, SocketRole role);
     void ReleaseConnection(StunConnection* pConn);
+    
+    // ResetConnection resets streams to handle a subsequent incoming packet
+    // It's a lighter version of calling ReleaseConnection followed by GetConnection
+    void ResetConnection(StunConnection* pConn);
     
     void Reset();
     

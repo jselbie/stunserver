@@ -96,7 +96,6 @@ class CTCPStunThread
     
     HRESULT ReceiveBytesForConnection(StunConnection* pConn);
     HRESULT WriteBytesForConnection(StunConnection* pConn);
-    HRESULT ConsumeRemoteClose(StunConnection* pConn);
     
     void CloseAllConnections(StunThreadConnectionMap* pConnMap);
     void SweepDeadConnections();
@@ -104,6 +103,7 @@ class CTCPStunThread
     int GetTimeoutSeconds();
     bool IsConnectionCountAtMax();
     void CloseConnection(StunConnection* pConn);
+    bool RateCheck(const CSocketAddress& addr);
     
     // thread members
     

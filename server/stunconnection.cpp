@@ -92,3 +92,11 @@ void CConnectionPool::ReleaseConnection(StunConnection* pConn)
     _freelist = pConn;
 }
 
+void CConnectionPool::ResetConnection(StunConnection* pConn)
+{
+    pConn->_reader.Reset();
+    pConn->_reader.GetStream().Attach(pConn->_spReaderBuffer, true);
+    pConn->_state = ConnectionState_Receiving;
+    pConn->_txCount = 0;
+}
+
