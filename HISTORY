@@ -31,3 +31,5 @@ Version 1.2.8  - New command line parameter, --ddp, which enables DDOS (distribu
 
 Version 1.2.9  - Merged github pull requests, Mac now uses CommonCrypto instead of OpenSSL
 
+Version 1.2.10 - TCP mode allows the client to keep the connection open longer and send multiple binding requests
+
