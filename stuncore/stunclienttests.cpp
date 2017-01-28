@@ -91,8 +91,6 @@ HRESULT CStunClientTestBase::BasicReaderValidation(CRefCountedBuffer& spMsg, CSt
         }
     }
 
-
-Cleanup:
     return hr;
 }
 
