@@ -33,3 +33,5 @@ Version 1.2.9  - Merged github pull requests, Mac now uses CommonCrypto instead 
 
 Version 1.2.10 - TCP mode allows the client to keep the connection open longer and send multiple binding requests
 
+Version 1.2.11 - stunclient will now initiate filtering tests before behavior testst in full mode. "--mode full" is now deprecaed as a parameter for stunclient in favor of running "--mode behavior" and "--mode filtering" separately.
+
