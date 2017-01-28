@@ -235,9 +235,17 @@ HRESULT CreateConfigFromCommandLine(ClientCmdLineArgs& args, StunClientLogicConf
             config.fBehaviorTest = true;
             config.fFilteringTest = (fTCP == false); // impossible to to a filtering test in TCP
         }
+        else if (args.strMode == "behavior")
+        {
+            config.fBehaviorTest = true;
+        }
+        else if (args.strMode == "filtering")
+        {
+            config.fFilteringTest = true;
+        }
         else
         {
-            Logging::LogMsg(LL_ALWAYS, "Mode option must be 'full' or 'basic'");
+            Logging::LogMsg(LL_ALWAYS, "Mode option must be 'full', 'basic', 'behavior', or 'filtering'");
         }
     }
 

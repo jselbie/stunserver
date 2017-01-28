@@ -74,13 +74,23 @@ HRESULT CStunClientTestBase::BasicReaderValidation(CRefCountedBuffer& spMsg, CSt
     int cmp = 0;
 
     readerstate = reader.AddBytes(spMsg->GetData(), spMsg->GetSize());
-    ChkIf(readerstate != CStunMessageReader::BodyValidated, E_FAIL);
+    
+    hr = (readerstate == CStunMessageReader::BodyValidated) ? S_OK : E_FAIL;
+    if (FAILED(hr))
+    {
+        Logging::LogMsg(LL_DEBUG, "BasicReaderValidation - body parsing failed");
+    }
+    else
+    {
+        reader.GetTransactionId(&transid);
+        cmp = memcmp(transid.id, _transid.id, sizeof(_transid));
+        hr = (cmp == 0) ? S_OK : E_FAIL;
+        if (FAILED(hr))
+        {
+            Logging::LogMsg(LL_DEBUG, "BasicReaderValidation - transaction id comparison failed");
+        }
+    }
 
-    reader.GetTransactionId(&transid);
-
-    cmp = memcmp(transid.id, _transid.id, sizeof(_transid));
-
-    ChkIf(cmp!=0, E_FAIL);
 
 Cleanup:
     return hr;
@@ -144,7 +154,6 @@ HRESULT CBasicBindingTest::ProcessResponse(CRefCountedBuffer& spMsg, CSocketAddr
     CSocketAddress addrOther;
     bool fHasOtherAddress = false;
 
-    // todo - figure out a way to make buffering TCP fragments work
     Chk(BasicReaderValidation(spMsg, reader));
 
     hr = reader.GetXorMappedAddress(&addrMapped);
@@ -252,10 +261,12 @@ HRESULT CBehaviorTest::GetMessage(CRefCountedBuffer& spMsg, CSocketAddress* pAdd
 
     if (_fIsTest3 == false)
     {
+        Logging::LogMsg(LL_DEBUG, "Preparing message for behavior test #2 (destination=AP)");
         *pAddrDest = _pResults->addrAP;
     }
     else
     {
+        Logging::LogMsg(LL_DEBUG, "Preparing message for behavior test #2 (destination=AA)");
         *pAddrDest = _pResults->addrAA;
     }
 
@@ -369,12 +380,14 @@ HRESULT CFilteringTest::GetMessage(CRefCountedBuffer& spMsg, CSocketAddress* pAd
 
     if (_fIsTest3 == false)
     {
+        Logging::LogMsg(LL_DEBUG, "Preparing message for filtering test #2 (ChangeRequest=AA)");
         change.fChangeIP = true;
         change.fChangePort = true;
         builder.AddChangeRequest(change);
     }
     else
     {
+        Logging::LogMsg(LL_DEBUG, "Preparing message for filtering test #3 (ChangeRequest=PA)");
         change.fChangeIP = false;
         change.fChangePort = true;
         builder.AddChangeRequest(change);

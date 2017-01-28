@@ -43,10 +43,19 @@ _____
 
 **--mode** MODE
 
-Where MODE is either "basic" or "full". "basic" mode is the default and indicates that the
-client should perform a STUN binding test only. "full" mode indicates that the client should
-attempt to diagnose NAT behavior and filtering methodologies if the server supports this mode.
-The NAT filtering test is only supported for UDP.
+Where MODE is either "basic", "behavior", or "filtering".
+
+"basic" mode is the default and indicates that the
+client should perform a STUN binding test only.
+
+"behavior" mode indicates that the client should
+attempt to diagnose NAT behavior and port mapping methodologies if the server supports this mode.
+
+"filtering" mode indicates that the client should
+attempt to diagnose NAT filtering methodologies if the server supports this mode.  The NAT filtering test is only supported for UDP.
+
+"full" mode is a deprecated mode. It performs both a filtering and a behavior test together. Users
+are encouraged to run these tests separately and to avoid using the same local port.
 
 ____
 
@@ -96,8 +105,12 @@ Prints this help page
 stunclient stunserver.org 3478
 :    Performs a simple binding test request with the server listening at "stunserver.org"
 
-stunclient --mode full --localport 9999 12.34.56.78
-:    Performs a full set of UDP NAT behavior tests from local port 9999 to the server listening at IP
+stunclient --mode filtering --localport 9999 12.34.56.78
+:    Performs the NAT filtering tests from local port 9999 to the server listening at IP
+     Address 12.34.56.78 (port 3478)
+
+stunclient --mode behavior 12.34.56.78
+:    Performs the NAT behavior and port mapping tests from a random local port to the server listening at IP
      Address 12.34.56.78 (port 3478)
 
 stunclient --protocol tcp stun.selbie.com

@@ -108,16 +108,6 @@ HRESULT CStunClientLogic::Initialize(StunClientLogicConfig& config)
     _testlist.push_back(&_test1);
 
 
-    if (_config.fBehaviorTest)
-    {
-        _testBehavior2.Init(&_config, &_results);
-        _testlist.push_back(&_testBehavior2);
-
-        _testBehavior3.Init(&_config, &_results);
-        _testBehavior3.RunAsTest3(true);
-        _testlist.push_back(&_testBehavior3);
-    }
-
     if (_config.fFilteringTest)
     {
         _testFiltering2.Init(&_config, &_results);
@@ -126,6 +116,16 @@ HRESULT CStunClientLogic::Initialize(StunClientLogicConfig& config)
         _testFiltering3.Init(&_config, &_results);
         _testFiltering3.RunAsTest3(true);
         _testlist.push_back(&_testFiltering3);
+    }
+    
+    if (_config.fBehaviorTest)
+    {
+        _testBehavior2.Init(&_config, &_results);
+        _testlist.push_back(&_testBehavior2);
+
+        _testBehavior3.Init(&_config, &_results);
+        _testBehavior3.RunAsTest3(true);
+        _testlist.push_back(&_testBehavior3);
     }
 
     _fPreCheckRunOnTest = false;
