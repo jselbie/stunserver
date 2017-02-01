@@ -48,6 +48,24 @@ void PrintUsage(bool fSummaryUsage)
     PrettyPrint(psz, width);
 }
 
+
+// Because strerror_r has two versions (one that returns an int and another that returns char*)
+// we wrap the result into an overloaded function
+char* strerror_helper(int result, char* msg, int err)
+{
+    if (result != 0)
+    {
+        sprintf(msg, "Unknown error %d", err);
+    }
+    return msg;
+}
+
+char* strerror_helper(char* pszResult, char*, int)
+{
+    return pszResult;
+}
+
+
 void LogHR(uint16_t level, HRESULT hr)
 {
     uint32_t facility = HRESULT_FACILITY(hr);
@@ -60,18 +78,7 @@ void LogHR(uint16_t level, HRESULT hr)
         msg[0] = '\0';
         int err = (int)(HRESULT_CODE(hr));
         
-#ifdef _GNU_SOURCE        
-        pMsg = strerror_r(err, msg, ARRAYSIZE(msg));
-#else
-        {
-            int result = strerror_r(err, msg, ARRAYSIZE(msg));
-            if (result == -1)
-            {
-                    sprintf(msg, "%d", err);
-            }
-            pMsg = msg;
-        }
-#endif
+        pMsg = strerror_helper(strerror_r(err, msg, ARRAYSIZE(msg)), msg, err);
 
         if (pMsg)
         {
