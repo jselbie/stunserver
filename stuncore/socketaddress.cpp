@@ -295,6 +295,7 @@ HRESULT CSocketAddress::ToStringBuffer(char* pszAddrBytes, size_t length) const
     const char* pszResult = NULL;
     const size_t portLength = 6; // colon plus 5 digit string e.g. ":55555"
     char szPort[portLength+1];
+    char delimiter = (family == AF_INET) ? ':' : '.';
 
 
     ChkIfA(pszAddrBytes == NULL, E_INVALIDARG);
@@ -320,7 +321,7 @@ HRESULT CSocketAddress::ToStringBuffer(char* pszAddrBytes, size_t length) const
 
     ChkIf(pszResult == NULL, ERRNOHR);
 
-    sprintf(szPort, ":%d", GetPort());
+    sprintf(szPort, "%c%d", delimiter, GetPort());
 #if DEBUG
     ChkIfA(strlen(szPort) > portLength, E_FAIL);
 #endif
