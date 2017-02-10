@@ -534,26 +534,30 @@ HRESULT ParseCommandLineArgs(int argc, char** argv, int startindex, StartupArgs*
 }
 
 
-
-// This routine will set SIGINT And SIGTERM to "blocked" status only so that the
-// child worker threads will never have these events raised on them.
-HRESULT InitAppExitListener()
+HRESULT BlockSignal(int sig)
 {
     HRESULT hr = S_OK;
-    sigset_t sigs;
+    int result = 0;
+    sigset_t signalset;
+    sigset_t oldset;
     
-    int ret;
-    sigemptyset(&sigs);
-    sigaddset(&sigs, SIGINT);
-    sigaddset(&sigs, SIGTERM);
-
-    ret = pthread_sigmask(SIG_BLOCK, &sigs, NULL);
-    hr = (ret == 0) ? S_OK : ERRNO_TO_HRESULT(ret);
-
-    Logging::LogMsg(LL_DEBUG, "InitAppExitListener: x%x", hr);
-
+    sigemptyset(&signalset);
+    sigemptyset(&oldset);
+    
+    sigaddset(&signalset, sig);
+    
+    // blocks the signal on *this* thread and all child threads spawned with pthread_create
+    result = pthread_sigmask(SIG_BLOCK, &signalset, &oldset);
+    
+    if (result != 0)
+    {
+        hr = ERRNO_TO_HRESULT(result);
+        Logging::LogMsg(LL_DEBUG, "BlockSignal: x%x", hr);
+    }
+    
     return hr;
 }
+
 
 // after all the child threads have initialized with a signal mask that blocks SIGINT and SIGTERM
 // then the main thread UI can just sit on WaitForAppExitSignal and wait for CTRL-C to get pressed
@@ -625,9 +629,6 @@ HRESULT StartTCP(CRefCountedPtr<CTCPServer>& spTCPServer, CStunServerConfig& con
     
 }
 
-
-
-
 int main(int argc, char** argv)
 {
     HRESULT hr = S_OK;
@@ -684,13 +685,14 @@ int main(int argc, char** argv)
 
     DumpConfig(config);
 
-    // For now, just swallow sigpipe events globally so TCP server won't blow up
-    // on a send() call to a disconnected client
-    // There's other ways to do this (sigaction on each thread, MSG_NOSIGNAL, SO_NOSIGPIPE, etc...)
-    // This seems just as good, and is the most portable
-    signal(SIGPIPE, SIG_IGN);
     
-    InitAppExitListener();
+     // block sigpipe so that socket send calls from raising SIGPIPE
+    signal(SIGPIPE, SIG_IGN);
+    BlockSignal(SIGPIPE);
+    
+    // Block SIGTERM and SIGINT such that the child threads will never get that signal (so that subsequent WaitForAppExitSignal hooks on *this* thread)
+    BlockSignal(SIGTERM);
+    BlockSignal(SIGINT);
     
     if (config.fTCP == false)
     {
