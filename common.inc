@@ -1,4 +1,4 @@
-#BOOST_INCLUDE := -I/Users/jselbie/boost_1_52_0
+BOOST_INCLUDE := -I/Users/jselbielocal/boost_1_62_0
 #OPENSSL_INCLUDE := -I/Users/jselbie/openssl/include
 
 DEFINES := -DNDEBUG
@@ -12,6 +12,7 @@ RELEASE_FLAGS := -O2
 DEBUG_FLAGS := -g
 PROFILE_FLAGS := -O2 -g
 FLAVOR_FLAGS = $(RELEASE_FLAGS)
+CRYPTO_LIBS := -lcrypto
 
 
 #SOLARIS HACK
@@ -20,8 +21,10 @@ ifeq ($(UNAME),SunOS)
   SOCKET_LIBS := -lsocket -lnsl
 endif
 
-
-
+#Mac hack
+ifeq ($(UNAME),Darwin)
+  CRYPTO_LIBS :=
+endif
 
 .PHONY: all clean debug
 
