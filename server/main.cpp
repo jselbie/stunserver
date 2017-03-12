@@ -34,6 +34,9 @@
 #include "resolvehostname.h"
 
 
+using namespace boost::property_tree;
+
+
 void PrintUsage(bool fSummaryUsage)
 {
     size_t width = GetConsoleWidth();
@@ -120,6 +123,7 @@ struct StartupArgs
     std::string strVerbosity;
     std::string strMaxConnections;
     std::string strDosProtect;
+    std::string strConfigFile;
     
 };
 
@@ -527,6 +531,7 @@ HRESULT ParseCommandLineArgs(int argc, char** argv, int startindex, StartupArgs*
     cmdline.AddOption("help", no_argument, &pStartupArgs->strHelp);
     cmdline.AddOption("verbosity", required_argument, &pStartupArgs->strVerbosity);
     cmdline.AddOption("ddp", no_argument, &pStartupArgs->strDosProtect);
+    cmdline.AddOption("configfile", required_argument, &pStartupArgs->strConfigFile);
 
     cmdline.ParseCommandLine(argc, argv, startindex, &fError);
 
@@ -534,6 +539,79 @@ HRESULT ParseCommandLineArgs(int argc, char** argv, int startindex, StartupArgs*
 }
 
 
+HRESULT LoadConfigsFromFile(const std::string& filename, std::vector<StartupArgs>& configurations)
+{
+    ptree tree;
+    bool error = false;
+    std::string errorMessage;
+    
+    /* EXAMPLE configuration file
+     {
+      "configurations": [
+        {
+          "description" : "UDP Full Mode listening on default ports",
+          "mode": "full",
+          "family": "4",
+          "protocol": "udp",
+          "ddp": "1"
+        },
+        {
+          "description" : "TCP Full Mode listening on default port",
+          "mode": "full",
+          "family": "6",
+          "protocol": "tcp",
+          "ddp": "1"
+        }
+      ]
+    }
+    */
+    
+    try
+    {
+        read_json(filename, tree);
+        ptree root = tree.get_child("configurations");
+        
+        for (ptree::iterator itor = root.begin(); itor != root.end(); itor++)
+        {
+            const ptree& child = itor->second;
+            StartupArgs args;
+
+            args.strMode = child.get("mode", "");
+            args.strPrimaryInterface = child.get("primaryinterface", "");
+            args.strAltInterface = child.get("altinterface", "");
+            args.strPrimaryAdvertised = child.get("primaryadvertised", "");
+            args.strAlternateAdvertised = child.get("altadvertised", "");
+            args.strPrimaryPort = child.get("primaryport", "");
+            args.strAltPort = child.get("altport", "");
+            args.strFamily = child.get("family", "");
+            args.strProtocol = child.get("protocol", "");
+            args.strMaxConnections = child.get("maxconn", "");
+            args.strDosProtect = child.get("ddp", "");
+            
+            configurations.push_back(args);
+        }
+    }
+    catch(ptree_error ex1)
+    {
+        Logging::LogMsg(LL_ALWAYS, "Error processing configuration file: %s", ex1.what());
+        error = true;
+    }
+    
+    if (!error && configurations.size() == 0)
+    {
+        Logging::LogMsg(LL_ALWAYS, "File is valid json, but no configurations found");
+        error = true;
+    }
+    
+    if (error)
+    {
+        configurations.clear();
+        return E_FAIL;
+    }
+    
+    return S_OK;
+}
+    
 HRESULT BlockSignal(int sig)
 {
     HRESULT hr = S_OK;
@@ -589,7 +667,7 @@ HRESULT StartUDP(CRefCountedPtr<CStunServer>& spServer, CStunServerConfig& confi
     hr = CStunServer::CreateInstance(config, spServer.GetPointerPointer());
     if (FAILED(hr))
     {
-        Logging::LogMsg(LL_ALWAYS, "Unable to initialize server (error code = x%x)", hr);
+        Logging::LogMsg(LL_ALWAYS, "Unable to initialize UDP server (error code = x%x)", hr);
         LogHR(LL_ALWAYS, hr);
         return hr;
     }
@@ -597,10 +675,11 @@ HRESULT StartUDP(CRefCountedPtr<CStunServer>& spServer, CStunServerConfig& confi
     hr = spServer->Start();
     if (FAILED(hr))
     {
-        Logging::LogMsg(LL_ALWAYS, "Unable to start server (error code = x%x)", hr);
+        Logging::LogMsg(LL_ALWAYS, "Unable to start UDP server (error code = x%x)", hr);
         LogHR(LL_ALWAYS, hr);
         return hr;
     }
+    sleep(1);
     
     return S_OK;
 }
@@ -625,6 +704,8 @@ HRESULT StartTCP(CRefCountedPtr<CTCPServer>& spTCPServer, CStunServerConfig& con
         return hr;
     }
     
+    sleep(1);
+    
     return S_OK;
     
 }
@@ -633,9 +714,22 @@ int main(int argc, char** argv)
 {
     HRESULT hr = S_OK;
     StartupArgs args;
-    CStunServerConfig config;
-    CRefCountedPtr<CStunServer> spServer;
-    CRefCountedPtr<CTCPServer> spTCPServer;
+    std::vector<StartupArgs> argsVector;
+    int serverindex = 1;
+    
+    typedef CRefCountedPtr<CStunServer> UdpServerPtr;
+    typedef CRefCountedPtr<CTCPServer> TcpServerPtr;
+    
+    std::vector<UdpServerPtr> udpServers;
+    std::vector<TcpServerPtr> tcpServers;
+    
+     // block sigpipe so that socket send calls from raising SIGPIPE
+    signal(SIGPIPE, SIG_IGN);
+    BlockSignal(SIGPIPE);
+    
+    // Block SIGTERM and SIGINT such that the child threads will never get that signal (so that subsequent WaitForAppExitSignal hooks on *this* thread)
+    BlockSignal(SIGTERM);
+    BlockSignal(SIGINT);
     
 
 #ifdef DEBUG
@@ -667,69 +761,92 @@ int main(int argc, char** argv)
             Logging::SetLogLevel((uint32_t)loglevel);
         }
     }
-
-
-    if (SUCCEEDED(hr))
-    {
-        ::DumpStartupArgs(args);
-        hr = BuildServerConfigurationFromArgs(args, &config);
-    }
-
-    if (FAILED(hr))
-    {
-        Logging::LogMsg(LL_ALWAYS, "Error building configuration from command line options");
-        PrintUsage(true);
-        return -3;
-    }
-
-
-    DumpConfig(config);
-
     
-     // block sigpipe so that socket send calls from raising SIGPIPE
-    signal(SIGPIPE, SIG_IGN);
-    BlockSignal(SIGPIPE);
-    
-    // Block SIGTERM and SIGINT such that the child threads will never get that signal (so that subsequent WaitForAppExitSignal hooks on *this* thread)
-    BlockSignal(SIGTERM);
-    BlockSignal(SIGINT);
-    
-    if (config.fTCP == false)
+    if (args.strConfigFile.empty() == false)
     {
-        hr = StartUDP(spServer, config);
+        hr = LoadConfigsFromFile(args.strConfigFile, argsVector);
         if (FAILED(hr))
         {
-            return -4;
+            Logging::LogMsg(LL_ALWAYS, "Can't process configuration file");
+            return -3;
         }
     }
     else
     {
-        hr = StartTCP(spTCPServer, config);
-        if (FAILED(hr))
+        argsVector.push_back(args);
+    }
+
+    if (SUCCEEDED(hr))
+    {
+        for (std::vector<StartupArgs>::iterator itor = argsVector.begin(); itor != argsVector.end(); itor++)
         {
-            return -5;
+            CStunServerConfig config;
+            StartupArgs args = *itor;
+            
+            Logging::LogMsg(LL_DEBUG, "Starting server %d", serverindex);
+            serverindex++;
+            
+            ::DumpStartupArgs(args);
+            hr = BuildServerConfigurationFromArgs(args, &config);
+            if (FAILED(hr))
+            {
+                Logging::LogMsg(LL_ALWAYS, "Error building configuration from options given");
+                break;
+            }
+            DumpConfig(config);
+            
+            if (config.fTCP)
+            {
+                TcpServerPtr spTcpServer;
+                hr = StartTCP(spTcpServer, config);
+                
+                if (SUCCEEDED(hr))
+                {
+                    tcpServers.push_back(spTcpServer);
+                }
+            }
+            else
+            {
+                UdpServerPtr spUdpServer;
+                hr = StartUDP(spUdpServer, config);
+                if (SUCCEEDED(hr))
+                {
+                    udpServers.push_back(spUdpServer);
+                }
+            }
+            
+            if (FAILED(hr))
+            {
+                break;
+            }
         }
     }
+    
 
-    Logging::LogMsg(LL_DEBUG, "Successfully started server.");
+    if (SUCCEEDED(hr))
+    {
+        Logging::LogMsg(LL_DEBUG, "Successfully started server.");
+        WaitForAppExitSignal();
+    }
 
-    WaitForAppExitSignal();
 
     Logging::LogMsg(LL_DEBUG, "Server is exiting");
-
-    if (spServer != NULL)
+    
+    
+    for (std::vector<UdpServerPtr>::iterator itor = udpServers.begin(); itor != udpServers.end(); itor++)
     {
-        spServer->Stop();
-        spServer.ReleaseAndClear();
+        Logging::LogMsg(LL_DEBUG, "Shutting down UDP server");
+        UdpServerPtr server = *itor;
+        server->Stop();
     }
     
-    if (spTCPServer != NULL)
+    for (std::vector<TcpServerPtr>::iterator itor = tcpServers.begin(); itor != tcpServers.end(); itor++)
     {
-        spTCPServer->Stop();
-        spTCPServer.ReleaseAndClear();
+        Logging::LogMsg(LL_DEBUG, "Shutting down TCP server");
+        TcpServerPtr server = *itor;
+        server->Stop();
     }
     
-
     return 0;
 }
 

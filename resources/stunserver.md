@@ -29,6 +29,7 @@ The following options are supported.
     --ddp
     --primaryadvertised
     --altadvertised
+    --configfile
     --help
 
 Details of each option are as follows.
@@ -185,6 +186,18 @@ For more details, visit www.stunprotocol.org for details on how to correctly set
 
 ____
 
+**--configfile** FILENAME
+
+The --configfile switch allows the server to be configured with a JSON configuration file rather
+that through command line parameters. If this switch is specified, most other command line parameters will be ignored.
+(--verbosity is the only one honored).  Instead of configuring the server with command line parameters, the configuration
+will be read from file. Since multiple configurations can be specified, this has the added advantage of allowing multiple
+protocols and IP families to run within the same process (each in a separate thread). The fields of each configuration node
+are named identical to the corresponding command line parameters (with the leading dashes removed). An example stun.conf
+configuration file is shipped in the "testcode" folder of the source package
+
+____
+
 **--help**
 
 Prints this help page
@@ -213,6 +226,7 @@ stunserver --mode full --primaryinterface eth0 --altinterface eth1
 :   Same as above, except the interfaces are specified by their names as
     enumerated by the system. The "ifconfig" or "ipconfig" command will
     enumerate available interface names.
+
 
 # AUTHOR
 john selbie (john@selbie.com)
