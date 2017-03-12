@@ -679,7 +679,6 @@ HRESULT StartUDP(CRefCountedPtr<CStunServer>& spServer, CStunServerConfig& confi
         LogHR(LL_ALWAYS, hr);
         return hr;
     }
-    sleep(1);
     
     return S_OK;
 }
@@ -703,8 +702,6 @@ HRESULT StartTCP(CRefCountedPtr<CTCPServer>& spTCPServer, CStunServerConfig& con
         LogHR(LL_ALWAYS, hr);
         return hr;
     }
-    
-    sleep(1);
     
     return S_OK;
     
