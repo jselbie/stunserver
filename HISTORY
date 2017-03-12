@@ -35,5 +35,10 @@ Version 1.2.10 - TCP mode allows the client to keep the connection open longer a
 
 Version 1.2.11 - stunclient will now initiate filtering tests before behavior testst in full mode. "--mode full" is now deprecaed as a parameter for stunclient in favor of running "--mode behavior" and "--mode filtering" separately.
 
+
 Version 1.2.11a - Fix compiler error for musl and Alpine Linux
+
+Version 1.2.12 - When printing addresses, use correct delimiter (IP:port for IPv4 and IP.port for IPv6)
+
+Version 1.2.13 - Support config file and multiple protocols in the same process with --configfile option
 
