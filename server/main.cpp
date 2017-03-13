@@ -15,6 +15,10 @@
 */
 
 #include "commonincludes.hpp"
+
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
+
 #include "stuncore.h"
 #include "server.h"
 #include "tcpserver.h"
