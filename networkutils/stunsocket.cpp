@@ -321,7 +321,7 @@ Cleanup:
 
 HRESULT CStunSocket::UDPInit(const CSocketAddress& local, SocketRole role)
 {
-    return InitCommon(SOCK_DGRAM, local, role, false);
+    return InitCommon(SOCK_DGRAM, local, role, true);
 }
 
 HRESULT CStunSocket::TCPInit(const CSocketAddress& local, SocketRole role, bool fSetReuseFlag)
