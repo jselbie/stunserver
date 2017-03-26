@@ -32,7 +32,8 @@ fHasAA(false),
 fMultiThreadedMode(false),
 fTCP(false),
 nMaxConnections(0), // zero means default
-fEnableDosProtection(false)
+fEnableDosProtection(false),
+fReuseAddr(false)
 {
     ;
 }

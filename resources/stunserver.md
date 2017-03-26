@@ -200,7 +200,7 @@ ____
 
 **--reuseaddr**
 
-The --reuseaddr switch sets the SO_REUSEADDR socket option. This allows other processes to share the STUN server port, usually 3478, for transmitting UDP messages to listening clients, easily traversing over NAT, because the from IP and Port match the STUN server.
+The --reuseaddr switch allows the STUN server port to be shared with other processes. This is useful for scenarios where another process needs to send from the STUN server port.
 
 ____
 
