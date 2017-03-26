@@ -65,7 +65,7 @@ public:
     
     void UpdateAddresses();
     
-    HRESULT UDPInit(const CSocketAddress& local, SocketRole role);
+    HRESULT UDPInit(const CSocketAddress& local, SocketRole role, bool fSetReuseFlag);
     HRESULT TCPInit(const CSocketAddress& local, SocketRole role, bool fSetReuseFlag);
 };
 

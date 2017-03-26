@@ -128,6 +128,7 @@ struct StartupArgs
     std::string strMaxConnections;
     std::string strDosProtect;
     std::string strConfigFile;
+    std::string strReuseAddr;
     
 };
 
@@ -149,6 +150,7 @@ void DumpStartupArgs(StartupArgs& args)
     PRINTARG(strVerbosity);
     PRINTARG(strMaxConnections);
     PRINTARG(strDosProtect);
+    PRINTARG(strReuseAddr);
     Logging::LogMsg(LL_DEBUG, "--------------------------\n");
 }
 
@@ -508,6 +510,9 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
     // ---- DDOS PROTECTION SWITCH -------------------------------------------
     config.fEnableDosProtection = (argsIn.strDosProtect.length() > 0);
 
+    // ---- REUSE ADDRESS SWITCH -------------------------------------------
+    config.fReuseAddr = (argsIn.strReuseAddr.length() > 0);
+
     *pConfigOut = config;
     hr = S_OK;
 
@@ -536,6 +541,7 @@ HRESULT ParseCommandLineArgs(int argc, char** argv, int startindex, StartupArgs*
     cmdline.AddOption("verbosity", required_argument, &pStartupArgs->strVerbosity);
     cmdline.AddOption("ddp", no_argument, &pStartupArgs->strDosProtect);
     cmdline.AddOption("configfile", required_argument, &pStartupArgs->strConfigFile);
+    cmdline.AddOption("reuseaddr", no_argument, &pStartupArgs->strReuseAddr);
 
     cmdline.ParseCommandLine(argc, argv, startindex, &fError);
 
@@ -591,6 +597,7 @@ HRESULT LoadConfigsFromFile(const std::string& filename, std::vector<StartupArgs
             args.strProtocol = child.get("protocol", "");
             args.strMaxConnections = child.get("maxconn", "");
             args.strDosProtect = child.get("ddp", "");
+            args.strReuseAddr = child.get("reuseaddr", "");
             
             configurations.push_back(args);
         }

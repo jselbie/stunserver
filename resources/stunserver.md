@@ -198,6 +198,12 @@ configuration file is shipped in the "testcode" folder of the source package
 
 ____
 
+**--reuseaddr**
+
+The --reuseaddr switch sets the SO_REUSEADDR socket option. This allows other processes to share the STUN server port, usually 3478, for transmitting UDP messages to listening clients, easily traversing over NAT, because the from IP and Port match the STUN server.
+
+____
+
 **--help**
 
 Prints this help page
