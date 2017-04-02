@@ -32,7 +32,8 @@ fHasAA(false),
 fMultiThreadedMode(false),
 fTCP(false),
 nMaxConnections(0), // zero means default
-fEnableDosProtection(false)
+fEnableDosProtection(false),
+fReuseAddr(false)
 {
     ;
 }
@@ -50,13 +51,13 @@ CStunServer::~CStunServer()
     Shutdown();
 }
 
-HRESULT CStunServer::AddSocket(TransportAddressSet* pTSA, SocketRole role, const CSocketAddress& addrListen, const CSocketAddress& addrAdvertise)
+HRESULT CStunServer::AddSocket(TransportAddressSet* pTSA, SocketRole role, const CSocketAddress& addrListen, const CSocketAddress& addrAdvertise, bool fSetReuseFlag)
 {
     HRESULT hr = S_OK;
     
     ASSERT(IsValidSocketRole(role));
     
-    Chk(_arrSockets[role].UDPInit(addrListen, role));
+    Chk(_arrSockets[role].UDPInit(addrListen, role, fSetReuseFlag));
     ChkA(_arrSockets[role].EnablePktInfoOption(true));
 
 
@@ -110,25 +111,25 @@ HRESULT CStunServer::Initialize(const CStunServerConfig& config)
     // Create the sockets and initialize the TSA thing
     if (config.fHasPP)
     {
-        Chk(AddSocket(&tsa, RolePP, config.addrPP, config.addrPrimaryAdvertised));
+        Chk(AddSocket(&tsa, RolePP, config.addrPP, config.addrPrimaryAdvertised, config.fReuseAddr));
         socketcount++;
     }
 
     if (config.fHasPA)
     {
-        Chk(AddSocket(&tsa, RolePA, config.addrPA, config.addrPrimaryAdvertised));
+        Chk(AddSocket(&tsa, RolePA, config.addrPA, config.addrPrimaryAdvertised, config.fReuseAddr));
         socketcount++;
     }
 
     if (config.fHasAP)
     {
-        Chk(AddSocket(&tsa, RoleAP, config.addrAP, config.addrAlternateAdvertised));
+        Chk(AddSocket(&tsa, RoleAP, config.addrAP, config.addrAlternateAdvertised, config.fReuseAddr));
         socketcount++;
     }
 
     if (config.fHasAA)
     {
-        Chk(AddSocket(&tsa, RoleAA, config.addrAA, config.addrAlternateAdvertised));
+        Chk(AddSocket(&tsa, RoleAA, config.addrAA, config.addrAlternateAdvertised, config.fReuseAddr));
         socketcount++;
     }
 

@@ -506,7 +506,7 @@ HRESULT UdpClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& s
         Chk(hr);
     }
 
-    hr = stunSocket.UDPInit(socketconfig.addrLocal, RolePP);
+    hr = stunSocket.UDPInit(socketconfig.addrLocal, RolePP, false);
     if (FAILED(hr))
     {
         Logging::LogMsg(LL_ALWAYS, "Unable to create local socket: (error = x%x)", hr);

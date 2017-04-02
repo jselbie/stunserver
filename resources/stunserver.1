@@ -221,7 +221,18 @@ the same process (each in a separate thread).
 The fields of each configuration node are named identical to the
 corresponding command line parameters (with the leading dashes removed).
 An example stun.conf configuration file is shipped in the "testcode"
-folder of the source package ____
+folder of the source package
+.PP
+   *   *   *   *   *
+.PP
+\f[B]\-\-reuseaddr\f[]
+.PP
+The \-\-reuseaddr switch allows the STUN server port to be shared with
+other processes.
+This is useful for scenarios where another process needs to send from
+the STUN server port.
+.PP
+   *   *   *   *   *
 .PP
 \f[B]\-\-help\f[]
 .PP

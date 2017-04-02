@@ -198,6 +198,12 @@ configuration file is shipped in the "testcode" folder of the source package
 
 ____
 
+**--reuseaddr**
+
+The --reuseaddr switch allows the STUN server port to be shared with other processes. This is useful for scenarios where another process needs to send from the STUN server port.
+
+____
+
 **--help**
 
 Prints this help page

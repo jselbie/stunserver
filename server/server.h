@@ -50,6 +50,8 @@ public:
     
     bool fEnableDosProtection; // enable denial of service protection
 
+    bool fReuseAddr; // if true, the socket option SO_REUSEADDR will be set
+
     CStunServerConfig();
 };
 
@@ -71,7 +73,7 @@ private:
 
     CRefCountedPtr<IStunAuth> _spAuth;
     
-    HRESULT AddSocket(TransportAddressSet* pTSA, SocketRole role, const CSocketAddress& addrListen, const CSocketAddress& addrAdvertise);
+    HRESULT AddSocket(TransportAddressSet* pTSA, SocketRole role, const CSocketAddress& addrListen, const CSocketAddress& addrAdvertise, bool fSetReuseFlag);
     
 public:
 
