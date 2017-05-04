@@ -153,17 +153,17 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
     uint8_t hmaccomputed[c_hmacsize] = {}; // zero-init
     unsigned int hmaclength = c_hmacsize;
 #ifndef __APPLE__
-    HMAC_CTX* ctx;
+    HMAC_CTX* ctx = NULL;
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
-    HMAC_CTX ctxData;
+    HMAC_CTX ctxData = {};
     ctx = &ctxData;
     HMAC_CTX_init(ctx);
 #else
     ctx = HMAC_CTX_new();
 #endif
 #else
-    CCHmacContext* ctx;
-    CCHmacContext ctxData;
+    CCHmacContext* ctx = NULL;
+    CCHmacContext ctxData = {};
     ctx = &ctxData;
     
     UNREFERENCED_VARIABLE(hmaclength);
