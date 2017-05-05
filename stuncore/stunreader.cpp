@@ -153,9 +153,19 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
     uint8_t hmaccomputed[c_hmacsize] = {}; // zero-init
     unsigned int hmaclength = c_hmacsize;
 #ifndef __APPLE__
-    HMAC_CTX ctx = {};
+    HMAC_CTX* ctx = NULL;
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+    HMAC_CTX ctxData = {};
+    ctx = &ctxData;
+    HMAC_CTX_init(ctx);
 #else
-    CCHmacContext ctx = {};
+    ctx = HMAC_CTX_new();
+#endif
+#else
+    CCHmacContext* ctx = NULL;
+    CCHmacContext ctxData = {};
+    ctx = &ctxData;
+    
     UNREFERENCED_VARIABLE(hmaclength);
 #endif
     uint32_t chunk32;
@@ -195,19 +205,22 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
     
     // Here comes the fun part.  If there is a fingerprint attribute, we have to adjust the length header in computing the hash
 #ifndef __APPLE__
-    HMAC_CTX_init(&ctx);
-    HMAC_Init(&ctx, key, keylength, EVP_sha1());
+#if OPENSSL_VERSION_NUMBER < 0x10100000L // could be lower!
+    HMAC_Init(ctx, key, keylength, EVP_sha1());
 #else
-    CCHmacInit(&ctx, kCCHmacAlgSHA1, key, keylength);
+    HMAC_Init_ex(ctx, key, keylength, EVP_sha1(), NULL);
+#endif
+#else
+    CCHmacInit(ctx, kCCHmacAlgSHA1, key, keylength);
 #endif
     fContextInit = true;
     
     // message type
     Chk(stream.ReadUint16(&chunk16));
 #ifndef __APPLE__
-    HMAC_Update(&ctx, (unsigned char*)&chunk16, sizeof(chunk16));
+    HMAC_Update(ctx, (unsigned char*)&chunk16, sizeof(chunk16));
 #else
-    CCHmacUpdate(&ctx, &chunk16, sizeof(chunk16));
+    CCHmacUpdate(ctx, &chunk16, sizeof(chunk16));
 #endif
     
     // message length
@@ -225,9 +238,9 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
     }
     
 #ifndef __APPLE__
-    HMAC_Update(&ctx, (unsigned char*)&chunk16, sizeof(chunk16));
+    HMAC_Update(ctx, (unsigned char*)&chunk16, sizeof(chunk16));
 #else
-    CCHmacUpdate(&ctx, &chunk16, sizeof(chunk16));
+    CCHmacUpdate(ctx, &chunk16, sizeof(chunk16));
 #endif
     
     // now include everything up to the hash attribute itself.
@@ -243,16 +256,16 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
     {
         Chk(stream.ReadUint32(&chunk32));
 #ifndef __APPLE__
-        HMAC_Update(&ctx, (unsigned char*)&chunk32, sizeof(chunk32));
+        HMAC_Update(ctx, (unsigned char*)&chunk32, sizeof(chunk32));
 #else
-        CCHmacUpdate(&ctx, &chunk32, sizeof(chunk32));
+        CCHmacUpdate(ctx, &chunk32, sizeof(chunk32));
 #endif
     }
     
 #ifndef __APPLE__
-    HMAC_Final(&ctx, hmaccomputed, &hmaclength);
+    HMAC_Final(ctx, hmaccomputed, &hmaclength);
 #else
-    CCHmacFinal(&ctx, hmaccomputed);
+    CCHmacFinal(ctx, hmaccomputed);
 #endif
     
     
@@ -265,7 +278,11 @@ Cleanup:
     if (fContextInit)
     {
 #ifndef __APPLE__
-        HMAC_CTX_cleanup(&ctx);
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+        HMAC_CTX_cleanup(ctx);
+#else
+        HMAC_CTX_free(ctx);
+#endif
 #else
         UNREFERENCED_VARIABLE(fContextInit);
 #endif
