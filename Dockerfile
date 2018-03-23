@@ -19,6 +19,6 @@ RUN cd /opt && git clone https://github.com/jselbie/stunserver.git && cd stunser
 
 WORKDIR /opt/stunserver
 
-HEALTHCHECK CMD /opt/stunserver/stunserver localhost
+HEALTHCHECK CMD /opt/stunserver/stunclient localhost
 
 ENTRYPOINT ["/opt/stunserver/stunserver"]
