@@ -56,34 +56,26 @@ public:
 };
 
 
-class CStunServer :
-public CBasicRefCount,
-public CObjectFactory<CStunServer>,
-public IRefCounted
+class CStunServer 
 {
 private:
     CStunSocket _arrSockets[4];
 
     std::vector<CStunSocketThread*> _threads;
 
-    CStunServer();
-    ~CStunServer();
-
-    friend class CObjectFactory<CStunServer>;
-
-    CRefCountedPtr<IStunAuth> _spAuth;
+    std::shared_ptr<IStunAuth> _spAuth;
     
     HRESULT AddSocket(TransportAddressSet* pTSA, SocketRole role, const CSocketAddress& addrListen, const CSocketAddress& addrAdvertise, bool fSetReuseFlag);
     
 public:
+    CStunServer();
+    ~CStunServer();
 
     HRESULT Initialize(const CStunServerConfig& config);
     HRESULT Shutdown();
 
     HRESULT Start();
     HRESULT Stop();
-
-    ADDREF_AND_RELEASE_IMPL();
 };
 
 

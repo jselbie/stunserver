@@ -17,8 +17,6 @@
 #ifndef STUNSOCKET_H
 #define	STUNSOCKET_H
 
-
-
 class CStunSocket
 {
 private:
@@ -41,7 +39,6 @@ private:
     HRESULT SetV6Only(int sock);
     
 public:
-
     CStunSocket();
     ~CStunSocket();
     
@@ -62,16 +59,11 @@ public:
     HRESULT EnablePktInfoOption(bool fEnable);
     HRESULT SetNonBlocking(bool fEnable);
     
-    
     void UpdateAddresses();
     
     HRESULT UDPInit(const CSocketAddress& local, SocketRole role, bool fSetReuseFlag);
     HRESULT TCPInit(const CSocketAddress& local, SocketRole role, bool fSetReuseFlag);
 };
-
-typedef boost::shared_ptr<CStunSocket> CRefCountedStunSocket;
-
-
 
 #endif	/* STUNSOCKET_H */
 

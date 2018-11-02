@@ -52,7 +52,7 @@ Cleanup:
 void CTestPolling::TestUnInit()
 {
     size_t size = _pipes.size();
-    _spPolling.ReleaseAndClear();
+    _spPolling.reset();
     
     for (size_t index = 0; index < size; index++)
     {
@@ -116,7 +116,7 @@ HRESULT CTestPolling::TestInit(size_t sizePolling, size_t sizePipeArray)
     
     TestUnInit();
     
-    ChkA(CreatePollingInstance(_polltype, sizePolling, _spPolling.GetPointerPointer()));
+    ChkA(CreatePollingInstance(_polltype, sizePolling, _spPolling));
     
     for (size_t index = 0; index < sizePipeArray; index++)
     {

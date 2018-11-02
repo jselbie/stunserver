@@ -172,8 +172,7 @@ HRESULT CTestClientLogic::CommonInit(NatBehavior behavior, NatFiltering filterin
     _addrMappedAP = addrMapped;
     _addrMappedAA = addrMapped;
     
-    _spClientLogic = boost::shared_ptr<CStunClientLogic>(new CStunClientLogic());
-    
+    _spClientLogic = std::make_shared<CStunClientLogic>();
     
     switch (behavior)
     {

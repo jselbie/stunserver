@@ -35,9 +35,10 @@ const uint32_t IPOLLING_PRI =          0x01 << 5;
 const uint32_t IPOLLING_ERROR =        0x01 << 6;
 
 
-class IPolling : public IRefCounted
+class IPolling
 {
 public:
+    virtual ~IPolling() = default;
     virtual HRESULT Initialize(size_t maxSockets) = 0;
     virtual HRESULT Close() = 0;
     virtual HRESULT Add(int fd, uint32_t eventflags) = 0;
@@ -51,7 +52,7 @@ const uint32_t IPOLLING_TYPE_BEST  = 0x01 << 0;
 const uint32_t IPOLLING_TYPE_EPOLL = 0x01 << 1;
 const uint32_t IPOLLING_TYPE_POLL  = 0x01 << 2;
 
-HRESULT CreatePollingInstance(uint32_t type, size_t maxSockets, IPolling** ppPolling);
+HRESULT CreatePollingInstance(uint32_t type, size_t maxSockets, std::shared_ptr<IPolling>& spPolling);
 
 
 

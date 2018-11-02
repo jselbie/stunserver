@@ -73,19 +73,19 @@ void RunUnitTests()
 {
     std::vector<IUnitTest*> vecTests;
     
-    boost::shared_ptr<CTestDataStream> spTestDataStream(new CTestDataStream);
-    boost::shared_ptr<CTestReader> spTestReader(new CTestReader);
-    boost::shared_ptr<CTestBuilder> spTestBuilder(new CTestBuilder);
-    boost::shared_ptr<CTestIntegrity> spTestIntegrity(new CTestIntegrity);
-    boost::shared_ptr<CTestMessageHandler> spTestMessageHandler(new CTestMessageHandler);
-    boost::shared_ptr<CTestCmdLineParser> spTestCmdLineParser(new CTestCmdLineParser);
-    boost::shared_ptr<CTestClientLogic> spTestClientLogic(new CTestClientLogic);
-    boost::shared_ptr<CTestRecvFromExIPV4> spTestRecvFromEx4(new CTestRecvFromExIPV4);
-    boost::shared_ptr<CTestRecvFromExIPV6> spTestRecvFromEx6(new CTestRecvFromExIPV6);
-    boost::shared_ptr<CTestFastHash> spTestFastHash(new CTestFastHash);
-    boost::shared_ptr<CTestPolling> spTestPolling(new CTestPolling);
-    boost::shared_ptr<CTestAtomicHelpers> spTestAtomicHelpers(new CTestAtomicHelpers);
-    boost::shared_ptr<CTestRateLimiter> spTestRateLimiter(new CTestRateLimiter);
+    std::shared_ptr<CTestDataStream> spTestDataStream(new CTestDataStream);
+    std::shared_ptr<CTestReader> spTestReader(new CTestReader);
+    std::shared_ptr<CTestBuilder> spTestBuilder(new CTestBuilder);
+    std::shared_ptr<CTestIntegrity> spTestIntegrity(new CTestIntegrity);
+    std::shared_ptr<CTestMessageHandler> spTestMessageHandler(new CTestMessageHandler);
+    std::shared_ptr<CTestCmdLineParser> spTestCmdLineParser(new CTestCmdLineParser);
+    std::shared_ptr<CTestClientLogic> spTestClientLogic(new CTestClientLogic);
+    std::shared_ptr<CTestRecvFromExIPV4> spTestRecvFromEx4(new CTestRecvFromExIPV4);
+    std::shared_ptr<CTestRecvFromExIPV6> spTestRecvFromEx6(new CTestRecvFromExIPV6);
+    std::shared_ptr<CTestFastHash> spTestFastHash(new CTestFastHash);
+    std::shared_ptr<CTestPolling> spTestPolling(new CTestPolling);
+    std::shared_ptr<CTestAtomicHelpers> spTestAtomicHelpers(new CTestAtomicHelpers);
+    std::shared_ptr<CTestRateLimiter> spTestRateLimiter(new CTestRateLimiter);
 
     vecTests.push_back(spTestDataStream.get());
     vecTests.push_back(spTestReader.get());

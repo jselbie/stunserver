@@ -46,7 +46,7 @@ CTCPStunThread::CTCPStunThread()
 
 void CTCPStunThread::Reset()
 {
-    _spPolling.ReleaseAndClear();
+    _spPolling.reset();
     
     CloseListenSockets();
     ClosePipes();
@@ -56,7 +56,7 @@ void CTCPStunThread::Reset()
     memset(&_tsaListen, '\0', sizeof(_tsaListen));
     
     _fNeedToExit = false;
-    _spAuth.ReleaseAndClear();
+    _spAuth.reset();
     _role = RolePP;
     
     memset(&_tsa, '\0', sizeof(_tsa));
@@ -227,7 +227,7 @@ CStunSocket* CTCPStunThread::GetListenSocket(int sock)
 
 
 
-HRESULT CTCPStunThread::Init(const TransportAddressSet& tsaListen, const TransportAddressSet& tsaHandler, IStunAuth* pAuth, int maxConnections, boost::shared_ptr<RateLimiter>& spLimiter)
+HRESULT CTCPStunThread::Init(const TransportAddressSet& tsaListen, const TransportAddressSet& tsaHandler, std::shared_ptr<IStunAuth> spAuth, int maxConnections, std::shared_ptr<RateLimiter>& spLimiter)
 {
     HRESULT hr = S_OK;
     int ret;
@@ -255,14 +255,14 @@ HRESULT CTCPStunThread::Init(const TransportAddressSet& tsaListen, const Transpo
     _tsaListen = tsaListen;
     _tsa = tsaHandler;
     
-    _spAuth.Attach(pAuth);
+    _spAuth = spAuth;
 
     ChkA(CreateListenSockets());
     
     ChkA(CreatePipes());
 
     // +5 for listening sockets and pipe
-    ChkA(CreatePollingInstance(IPOLLING_TYPE_BEST, (size_t)(_maxConnections + 5), _spPolling.GetPointerPointer()));
+    ChkA(CreatePollingInstance(IPOLLING_TYPE_BEST, (size_t)(_maxConnections + 5), _spPolling));
     
     
     // add listen socket to epoll
@@ -611,7 +611,7 @@ HRESULT CTCPStunThread::ReceiveBytesForConnection(StunConnection* pConn)
             allowed_to_pass = this->RateCheck(msgIn.addrRemote);
             ChkIf(allowed_to_pass == false, E_FAIL);
             
-            Chk(CStunRequestHandler::ProcessRequest(msgIn, msgOut, &_tsa, _spAuth));
+            Chk(CStunRequestHandler::ProcessRequest(msgIn, msgOut, &_tsa, _spAuth.get()));
             
             // success - transition to the response state
             pConn->_state = ConnectionState_Transmitting;
@@ -832,7 +832,7 @@ HRESULT CTCPServer::Initialize(const CStunServerConfig& config)
     HRESULT hr = S_OK;
     TransportAddressSet tsaListenAll;
     TransportAddressSet tsaHandler;
-    boost::shared_ptr<RateLimiter> spLimiter;
+    std::shared_ptr<RateLimiter> spLimiter;
     
     ChkIfA(_threads[0] != NULL, E_UNEXPECTED); // we can't already be initialized, right?
     
@@ -855,7 +855,7 @@ HRESULT CTCPServer::Initialize(const CStunServerConfig& config)
     
     if (config.fEnableDosProtection)
     {
-        spLimiter = boost::shared_ptr<RateLimiter>(new RateLimiter(20000, config.fMultiThreadedMode));
+        spLimiter = std::make_shared<RateLimiter>(20000, config.fMultiThreadedMode);
     }
     
     if (config.fMultiThreadedMode == false)
@@ -908,7 +908,7 @@ HRESULT CTCPServer::Shutdown()
         _threads[role] = NULL;
     }
     
-    _spAuth.ReleaseAndClear();
+    _spAuth.reset();
     
     return S_OK;
 }

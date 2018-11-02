@@ -29,7 +29,7 @@ class CTestPolling : public IUnitTest
 {
     
 public:
-    CRefCountedPtr<IPolling> _spPolling;
+    std::shared_ptr<IPolling> _spPolling;
     std::vector<PipePair> _pipes;
     
     uint32_t _polltype;

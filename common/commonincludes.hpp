@@ -48,14 +48,12 @@
 #include <math.h>
 #include <sys/termios.h>
 
-#include <boost/shared_ptr.hpp>
-#include <boost/scoped_array.hpp>
-#include <boost/scoped_ptr.hpp>
 
 #include <map>
 #include <vector>
 #include <list>
 #include <string>
+#include <memory>
 
 
 #ifdef IS_LINUX
@@ -128,13 +126,6 @@ inline void cta_noop(const char* psz)
 
 #include "hresult.h"
 #include "chkmacros.h"
-
-
-// ---------------------------------------------
-// Unless there's good reason, put additional header files after hresult.h and chkmacros.h
-#include "refcountobject.h"
-#include "objectfactory.h"
-
 
 
 #include "logger.h"

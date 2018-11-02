@@ -22,7 +22,7 @@
 
 
 CBuffer::CBuffer() :
-_data(NULL),
+_data(nullptr),
 _size(0),
 _allocatedSize(0)
 {
@@ -31,8 +31,8 @@ _allocatedSize(0)
 
 void CBuffer::Reset()
 {
-    _spAllocation.reset();
-    _data = NULL;
+    _spAllocation.clear();
+    _data = nullptr;
     _size = 0;
     _allocatedSize = 0;
 
@@ -51,13 +51,13 @@ HRESULT CBuffer::InitWithAllocation(size_t size)
     Reset();
 
     // deliberately not checking for 0.  Ok to allocate a 0 byte array
-    boost::scoped_array<uint8_t> spAlloc(new uint8_t[size+2]); // add two bytes for null termination (makes debugging ascii and unicode strings easier), but these two bytes are invisible to the caller (not included in _allocatedSize)
+    std::vector<uint8_t> spAlloc(size+2); // add two bytes for null termination (makes debugging ascii and unicode strings easier), but these two bytes are invisible to the caller (not included in _allocatedSize)
 
     _spAllocation.swap(spAlloc);
 
-    spAlloc.reset();
+    spAlloc.clear();
 
-    _data = _spAllocation.get();
+    _data = _spAllocation.data();
 
     if (_data)
     {
@@ -65,17 +65,17 @@ HRESULT CBuffer::InitWithAllocation(size_t size)
         _data[size+1] = 0;
     }
 
-    _size = (_data != NULL) ? size : 0;
+    _size = (_data != nullptr) ? size : 0;
     _allocatedSize = _size;
 
-    return (_data != NULL) ? S_OK : E_FAIL;
+    return (_data != nullptr) ? S_OK : E_FAIL;
 }
 
 HRESULT CBuffer::InitNoAlloc(uint8_t* pByteArray, size_t size)
 {
     Reset();
 
-    if (pByteArray == NULL)
+    if (pByteArray == nullptr) 
     {
         size = 0;
     }
@@ -91,7 +91,7 @@ HRESULT CBuffer::InitWithAllocAndCopy(uint8_t* pByteArray, size_t size)
     HRESULT hr = S_OK;
     Reset();
 
-    if (pByteArray == NULL)
+    if (pByteArray == nullptr)
     {
         size = 0;
     }
@@ -142,7 +142,7 @@ HRESULT CBuffer::SetSize(size_t size)
 
 bool CBuffer::IsValid()
 {
-    return (_data != NULL);
+    return (_data != nullptr);
 }
 
 

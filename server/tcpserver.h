@@ -39,10 +39,10 @@ class CTCPStunThread
     HRESULT NotifyThreadViaPipe();
     void ClosePipes();
 
-    CRefCountedPtr<IPolling> _spPolling;
+    std::shared_ptr<IPolling> _spPolling;
     bool _fListenSocketsOnEpoll;
     
-    boost::shared_ptr<RateLimiter> _spLimiter;
+    std::shared_ptr<RateLimiter> _spLimiter;
     
     // epoll helpers
     HRESULT SetListenSocketsOnEpoll(bool fEnable);
@@ -57,7 +57,7 @@ class CTCPStunThread
     
     
     bool _fNeedToExit;
-    CRefCountedPtr<IStunAuth> _spAuth;
+    std::shared_ptr<IStunAuth> _spAuth;
     SocketRole _role;
     
     TransportAddressSet _tsa;  // this
@@ -88,8 +88,6 @@ class CTCPStunThread
     StunThreadConnectionMap* _pOldConnList;
     time_t _timeLastSweep;
     
-    
-    
     StunConnection* AcceptConnection(CStunSocket* pListenSocket);
 
     void ProcessConnectionEvent(int sock, uint32_t eventflags);
@@ -115,21 +113,18 @@ public:
     
     // tsaListen are the set of addresses we listen to connections on (either 1 address or 4 addresses)
     // tsaHandler is what gets passed to the CStunRequestHandler for formation of the "other-address" attribute
-    HRESULT Init(const TransportAddressSet& tsaListen, const TransportAddressSet& tsaHandler, IStunAuth* pAuth, int maxConnections, boost::shared_ptr<RateLimiter>& spLimiter);
+    HRESULT Init(const TransportAddressSet& tsaListen, const TransportAddressSet& tsaHandler, std::shared_ptr<IStunAuth> spAuth, int maxConnections, std::shared_ptr<RateLimiter>& spLimiter);
     HRESULT Start();
     HRESULT Stop();
 };
 
-class CTCPServer :
-    public CBasicRefCount,
-    public CObjectFactory<CTCPServer>,
-    public IRefCounted
+class CTCPServer
 {
 private:
     
     CTCPStunThread* _threads[4];
     
-    CRefCountedPtr<IStunAuth> _spAuth;
+    std::shared_ptr<IStunAuth> _spAuth;
     
     void InitTSA(TransportAddressSet* pTSA, SocketRole role, bool fValid, const CSocketAddress& addrListen, const CSocketAddress& addrAdvertise);
     
@@ -143,9 +138,6 @@ public:
     HRESULT Shutdown();
     HRESULT Start();
     HRESULT Stop();
-    
-    ADDREF_AND_RELEASE_IMPL();    
-    
 };
 
 

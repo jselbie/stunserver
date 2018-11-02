@@ -30,7 +30,7 @@ private:
     uint8_t* _data;
     size_t _size;
     size_t _allocatedSize;
-    boost::scoped_array<uint8_t> _spAllocation;
+    std::vector<uint8_t> _spAllocation;
 
     // disallow copy and assignment.
     CBuffer(const CBuffer&);
@@ -62,7 +62,7 @@ public:
     bool IsValid();
 };
 
-typedef boost::shared_ptr<CBuffer> CRefCountedBuffer;
+typedef std::shared_ptr<CBuffer> CRefCountedBuffer;
 
 
 #endif

@@ -24,8 +24,6 @@
 #ifdef HAS_EPOLL
 
 class CEpoll : 
-    public CBasicRefCount,
-    public CObjectFactory<CEpoll>,
     public IPolling
 {
 private:
@@ -35,8 +33,6 @@ private:
     size_t _sizeEvents;        // total allocated size for events
     size_t _pendingCount;      // number of valid events in _events
     size_t _currentEventIndex; // which one to process next
-    
-    
     
     uint32_t ToNativeFlags(uint32_t eventflags);
     uint32_t FromNativeFlags(uint32_t eventflags);
@@ -51,8 +47,6 @@ public:
     
     CEpoll();
     ~CEpoll();
-    
-    ADDREF_AND_RELEASE_IMPL();
 };
 
 
@@ -243,8 +237,6 @@ Cleanup:
 // ------------------------------------------------------------------------------
 
 class CPoll : 
-    public CBasicRefCount,
-    public CObjectFactory<CPoll>,
     public IPolling
 {
 private:
@@ -272,8 +264,6 @@ public:
     
     CPoll();
     ~CPoll();
-    
-    ADDREF_AND_RELEASE_IMPL();
 };
 
 CPoll::CPoll() :
@@ -516,11 +506,10 @@ bool CPoll::FindNextEvent(PollEvent* pEvent)
 
 
 
-HRESULT CreatePollingInstance(uint32_t type, size_t maxSockets, IPolling** ppPolling)
+HRESULT CreatePollingInstance(uint32_t type, size_t maxSockets, std::shared_ptr<IPolling>& spPolling)
 {
     HRESULT hr = S_OK;
     
-    ChkIfA(ppPolling == NULL, E_INVALIDARG);
     
 #ifdef HAS_EPOLL
     if (type == IPOLLING_TYPE_BEST)
@@ -540,12 +529,17 @@ HRESULT CreatePollingInstance(uint32_t type, size_t maxSockets, IPolling** ppPol
 #ifndef HAS_EPOLL
         ChkA(E_FAIL);
 #else
-        ChkA(CEpoll::CreateInstance(maxSockets, ppPolling));
+        auto spEpoll = std::make_shared<CEpoll>();
+        ChkA(spEpoll->Initialize(maxSockets));
+        spPolling = spEpoll;
 #endif
     }
     else if (type == IPOLLING_TYPE_POLL)
     {
-        ChkA(CPoll::CreateInstance(maxSockets, ppPolling));
+        
+        auto spPoll = std::make_shared<CPoll>();
+        ChkA(spPoll->Initialize(maxSockets));
+        spPolling = spPoll;
     }
     else
     {
@@ -553,6 +547,7 @@ HRESULT CreatePollingInstance(uint32_t type, size_t maxSockets, IPolling** ppPol
     }
     
 Cleanup:
+
     return hr;
 }
 

@@ -671,11 +671,12 @@ void WaitForAppExitSignal()
 
 
 
-HRESULT StartUDP(CRefCountedPtr<CStunServer>& spServer, CStunServerConfig& config)
+HRESULT StartUDP(std::shared_ptr<CStunServer>& spServer, CStunServerConfig& config)
 {
     HRESULT hr;
     
-    hr = CStunServer::CreateInstance(config, spServer.GetPointerPointer());
+    auto spTemp = std::make_shared<CStunServer>();
+    hr = spTemp->Initialize(config);
     if (FAILED(hr))
     {
         Logging::LogMsg(LL_ALWAYS, "Unable to initialize UDP server (error code = x%x)", hr);
@@ -683,22 +684,24 @@ HRESULT StartUDP(CRefCountedPtr<CStunServer>& spServer, CStunServerConfig& confi
         return hr;
     }
 
-    hr = spServer->Start();
+    hr = spTemp->Start();
     if (FAILED(hr))
     {
         Logging::LogMsg(LL_ALWAYS, "Unable to start UDP server (error code = x%x)", hr);
         LogHR(LL_ALWAYS, hr);
         return hr;
     }
+    spServer = spTemp;
     
     return S_OK;
 }
 
-HRESULT StartTCP(CRefCountedPtr<CTCPServer>& spTCPServer, CStunServerConfig& config)
+HRESULT StartTCP(std::shared_ptr<CTCPServer>& spTCPServer, CStunServerConfig& config)
 {
     HRESULT hr;
     
-    hr = CTCPServer::CreateInstance(config, spTCPServer.GetPointerPointer());
+    auto spTemp = std::make_shared<CTCPServer>();
+    hr = spTemp->Initialize(config);
     if (FAILED(hr))
     {
         Logging::LogMsg(LL_ALWAYS, "Unable to initialize TCP server (error code = x%x)", hr);
@@ -706,7 +709,7 @@ HRESULT StartTCP(CRefCountedPtr<CTCPServer>& spTCPServer, CStunServerConfig& con
         return hr;
     }
     
-    hr = spTCPServer->Start();
+    hr = spTemp->Start();
     if (FAILED(hr))
     {
         Logging::LogMsg(LL_ALWAYS, "Unable to start TCP server (error code = x%x)", hr);
@@ -714,8 +717,8 @@ HRESULT StartTCP(CRefCountedPtr<CTCPServer>& spTCPServer, CStunServerConfig& con
         return hr;
     }
     
+    spTCPServer = spTemp;
     return S_OK;
-    
 }
 
 int main(int argc, char** argv)
@@ -725,11 +728,8 @@ int main(int argc, char** argv)
     std::vector<StartupArgs> argsVector;
     int serverindex = 1;
     
-    typedef CRefCountedPtr<CStunServer> UdpServerPtr;
-    typedef CRefCountedPtr<CTCPServer> TcpServerPtr;
-    
-    std::vector<UdpServerPtr> udpServers;
-    std::vector<TcpServerPtr> tcpServers;
+    std::vector<std::shared_ptr<CStunServer>> udpServers;
+    std::vector<std::shared_ptr<CTCPServer>> tcpServers;
     
      // block sigpipe so that socket send calls from raising SIGPIPE
     signal(SIGPIPE, SIG_IGN);
@@ -738,6 +738,8 @@ int main(int argc, char** argv)
     // Block SIGTERM and SIGINT such that the child threads will never get that signal (so that subsequent WaitForAppExitSignal hooks on *this* thread)
     BlockSignal(SIGTERM);
     BlockSignal(SIGINT);
+
+    ASSERT(false);
     
 
 #ifdef DEBUG
@@ -786,7 +788,7 @@ int main(int argc, char** argv)
 
     if (SUCCEEDED(hr))
     {
-        for (std::vector<StartupArgs>::iterator itor = argsVector.begin(); itor != argsVector.end(); itor++)
+        for (auto itor = argsVector.begin(); itor != argsVector.end(); itor++)
         {
             CStunServerConfig config;
             StartupArgs args = *itor;
@@ -805,7 +807,7 @@ int main(int argc, char** argv)
             
             if (config.fTCP)
             {
-                TcpServerPtr spTcpServer;
+                std::shared_ptr<CTCPServer> spTcpServer;
                 hr = StartTCP(spTcpServer, config);
                 
                 if (SUCCEEDED(hr))
@@ -815,7 +817,7 @@ int main(int argc, char** argv)
             }
             else
             {
-                UdpServerPtr spUdpServer;
+                std::shared_ptr<CStunServer> spUdpServer;
                 hr = StartUDP(spUdpServer, config);
                 if (SUCCEEDED(hr))
                 {
@@ -841,17 +843,17 @@ int main(int argc, char** argv)
     Logging::LogMsg(LL_DEBUG, "Server is exiting");
     
     
-    for (std::vector<UdpServerPtr>::iterator itor = udpServers.begin(); itor != udpServers.end(); itor++)
+    for (auto itor = udpServers.begin(); itor != udpServers.end(); itor++)
     {
         Logging::LogMsg(LL_DEBUG, "Shutting down UDP server");
-        UdpServerPtr server = *itor;
+        auto server = *itor;
         server->Stop();
     }
     
-    for (std::vector<TcpServerPtr>::iterator itor = tcpServers.begin(); itor != tcpServers.end(); itor++)
+    for (auto itor = tcpServers.begin(); itor != tcpServers.end(); itor++)
     {
         Logging::LogMsg(LL_DEBUG, "Shutting down TCP server");
-        TcpServerPtr server = *itor;
+        auto server = *itor;
         server->Stop();
     }
     

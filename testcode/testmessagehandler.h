@@ -21,24 +21,18 @@
 
 
 class CMockAuthShort : 
-     public CBasicRefCount,
-     public CObjectFactory<CMockAuthShort>,
      public IStunAuth
 {
 public:
     virtual HRESULT DoAuthCheck(AuthAttributes* pAuthAttributes, AuthResponse* pResponse);
-    ADDREF_AND_RELEASE_IMPL();
 };
 
 
 class CMockAuthLong : 
-     public CBasicRefCount,
-     public CObjectFactory<CMockAuthLong>,
      public IStunAuth
 {
 public:
     virtual HRESULT DoAuthCheck(AuthAttributes* pAuthAttributes, AuthResponse* pResponse);
-    ADDREF_AND_RELEASE_IMPL();
 };
 
 
@@ -48,8 +42,8 @@ public:
 class CTestMessageHandler : public IUnitTest
 {
 private:
-    CRefCountedPtr<CMockAuthShort> _spAuthShort;
-    CRefCountedPtr<CMockAuthLong> _spAuthLong;
+    std::shared_ptr<CMockAuthShort> _spAuthShort;
+    std::shared_ptr<CMockAuthLong> _spAuthLong;
     
     
     CSocketAddress _addrLocal;
@@ -78,7 +72,7 @@ private:
     
     HRESULT ValidateOtherAddress(CStunMessageReader& reader, const CSocketAddress& addrExpected);
     
-    HRESULT SendHelper(CStunMessageBuilder& builderRequest, CStunMessageReader* pReaderResponse, IStunAuth* pAuth);
+    HRESULT SendHelper(CStunMessageBuilder& builderRequest, CStunMessageReader* pReaderResponse, std::shared_ptr<IStunAuth> spAuth);
     
 public:
     CTestMessageHandler();

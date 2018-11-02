@@ -91,8 +91,8 @@ HRESULT CMockAuthLong::DoAuthCheck(AuthAttributes* pAuthAttributes, AuthResponse
 
 CTestMessageHandler::CTestMessageHandler()
 {
-    CMockAuthShort::CreateInstanceNoInit(_spAuthShort.GetPointerPointer());
-    CMockAuthLong::CreateInstanceNoInit(_spAuthLong.GetPointerPointer());
+    _spAuthShort = std::make_shared<CMockAuthShort>();
+    _spAuthLong = std::make_shared<CMockAuthLong>();
 
     ToAddr(c_szIPLocal, c_portLocal, &_addrLocal);
     ToAddr(c_szIPMapped, c_portMapped, &_addrMapped);
@@ -104,7 +104,7 @@ CTestMessageHandler::CTestMessageHandler()
 }
 
 
-HRESULT CTestMessageHandler::SendHelper(CStunMessageBuilder& builderRequest, CStunMessageReader* pReaderResponse, IStunAuth* pAuth)
+HRESULT CTestMessageHandler::SendHelper(CStunMessageBuilder& builderRequest, CStunMessageReader* pReaderResponse, std::shared_ptr<IStunAuth> spAuth)
 {
     CRefCountedBuffer spBufferRequest;
     CRefCountedBuffer spBufferResponse(new CBuffer(MAX_STUN_MESSAGE_SIZE));
@@ -130,7 +130,7 @@ HRESULT CTestMessageHandler::SendHelper(CStunMessageBuilder& builderRequest, CSt
     
     msgOut.spBufferOut = spBufferResponse;
     
-    ChkA(CStunRequestHandler::ProcessRequest(msgIn, msgOut, &tas, pAuth));
+    ChkA(CStunRequestHandler::ProcessRequest(msgIn, msgOut, &tas, spAuth.get()));
     
     ChkIf(CStunMessageReader::BodyValidated != pReaderResponse->AddBytes(spBufferResponse->GetData(), spBufferResponse->GetSize()), E_FAIL);
     

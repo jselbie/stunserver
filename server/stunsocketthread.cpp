@@ -47,7 +47,7 @@ void CStunSocketThread::ClearSocketArray()
     _socks.clear();
 }
 
-HRESULT CStunSocketThread::Init(CStunSocket* arrayOfFourSockets, TransportAddressSet* pTSA, IStunAuth* pAuth, SocketRole rolePrimaryRecv, boost::shared_ptr<RateLimiter>& spLimiter)
+HRESULT CStunSocketThread::Init(CStunSocket* arrayOfFourSockets, TransportAddressSet* pTSA, std::shared_ptr<IStunAuth> spAuth, SocketRole rolePrimaryRecv, std::shared_ptr<RateLimiter>& spLimiter)
 {
     HRESULT hr = S_OK;
     
@@ -94,7 +94,7 @@ HRESULT CStunSocketThread::Init(CStunSocket* arrayOfFourSockets, TransportAddres
     
     _rotation = 0;
     
-    _spAuth.Attach(pAuth);
+    _spAuth = spAuth;
     
     _spLimiter = spLimiter;
 
@@ -391,7 +391,7 @@ HRESULT CStunSocketThread::ProcessRequestAndSendResponse()
     
     // msgIn and msgOut are already initialized
     
-    Chk(CStunRequestHandler::ProcessRequest(_msgIn, _msgOut, &_tsa, _spAuth));
+    Chk(CStunRequestHandler::ProcessRequest(_msgIn, _msgOut, &_tsa, _spAuth.get()));
 
     ASSERT(_tsa.set[_msgOut.socketrole].fValid);
     ASSERT(_arrSendSockets[_msgOut.socketrole].IsValid());

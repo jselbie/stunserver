@@ -60,9 +60,10 @@ struct AuthResponse
 };
 
 
-class IStunAuth : public IRefCounted
+class IStunAuth
 {
 public:
+    virtual ~IStunAuth() = default;
     virtual HRESULT DoAuthCheck(AuthAttributes* pAuthAttributes, AuthResponse* pResponse) = 0;
 };
 

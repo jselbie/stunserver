@@ -97,16 +97,16 @@ HRESULT CStunServer::Initialize(const CStunServerConfig& config)
 {
     HRESULT hr = S_OK;
     int socketcount = 0;
-    CRefCountedPtr<IStunAuth> _spAuth;
+    std::shared_ptr<IStunAuth> _spAuth;
     TransportAddressSet tsa = {};
-    boost::shared_ptr<RateLimiter> spLimiter;
+    std::shared_ptr<RateLimiter> spLimiter;
 
     // cleanup any thing that's going on now
     Shutdown();
     
     // optional code: create an authentication provider and initialize it here (if you want authentication)
     // set the _spAuth member to reference it
-    // Chk(CYourAuthProvider::CreateInstanceNoInit(&_spAuth));
+    // _spAuth = std::make_shared<CYourAuthProvider>();
     
     // Create the sockets and initialize the TSA thing
     if (config.fHasPP)
@@ -139,7 +139,7 @@ HRESULT CStunServer::Initialize(const CStunServerConfig& config)
     {
         Logging::LogMsg(LL_DEBUG, "Creating rate limiter for ddos protection\n");
         // hard coding to 25000 ip addresses
-        spLimiter = boost::shared_ptr<RateLimiter>(new RateLimiter(25000, config.fMultiThreadedMode));
+        spLimiter = std::shared_ptr<RateLimiter>(new RateLimiter(25000, config.fMultiThreadedMode));
     }
 
     if (config.fMultiThreadedMode == false)
@@ -208,7 +208,7 @@ HRESULT CStunServer::Shutdown()
     }
     _threads.clear();
     
-    _spAuth.ReleaseAndClear();
+    _spAuth.reset();
     
     return S_OK;
 }

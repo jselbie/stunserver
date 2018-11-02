@@ -33,7 +33,7 @@ public:
     CStunSocketThread();
     ~CStunSocketThread();
     
-    HRESULT Init(CStunSocket* arrayOfFourSockets, TransportAddressSet* pTSA, IStunAuth* pAuth, SocketRole rolePrimaryRecv, boost::shared_ptr<RateLimiter>& _spRateLimiter);
+    HRESULT Init(CStunSocket* arrayOfFourSockets, TransportAddressSet* pTSA, std::shared_ptr<IStunAuth> spAuth, SocketRole rolePrimaryRecv, std::shared_ptr<RateLimiter>& _spRateLimiter);
     HRESULT Start();
 
     HRESULT SignalForStop(bool fPostMessages);
@@ -61,7 +61,7 @@ private:
     
     TransportAddressSet _tsa;
     
-    CRefCountedPtr<IStunAuth> _spAuth;
+    std::shared_ptr<IStunAuth> _spAuth;
     
     // pre-allocated objects for the thread
     CStunMessageReader _reader;
@@ -71,7 +71,7 @@ private:
     StunMessageIn _msgIn;
     StunMessageOut _msgOut;
     
-    boost::shared_ptr<RateLimiter> _spLimiter;
+    std::shared_ptr<RateLimiter> _spLimiter;
     
     HRESULT InitThreadBuffers();
     void UninitThreadBuffers();

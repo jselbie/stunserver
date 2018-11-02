@@ -46,7 +46,7 @@ private:
     TransportAddressSet _tsa;
     
     
-    boost::shared_ptr<CStunClientLogic> _spClientLogic;
+    std::shared_ptr<CStunClientLogic> _spClientLogic;
     
 
         
