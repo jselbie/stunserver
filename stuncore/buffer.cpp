@@ -31,7 +31,7 @@ _allocatedSize(0)
 
 void CBuffer::Reset()
 {
-    _spAllocation.clear();
+    _vec.clear();
     _data = nullptr;
     _size = 0;
     _allocatedSize = 0;
@@ -47,25 +47,16 @@ CBuffer::CBuffer(size_t nSize)
 
 HRESULT CBuffer::InitWithAllocation(size_t size)
 {
-
     Reset();
-
-    // deliberately not checking for 0.  Ok to allocate a 0 byte array
-    std::vector<uint8_t> spAlloc(size+2); // add two bytes for null termination (makes debugging ascii and unicode strings easier), but these two bytes are invisible to the caller (not included in _allocatedSize)
-
-    _spAllocation.swap(spAlloc);
-
-    spAlloc.clear();
-
-    _data = _spAllocation.data();
-
-    if (_data)
-    {
-        _data[size] = 0;
-        _data[size+1] = 0;
-    }
-
-    _size = (_data != nullptr) ? size : 0;
+    
+    // deliberately not checking for 0.  Ok to allocate a 0 byte array.
+    // Plus two bytes for null termination (useful for debugging strings)
+    _vec.resize(size+2);
+    _vec[size] = 0;
+    _vec[size+1] = 0;
+    
+    _data = _vec.data();
+    _size = size;
     _allocatedSize = _size;
 
     return (_data != nullptr) ? S_OK : E_FAIL;

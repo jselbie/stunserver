@@ -129,6 +129,7 @@ struct StartupArgs
     std::string strDosProtect;
     std::string strConfigFile;
     std::string strReuseAddr;
+    std::string strThreading;
     
 };
 
@@ -151,6 +152,7 @@ void DumpStartupArgs(StartupArgs& args)
     PRINTARG(strMaxConnections);
     PRINTARG(strDosProtect);
     PRINTARG(strReuseAddr);
+    PRINTARG(strThreading);
     Logging::LogMsg(LL_DEBUG, "--------------------------\n");
 }
 
@@ -243,6 +245,8 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
     bool fHasAtLeastTwoAdapters = false;
     CStunServerConfig config;
     int nMaxConnections = 0;
+    int threadcount = 0;
+
     const char* pszPrimaryAdvertised = argsIn.strPrimaryAdvertised.c_str();
     const char* pszAltAdvertised = argsIn.strAlternateAdvertised.c_str();
 
@@ -279,6 +283,7 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
     
     StringHelper::Trim(args.strPrimaryAdvertised);
     StringHelper::Trim(args.strAlternateAdvertised);
+    StringHelper::Trim(args.strThreading);
 
 
 
@@ -512,6 +517,19 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
 
     // ---- REUSE ADDRESS SWITCH -------------------------------------------
     config.fReuseAddr = (argsIn.strReuseAddr.length() > 0);
+    
+    
+    // ---- THREADING ------------------------------------------------------
+    if (argsIn.strThreading.size() > 0)
+    {
+        hr = StringHelper::ValidateNumberString(argsIn.strThreading.c_str(), 0, 64, &threadcount);
+        if (FAILED(hr))
+        {
+            Logging::LogMsg(LL_ALWAYS, "Error with --threading. required argument must be between 0 - 64");
+            Chk(hr);
+        }
+    }
+    config.nThreadsPerSocket = threadcount;
 
     *pConfigOut = config;
     hr = S_OK;
@@ -542,6 +560,7 @@ HRESULT ParseCommandLineArgs(int argc, char** argv, int startindex, StartupArgs*
     cmdline.AddOption("ddp", no_argument, &pStartupArgs->strDosProtect);
     cmdline.AddOption("configfile", required_argument, &pStartupArgs->strConfigFile);
     cmdline.AddOption("reuseaddr", no_argument, &pStartupArgs->strReuseAddr);
+    cmdline.AddOption("threading", required_argument, &pStartupArgs->strThreading);
 
     cmdline.ParseCommandLine(argc, argv, startindex, &fError);
 
@@ -598,6 +617,7 @@ HRESULT LoadConfigsFromFile(const std::string& filename, std::vector<StartupArgs
             args.strMaxConnections = child.get("maxconn", "");
             args.strDosProtect = child.get("ddp", "");
             args.strReuseAddr = child.get("reuseaddr", "");
+            args.strThreading = child.get("threading", "");
             
             configurations.push_back(args);
         }
@@ -739,8 +759,6 @@ int main(int argc, char** argv)
     BlockSignal(SIGTERM);
     BlockSignal(SIGINT);
 
-    ASSERT(false);
-    
 
 #ifdef DEBUG
     Logging::SetLogLevel(LL_DEBUG);

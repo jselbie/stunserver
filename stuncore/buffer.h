@@ -30,7 +30,7 @@ private:
     uint8_t* _data;
     size_t _size;
     size_t _allocatedSize;
-    std::vector<uint8_t> _spAllocation;
+    std::vector<uint8_t> _vec;
 
     // disallow copy and assignment.
     CBuffer(const CBuffer&);

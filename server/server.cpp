@@ -29,7 +29,7 @@ fHasPP(false),
 fHasPA(false),
 fHasAP(false),
 fHasAA(false),
-fMultiThreadedMode(false),
+nThreadsPerSocket(0),
 fTCP(false),
 nMaxConnections(0), // zero means default
 fEnableDosProtection(false),
@@ -139,10 +139,11 @@ HRESULT CStunServer::Initialize(const CStunServerConfig& config)
     {
         Logging::LogMsg(LL_DEBUG, "Creating rate limiter for ddos protection\n");
         // hard coding to 25000 ip addresses
-        spLimiter = std::shared_ptr<RateLimiter>(new RateLimiter(25000, config.fMultiThreadedMode));
+        bool fMultiThreaded = (config.nThreadsPerSocket > 0);
+        spLimiter = std::shared_ptr<RateLimiter>(new RateLimiter(25000, fMultiThreaded));
     }
 
-    if (config.fMultiThreadedMode == false)
+    if (config.nThreadsPerSocket <= 0)
     {
         Logging::LogMsg(LL_DEBUG, "Configuring single threaded mode\n");
         
@@ -156,9 +157,9 @@ HRESULT CStunServer::Initialize(const CStunServerConfig& config)
     }
     else
     {
-        Logging::LogMsg(LL_DEBUG, "Configuring multi-threaded mode\n");
+        Logging::LogMsg(LL_DEBUG, "Configuring multi-threaded mode with %d threads per socket\n", config.nThreadsPerSocket);
 
-        // one thread for every socket
+        // N threads for every socket
         CStunSocketThread* pThread = NULL;
         for (size_t index = 0; index < ARRAYSIZE(_arrSockets); index++)
         {
@@ -166,10 +167,13 @@ HRESULT CStunServer::Initialize(const CStunServerConfig& config)
             {
                 SocketRole rolePrimaryRecv = _arrSockets[index].GetRole();
                 ASSERT(rolePrimaryRecv == (SocketRole)index);
-                pThread = new CStunSocketThread();
-                ChkIf(pThread==NULL, E_OUTOFMEMORY);
-                _threads.push_back(pThread);
-                Chk(pThread->Init(_arrSockets, &tsa, _spAuth, rolePrimaryRecv, spLimiter));
+                for (int t = 0; t < config.nThreadsPerSocket; t++)
+                {
+                    pThread = new CStunSocketThread();
+                    ChkIf(pThread==NULL, E_OUTOFMEMORY);
+                    _threads.push_back(pThread);
+                    Chk(pThread->Init(_arrSockets, &tsa, _spAuth, rolePrimaryRecv, spLimiter));
+                }
             }
         }
     }

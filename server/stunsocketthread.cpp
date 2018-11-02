@@ -282,6 +282,7 @@ void CStunSocketThread::Run()
     char szIPRemote[100] = {};
     char szIPLocal[100] = {};
     bool allowed_to_pass = true;
+    pthread_t threadid = pthread_self();
 
     
     int sendsocketcount = 0;
@@ -339,7 +340,7 @@ void CStunSocketThread::Run()
             szIPLocal[0] = '\0';
         }
         
-        Logging::LogMsg(LL_VERBOSE, "recvfrom returns %d from %s on local interface %s", ret, szIPRemote, szIPLocal);
+        Logging::LogMsg(LL_VERBOSE, "recvfrom returns %d from %s on local interface %s on thread %lu", ret, szIPRemote, szIPLocal, (unsigned long)threadid);
 
         allowed_to_pass = (_spLimiter.get() != NULL) ? _spLimiter->RateCheck(_msgIn.addrRemote) : true;
         

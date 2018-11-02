@@ -35,7 +35,7 @@ public:
     bool fHasAP; // AP: Alternate ip, Primary port
     bool fHasAA; // AA: Alternate ip, Alternate port
 
-    bool fMultiThreadedMode;  // if true, one thread for each socket
+    int nThreadsPerSocket;  // when set to > 0, each socket gets N threads assigned to it, otherwise, all sockets on 1 thread
     
     bool fTCP; // if true, then use TCP instead of UDP
     uint32_t nMaxConnections; // only valid for TCP (on a per-thread basis)

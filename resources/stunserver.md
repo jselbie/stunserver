@@ -29,7 +29,9 @@ The following options are supported.
     --ddp
     --primaryadvertised
     --altadvertised
+    --threading THREADCOUNT
     --configfile
+    --reuseaddr
     --help
 
 Details of each option are as follows.
@@ -183,6 +185,14 @@ and CHANGED-ADDRESS attributes sent by the server will be incorrect. The impact 
 will result in a client attempting to do NAT Behavior tests or NAT filtering tests to report an incorrect result.
 
 For more details, visit www.stunprotocol.org for details on how to correctly set these parameters for use within Amazon EC2.
+
+____
+
+**--threading** THREADCOUNT
+
+The --threading switch specifies the number of threads to use per socket. If 0 is specified for THREADCOUNT,  this indicates the default mode, which is
+that all sockets share a single thread. This is the recommended value for most scenarios. Specifying a higher number of threads is useful in scenarios where a single
+core is not sufficient to process the entire network load. 
 
 ____
 

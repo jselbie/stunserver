@@ -833,6 +833,7 @@ HRESULT CTCPServer::Initialize(const CStunServerConfig& config)
     TransportAddressSet tsaListenAll;
     TransportAddressSet tsaHandler;
     std::shared_ptr<RateLimiter> spLimiter;
+    bool fMultithreaded = false;  // hardwire TCP to be non-threaded until we can figure this all out
     
     ChkIfA(_threads[0] != NULL, E_UNEXPECTED); // we can't already be initialized, right?
     
@@ -855,10 +856,10 @@ HRESULT CTCPServer::Initialize(const CStunServerConfig& config)
     
     if (config.fEnableDosProtection)
     {
-        spLimiter = std::make_shared<RateLimiter>(20000, config.fMultiThreadedMode);
+        spLimiter = std::make_shared<RateLimiter>(20000, fMultithreaded);
     }
     
-    if (config.fMultiThreadedMode == false)
+    if (fMultithreaded == false)
     {
         _threads[0] = new CTCPStunThread();
         
