@@ -23,17 +23,17 @@
 
 void GetDefaultAdapters(int family, ifaddrs* pList, ifaddrs** ppAddrPrimary, ifaddrs** ppAddrAlternate)
 {
-    ifaddrs* pAdapter = NULL;
+    ifaddrs* pAdapter = nullptr;
 
-    *ppAddrPrimary = NULL;
-    *ppAddrAlternate = NULL;
+    *ppAddrPrimary = nullptr;
+    *ppAddrAlternate = nullptr;
 
     pAdapter = pList;
     while (pAdapter)
     {
-        if ( (pAdapter->ifa_addr != NULL) && (pAdapter->ifa_addr->sa_family == family) && (pAdapter->ifa_flags & IFF_UP) && !(pAdapter->ifa_flags & IFF_LOOPBACK))
+        if ( (pAdapter->ifa_addr != nullptr) && (pAdapter->ifa_addr->sa_family == family) && (pAdapter->ifa_flags & IFF_UP) && !(pAdapter->ifa_flags & IFF_LOOPBACK))
         {
-            if (*ppAddrPrimary == NULL)
+            if (*ppAddrPrimary == nullptr)
             {
                 *ppAddrPrimary = pAdapter;
             }
@@ -55,9 +55,9 @@ bool HasAtLeastTwoAdapters(int family)
 {
     HRESULT hr = S_OK;
     
-    ifaddrs* pList = NULL;
-    ifaddrs* pAdapter1 = NULL;
-    ifaddrs* pAdapter2 = NULL;
+    ifaddrs* pList = nullptr;
+    ifaddrs* pAdapter1 = nullptr;
+    ifaddrs* pAdapter2 = nullptr;
     bool fRet = false;
 
     ChkIf(getifaddrs(&pList) < 0, ERRNOHR);
@@ -83,12 +83,12 @@ Cleanup:
 HRESULT GetBestAddressForSocketBind(bool fPrimary, int family, uint16_t port, CSocketAddress* pSocketAddr)
 {
     HRESULT hr = S_OK;
-    ifaddrs* pList = NULL;
-    ifaddrs* pAdapter = NULL;
-    ifaddrs* pAdapter1 = NULL;
-    ifaddrs* pAdapter2 = NULL;
+    ifaddrs* pList = nullptr;
+    ifaddrs* pAdapter = nullptr;
+    ifaddrs* pAdapter1 = nullptr;
+    ifaddrs* pAdapter2 = nullptr;
 
-    ChkIfA(pSocketAddr == NULL, E_INVALIDARG);
+    ChkIfA(pSocketAddr == nullptr, E_INVALIDARG);
 
     ChkIf(getifaddrs(&pList) < 0, ERRNOHR);
 
@@ -96,8 +96,8 @@ HRESULT GetBestAddressForSocketBind(bool fPrimary, int family, uint16_t port, CS
 
     pAdapter = fPrimary ? pAdapter1 : pAdapter2;
 
-    ChkIf(pAdapter==NULL, E_FAIL);
-    ChkIfA(pAdapter->ifa_addr==NULL, E_UNEXPECTED);
+    ChkIf(pAdapter==nullptr, E_FAIL);
+    ChkIfA(pAdapter->ifa_addr==nullptr, E_UNEXPECTED);
 
     *pSocketAddr = CSocketAddress(*pAdapter->ifa_addr);
     pSocketAddr->SetPort(port);
@@ -111,14 +111,14 @@ Cleanup:
 HRESULT GetSocketAddressForAdapter(int family, const char* pszAdapterName, uint16_t port, CSocketAddress* pSocketAddr)
 {
     HRESULT hr = S_OK;
-    ifaddrs* pList = NULL;
-    ifaddrs* pAdapter = NULL;
-    ifaddrs* pAdapterFound = NULL;
+    ifaddrs* pList = nullptr;
+    ifaddrs* pAdapter = nullptr;
+    ifaddrs* pAdapterFound = nullptr;
 
 
-    ChkIfA(pszAdapterName == NULL, E_INVALIDARG);
+    ChkIfA(pszAdapterName == nullptr, E_INVALIDARG);
     ChkIfA(pszAdapterName[0] == '\0', E_INVALIDARG);
-    ChkIfA(pSocketAddr == NULL, E_INVALIDARG);
+    ChkIfA(pSocketAddr == nullptr, E_INVALIDARG);
 
 
 
@@ -127,7 +127,7 @@ HRESULT GetSocketAddressForAdapter(int family, const char* pszAdapterName, uint1
     pAdapter = pList;
     while (pAdapter)
     {
-        if ((pAdapter->ifa_addr != NULL) && (pAdapter->ifa_name != NULL) && (family == pAdapter->ifa_addr->sa_family))
+        if ((pAdapter->ifa_addr != nullptr) && (pAdapter->ifa_name != nullptr) && (family == pAdapter->ifa_addr->sa_family))
         {
             if (strcmp(pAdapter->ifa_name, pszAdapterName) == 0)
             {
@@ -142,11 +142,11 @@ HRESULT GetSocketAddressForAdapter(int family, const char* pszAdapterName, uint1
     // If pszAdapterName is an IP address, convert it into a sockaddr and compare the address field with that of the adapter
     // Note: an alternative approach would be to convert pAdapter->ifa_addr to a string and then do a string compare.
     // But then it would be difficult to match "::1" with "0:0:0:0:0:0:0:1" and other formats of IPV6 strings
-    if ((pAdapterFound == NULL) && ((family == AF_INET) || (family == AF_INET6)) )
+    if ((pAdapterFound == nullptr) && ((family == AF_INET) || (family == AF_INET6)) )
     {
         uint8_t addrbytes[sizeof(in6_addr)] = {};
         int comparesize = (family == AF_INET) ? sizeof(in_addr) : sizeof(in6_addr);
-        void* pCmp = NULL;
+        void* pCmp = nullptr;
 
 
         if (inet_pton(family, pszAdapterName, addrbytes) == 1)
@@ -154,7 +154,7 @@ HRESULT GetSocketAddressForAdapter(int family, const char* pszAdapterName, uint1
              pAdapter = pList;
              while (pAdapter)
              {
-                 if ((pAdapter->ifa_addr != NULL) && (family == pAdapter->ifa_addr->sa_family))
+                 if ((pAdapter->ifa_addr != nullptr) && (family == pAdapter->ifa_addr->sa_family))
                  {
                      // offsetof(sockaddr_in, sin_addr) != offsetof(sockaddr_in6, sin6_addr)
                      // so you really can't do too many casting tricks like you can with sockaddr and sockaddr_in
@@ -182,7 +182,7 @@ HRESULT GetSocketAddressForAdapter(int family, const char* pszAdapterName, uint1
         }
     }
 
-    ChkIf(pAdapterFound == NULL, E_FAIL);
+    ChkIf(pAdapterFound == nullptr, E_FAIL);
 
     {
         *pSocketAddr = CSocketAddress(*(pAdapterFound->ifa_addr));

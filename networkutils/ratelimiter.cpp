@@ -8,7 +8,7 @@ RateLimiter::RateLimiter(size_t tablesize, bool isUsingLock)
 {
     _table.InitTable(tablesize, tablesize/2);
     this->_isUsingLock = isUsingLock;
-    pthread_mutex_init(&_mutex, NULL);
+    pthread_mutex_init(&_mutex, nullptr);
 }
 
 RateLimiter::~RateLimiter()
@@ -19,7 +19,7 @@ RateLimiter::~RateLimiter()
 
 time_t RateLimiter::get_time()
 {
-    return time(NULL);
+    return time(nullptr);
 }
 
 uint64_t RateLimiter::get_rate(const RateTracker* pRT)
@@ -82,7 +82,7 @@ bool RateLimiter::RateCheckImpl(const CSocketAddress& addr)
     //      
     
     
-    if (pRT == NULL)
+    if (pRT == nullptr)
     {
         RateTracker rt;
         rt.count = 1;

@@ -149,7 +149,7 @@ HRESULT CStunServer::Initialize(const CStunServerConfig& config)
         
         // create one thread for all the sockets
         CStunSocketThread* pThread = new CStunSocketThread();
-        ChkIf(pThread==NULL, E_OUTOFMEMORY);
+        ChkIf(pThread==nullptr, E_OUTOFMEMORY);
 
         _threads.push_back(pThread);
         
@@ -160,7 +160,7 @@ HRESULT CStunServer::Initialize(const CStunServerConfig& config)
         Logging::LogMsg(LL_DEBUG, "Configuring multi-threaded mode with %d threads per socket\n", config.nThreadsPerSocket);
 
         // N threads for every socket
-        CStunSocketThread* pThread = NULL;
+        CStunSocketThread* pThread = nullptr;
         for (size_t index = 0; index < ARRAYSIZE(_arrSockets); index++)
         {
             if (_arrSockets[index].IsValid())
@@ -170,7 +170,7 @@ HRESULT CStunServer::Initialize(const CStunServerConfig& config)
                 for (int t = 0; t < config.nThreadsPerSocket; t++)
                 {
                     pThread = new CStunSocketThread();
-                    ChkIf(pThread==NULL, E_OUTOFMEMORY);
+                    ChkIf(pThread==nullptr, E_OUTOFMEMORY);
                     _threads.push_back(pThread);
                     Chk(pThread->Init(_arrSockets, &tsa, _spAuth, rolePrimaryRecv, spLimiter));
                 }
@@ -208,7 +208,7 @@ HRESULT CStunServer::Shutdown()
     {
         CStunSocketThread* pThread = _threads[index];
         delete pThread;
-        _threads[index] = NULL;
+        _threads[index] = nullptr;
     }
     _threads.clear();
     
@@ -229,7 +229,7 @@ HRESULT CStunServer::Start()
     for (size_t index = 0; index < len; index++)
     {
         CStunSocketThread* pThread = _threads[index];
-        if (pThread != NULL)
+        if (pThread != nullptr)
         {
             // set the "exit flag" that each thread looks at when it wakes up from waiting
             ChkA(pThread->Start());
@@ -254,7 +254,7 @@ HRESULT CStunServer::Stop()
     for (size_t index = 0; index < len; index++)
     {
         CStunSocketThread* pThread = _threads[index];
-        if (pThread != NULL)
+        if (pThread != nullptr)
         {
             // set the "exit flag" that each thread looks at when it wakes up from waiting
             pThread->SignalForStop(false);
@@ -268,7 +268,7 @@ HRESULT CStunServer::Stop()
 
         // Post a bunch of empty buffers to get the threads unblocked from whatever socket call they are on
         // In multi-threaded mode, this may wake up a different thread.  But that's ok, since all threads start and stop together
-        if (pThread != NULL)
+        if (pThread != nullptr)
         {
             pThread->SignalForStop(true);
         }
@@ -278,7 +278,7 @@ HRESULT CStunServer::Stop()
     {
         CStunSocketThread* pThread = _threads[index];
 
-        if  (pThread != NULL)
+        if  (pThread != nullptr)
         {
             pThread->WaitForStopAndClose();
         }

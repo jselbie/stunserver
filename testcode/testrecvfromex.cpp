@@ -112,7 +112,7 @@ HRESULT CTestRecvFromEx::DoTest(bool fIPV6)
     FD_SET(socketRecv.GetSocketHandle(), &set);
     tv.tv_sec = 3;
     
-    ret = select(socketRecv.GetSocketHandle()+1, &set, NULL, NULL, &tv);
+    ret = select(socketRecv.GetSocketHandle()+1, &set, nullptr, nullptr, &tv);
     
     ChkIfA(ret <= 0, E_UNEXPECTED);
     

@@ -22,10 +22,10 @@
 
 
 CStunRequestHandler::CStunRequestHandler() :
-_pAuth(NULL),
-_pAddrSet(NULL),
-_pMsgIn(NULL),
-_pMsgOut(NULL),
+_pAuth(nullptr),
+_pAddrSet(nullptr),
+_pMsgIn(nullptr),
+_pMsgOut(nullptr),
 _integrity(), // zero-init
 _error(), // zero-init
 _fRequestHasResponsePort(false),
@@ -43,13 +43,13 @@ HRESULT CStunRequestHandler::ProcessRequest(const StunMessageIn& msgIn, StunMess
     CStunRequestHandler handler;
     
     // parameter checking
-    ChkIfA(msgIn.pReader==NULL, E_INVALIDARG);
+    ChkIfA(msgIn.pReader==nullptr, E_INVALIDARG);
     ChkIfA(IsValidSocketRole(msgIn.socketrole)==false, E_INVALIDARG);
     
-    ChkIfA(msgOut.spBufferOut==NULL, E_INVALIDARG);
+    ChkIfA(msgOut.spBufferOut==nullptr, E_INVALIDARG);
     ChkIfA(msgOut.spBufferOut->GetAllocatedSize() < MAX_STUN_MESSAGE_SIZE, E_INVALIDARG);
     
-    ChkIf(pAddressSet == NULL, E_INVALIDARG);
+    ChkIf(pAddressSet == nullptr, E_INVALIDARG);
 
     // If we get something that can't be validated as a stun message, don't send back a response
     // STUN RFC may suggest sending back a "500", but I think that's the wrong approach.
@@ -128,7 +128,7 @@ HRESULT CStunRequestHandler::ProcessRequestImpl()
     
     if (_error.errorcode == 0)
     {
-        hrResult = ValidateAuth(); // returns S_OK if _pAuth is NULL
+        hrResult = ValidateAuth(); // returns S_OK if _pAuth is nullptr
         
         // if auth didn't succeed, but didn't set an error code, then setup a generic error response
         if (FAILED(hrResult) && (_error.errorcode == 0))
@@ -373,7 +373,7 @@ HRESULT CStunRequestHandler::ValidateAuth()
     // aliases
     CStunMessageReader& reader = *(_pMsgIn->pReader);
     
-    if (_pAuth == NULL)
+    if (_pAuth == nullptr)
     {
         return S_OK; // nothing to do if there is no auth mechanism in place
     }

@@ -42,7 +42,7 @@ HRESULT GetMappedAddress(uint8_t* pData, size_t size, CSocketAddress* pAddr)
     CRefCountedBuffer spBuffer(new CBuffer(pData, size, false));
     CDataStream stream(spBuffer);
 
-    ChkIfA(pAddr==NULL, E_INVALIDARG);
+    ChkIfA(pAddr==nullptr, E_INVALIDARG);
 
     Chk(stream.SeekDirect(1)); // skip over the zero byte
 

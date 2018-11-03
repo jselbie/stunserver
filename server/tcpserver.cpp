@@ -78,7 +78,7 @@ void CTCPStunThread::Reset()
     _pNewConnList = &_hashConnections1;
     _pOldConnList = &_hashConnections2;
     
-    _timeLastSweep = time(NULL);
+    _timeLastSweep = time(nullptr);
 }
 
 
@@ -222,7 +222,7 @@ CStunSocket* CTCPStunThread::GetListenSocket(int sock)
             }
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 
@@ -305,7 +305,7 @@ HRESULT CTCPStunThread::Start()
     ChkIf(_pipe[0] == -1, E_UNEXPECTED); // Init hasn't been called
     
     _fNeedToExit = false;
-    ret = ::pthread_create(&_pthread, NULL, ThreadFunction, this);
+    ret = ::pthread_create(&_pthread, nullptr, ThreadFunction, this);
     ChkIfA(ret != 0, ERRNO_TO_HRESULT(ret));
     
     _fThreadIsValid = true;
@@ -317,7 +317,7 @@ Cleanup:
 
 HRESULT CTCPStunThread::Stop()
 {
-    void* pRetValueFromThread = NULL;
+    void* pRetValueFromThread = nullptr;
     
     if (_fThreadIsValid)
     {
@@ -341,7 +341,7 @@ HRESULT CTCPStunThread::Stop()
 void* CTCPStunThread::ThreadFunction(void* pThis)
 {
     ((CTCPStunThread*)pThis)->Run();
-    return NULL;
+    return nullptr;
 }
 
 int CTCPStunThread::GetTimeoutSeconds()
@@ -365,14 +365,14 @@ void CTCPStunThread::Run()
     
     Logging::LogMsg(LL_DEBUG, "Starting TCP listening thread (%d sockets)\n", _countSocks);
     
-    _timeLastSweep = time(NULL);
+    _timeLastSweep = time(nullptr);
     
     while (_fNeedToExit == false)
     {
         PollEvent pollevent = {};
         // wait for a notification
         int timeout = GetTimeoutSeconds();
-        CStunSocket* pListenSocket = NULL;
+        CStunSocket* pListenSocket = nullptr;
         
         // turn off epoll eventing from the listen sockets if we are at max connections
         // otherwise, make sure it is enabled.
@@ -429,16 +429,16 @@ void CTCPStunThread::Run()
 
 void CTCPStunThread::ProcessConnectionEvent(int sock, uint32_t eventflags)
 {
-    StunConnection** ppConn = NULL;
-    StunConnection* pConn = NULL;
+    StunConnection** ppConn = nullptr;
+    StunConnection* pConn = nullptr;
     
     ppConn = _pNewConnList->Lookup(sock);
-    if (ppConn == NULL)
+    if (ppConn == nullptr)
     {
         ppConn = _pOldConnList->Lookup(sock);
     }
     
-    if ((ppConn == NULL) || (*ppConn == NULL))
+    if ((ppConn == nullptr) || (*ppConn == nullptr))
     {
         Logging::LogMsg(LL_DEBUG, "Warning - ProcessConnectionEvent could not resolve socket into connection (socket == %d)", sock);
         return;
@@ -489,7 +489,7 @@ StunConnection* CTCPStunThread::AcceptConnection(CStunSocket* pListenSocket)
     int socktmp = -1;
     sockaddr_storage addrClient;
     socklen_t socklen = sizeof(addrClient);
-    StunConnection* pConn = NULL;
+    StunConnection* pConn = nullptr;
     HRESULT hr = S_OK;
     int insertresult;
     int err;
@@ -513,7 +513,7 @@ StunConnection* CTCPStunThread::AcceptConnection(CStunSocket* pListenSocket)
     clientsock = socktmp;
     
     pConn = _connectionpool.GetConnection(clientsock, role);
-    ChkIfA(pConn == NULL, E_FAIL); // Our connection pool has nothing left to give, only thing to do is abort this connection and close the socket
+    ChkIfA(pConn == nullptr, E_FAIL); // Our connection pool has nothing left to give, only thing to do is abort this connection and close the socket
     socktmp = -1;
     
     ChkA(pConn->_stunsocket.SetNonBlocking(true));
@@ -542,7 +542,7 @@ Cleanup:
     if (FAILED(hr))
     {
         CloseConnection(pConn);
-        pConn = NULL;
+        pConn = nullptr;
         if (socktmp != -1)
         {
             close(socktmp);
@@ -625,7 +625,7 @@ HRESULT CTCPStunThread::ReceiveBytesForConnection(StunConnection* pConn)
             
             // so we can't assume the connection is still alive.  And if it's not alive, pConn likely got deleted
             // either refetch from the hash tables, or invent an out parameter on WriteBytesForConnection and ConsumeRemoteClose to better propagate the close state of the connection
-            pConn = NULL;
+            pConn = nullptr;
             
             break;
         }
@@ -647,14 +647,14 @@ HRESULT CTCPStunThread::WriteBytesForConnection(StunConnection* pConn)
     HRESULT hr = S_OK;
     int sock = pConn->_stunsocket.GetSocketHandle();
     int sent = -1;
-    uint8_t* pData = NULL;
+    uint8_t* pData = nullptr;
     size_t bytestotal, bytesremaining;
     bool fForceClose = false;
     int err;
 
     
     
-    ASSERT(pConn != NULL);    
+    ASSERT(pConn != nullptr);    
     
     pData = pConn->_spOutputBuffer->GetData();
     bytestotal = pConn->_spOutputBuffer->GetSize();
@@ -695,7 +695,7 @@ HRESULT CTCPStunThread::WriteBytesForConnection(StunConnection* pConn)
             // go back to listening for read events
             ChkA(_spPolling->ChangeEventSet(sock, EPOLL_CLIENT_READ_EVENT_SET));
 
-            pConn = NULL;
+            pConn = nullptr;
             break;
         }
         // loop back and try to send the remaining bytes
@@ -752,8 +752,8 @@ void CTCPStunThread::CloseAllConnections(StunThreadConnectionMap* pConnMap)
 
 void CTCPStunThread::SweepDeadConnections()
 {
-    time_t timeCurrent = time(NULL);
-    StunThreadConnectionMap* pSwap = NULL;
+    time_t timeCurrent = time(nullptr);
+    StunThreadConnectionMap* pSwap = nullptr;
     
     // should we try to scale the timeout based on the active number of connections?
     
@@ -766,7 +766,7 @@ void CTCPStunThread::SweepDeadConnections()
         
         CloseAllConnections(_pOldConnList);
         
-        _timeLastSweep = time(NULL);
+        _timeLastSweep = time(nullptr);
         
         
         pSwap = _pOldConnList;
@@ -792,7 +792,7 @@ CTCPServer::CTCPServer()
 {
     for (size_t i = 0; i < ARRAYSIZE(_threads); i++)
     {
-        _threads[i] = NULL;
+        _threads[i] = nullptr;
     }
 }
 
@@ -835,7 +835,7 @@ HRESULT CTCPServer::Initialize(const CStunServerConfig& config)
     std::shared_ptr<RateLimiter> spLimiter;
     bool fMultithreaded = false;  // hardwire TCP to be non-threaded until we can figure this all out
     
-    ChkIfA(_threads[0] != NULL, E_UNEXPECTED); // we can't already be initialized, right?
+    ChkIfA(_threads[0] != nullptr, E_UNEXPECTED); // we can't already be initialized, right?
     
     // optional code: create an authentication provider and initialize it here (if you want authentication)
     // set the _spAuth member to reference it
@@ -906,7 +906,7 @@ HRESULT CTCPServer::Shutdown()
     {
         // destructor of each TCP thread will stop the thread before returning
         delete _threads[role];
-        _threads[role] = NULL;
+        _threads[role] = nullptr;
     }
     
     _spAuth.reset();

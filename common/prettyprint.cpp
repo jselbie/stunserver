@@ -27,7 +27,7 @@ static void SplitParagraphIntoWords(const char* pszLine, std::vector<std::string
 {
     std::string strWord;
 
-    if (pszLine == NULL)
+    if (pszLine == nullptr)
     {
         return;
     }
@@ -60,7 +60,7 @@ static void SplitInputIntoParagraphs(const char* pszInput, std::vector<std::stri
     // blindly scan to the next \r or \n
     std::string strParagraph;
 
-    if (pszInput == NULL)
+    if (pszInput == nullptr)
     {
         return;
     }
@@ -107,7 +107,7 @@ static void PrintParagraph(const char* psz, size_t width)
         return;
     }
 
-    if (psz==NULL)
+    if (psz==nullptr)
     {
         return;
     }

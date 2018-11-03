@@ -52,10 +52,10 @@ HRESULT CCmdLineParser::AddOption(const char* pszName, int has_arg, std::string*
     HRESULT hr = S_OK;
     OptionDetail od;
 
-    ChkIfA(pszName==NULL, E_INVALIDARG);
+    ChkIfA(pszName==nullptr, E_INVALIDARG);
     ChkIfA(has_arg < 0, E_INVALIDARG);
     ChkIfA(has_arg > 2, E_INVALIDARG);
-    ChkIfA(pStrResult==NULL, E_INVALIDARG);
+    ChkIfA(pStrResult==nullptr, E_INVALIDARG);
 
     od.has_arg = has_arg;
     od.pStrResult = pStrResult;
@@ -115,7 +115,7 @@ HRESULT CCmdLineParser::ParseCommandLine(int argc, char** argv, int startindex, 
             continue;
         }
 
-        if ((longopts[index].has_arg != 0) && (optarg != NULL))
+        if ((longopts[index].has_arg != 0) && (optarg != nullptr))
         {
            _listOptionDetails[index].pStrResult->assign(optarg);
         }

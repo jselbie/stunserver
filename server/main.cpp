@@ -77,7 +77,7 @@ void LogHR(uint16_t level, HRESULT hr)
 {
     uint32_t facility = HRESULT_FACILITY(hr);
     char msg[400];
-    const char* pMsg = NULL;
+    const char* pMsg = nullptr;
     bool fGotMsg = false;
     
     if (facility == FACILITY_ERRNO)
@@ -261,7 +261,7 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
 
 
 
-    ChkIfA(pConfigOut == NULL, E_INVALIDARG);
+    ChkIfA(pConfigOut == nullptr, E_INVALIDARG);
 
 
     // normalize the args.  The "trim" is not needed for command line args, but will be useful when we have an "init file" for initializing the server

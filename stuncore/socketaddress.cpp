@@ -128,7 +128,7 @@ size_t CSocketAddress::GetIPImpl(void* pAddr, size_t length, bool fNBO) const
     HRESULT hr = S_OK;
     size_t bytescopied = 0;
 
-    ChkIfA(pAddr == NULL, E_INVALIDARG);
+    ChkIfA(pAddr == nullptr, E_INVALIDARG);
     ChkIfA(length <= 0, E_INVALIDARG);
     ChkIfA(length < GetIPLength(), E_INVALIDARG);
 
@@ -291,14 +291,14 @@ HRESULT CSocketAddress::ToStringBuffer(char* pszAddrBytes, size_t length) const
 {
     HRESULT hr = S_OK;
     int family = GetFamily();
-    const void *pAddrBytes = NULL;
-    const char* pszResult = NULL;
+    const void *pAddrBytes = nullptr;
+    const char* pszResult = nullptr;
     const size_t portLength = 6; // colon plus 5 digit string e.g. ":55555"
     char szPort[portLength+1];
     char delimiter = (family == AF_INET) ? ':' : '.';
 
 
-    ChkIfA(pszAddrBytes == NULL, E_INVALIDARG);
+    ChkIfA(pszAddrBytes == nullptr, E_INVALIDARG);
     ChkIf(length <= 0, E_INVALIDARG);
     pszAddrBytes[0] = 0;
 
@@ -319,7 +319,7 @@ HRESULT CSocketAddress::ToStringBuffer(char* pszAddrBytes, size_t length) const
 
     pszResult = ::inet_ntop(family, pAddrBytes, pszAddrBytes, length);
 
-    ChkIf(pszResult == NULL, ERRNOHR);
+    ChkIf(pszResult == nullptr, ERRNOHR);
 
     sprintf(szPort, "%c%d", delimiter, GetPort());
 #if DEBUG
@@ -338,7 +338,7 @@ HRESULT CSocketAddress::GetLocalHost(uint16_t family, CSocketAddress* pAddr)
 {
     
     if (  ((family != AF_INET) && (family != AF_INET6)) || 
-          (pAddr == NULL))
+          (pAddr == nullptr))
     {
         ASSERT(false);
         return E_FAIL;

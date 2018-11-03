@@ -53,7 +53,7 @@ public:
 
 CEpoll::CEpoll() :
 _epollfd(-1),
-_events(NULL),
+_events(nullptr),
 _sizeEvents(0),
 _pendingCount(0),
 _currentEventIndex(0)
@@ -116,7 +116,7 @@ HRESULT CEpoll::Initialize(size_t maxSockets)
 
     _sizeEvents = maxSockets;
     _events = new epoll_event[maxSockets];
-    ChkIf(_events == NULL, E_OUTOFMEMORY);
+    ChkIf(_events == nullptr, E_OUTOFMEMORY);
     
     
     _pendingCount = 0;
@@ -138,7 +138,7 @@ HRESULT CEpoll::Close()
     }
     
     delete [] _events;
-    _events = NULL;
+    _events = nullptr;
     _sizeEvents = 0;
     _pendingCount = 0;
     _currentEventIndex = 0;
@@ -173,7 +173,7 @@ HRESULT CEpoll::Remove(int fd)
     // we just got notified for isn't going to be within the _events array
     
     HRESULT hr = S_OK;
-    epoll_event ev={}; // pass empty ev, because some implementations of epoll_ctl can't handle a NULL event struct
+    epoll_event ev={}; // pass empty ev, because some implementations of epoll_ctl can't handle a nullptr event struct
 
     ChkIfA(fd == -1, E_INVALIDARG);
     ChkIfA(_epollfd==-1, E_UNEXPECTED);    
@@ -203,7 +203,7 @@ Cleanup:
 HRESULT CEpoll::WaitForNextEvent(PollEvent* pPollEvent, int timeoutMilliseconds)
 {
     HRESULT hr = S_OK;
-    epoll_event *pEvent = NULL;
+    epoll_event *pEvent = nullptr;
     int ret = 0;
     
     ChkIfA(_epollfd==-1, E_UNEXPECTED);   
@@ -342,7 +342,7 @@ HRESULT CPoll::Add(int fd, uint32_t eventflags)
     
     ChkIfA(_fInitialized == false, E_FAIL);
     
-    ChkIfA(_hashtable.Lookup(fd)!=NULL, E_UNEXPECTED);
+    ChkIfA(_hashtable.Lookup(fd)!=nullptr, E_UNEXPECTED);
     
     pfd.events = ToNativeFlags(eventflags);
     pfd.fd = fd;
@@ -357,7 +357,7 @@ HRESULT CPoll::Remove(int fd)
 {
     
     // See notes below why pPos is declared volatile.  Gets around a compiler bug
-    volatile size_t* pPos = NULL;
+    volatile size_t* pPos = nullptr;
     
     size_t size = _fds.size();
     size_t pos;
@@ -371,7 +371,7 @@ HRESULT CPoll::Remove(int fd)
     
     pPos = _hashtable.Lookup(fd);
     
-    ChkIfA(pPos == NULL, E_FAIL);
+    ChkIfA(pPos == nullptr, E_FAIL);
     
     pos = *pPos;
     
@@ -384,7 +384,7 @@ HRESULT CPoll::Remove(int fd)
         _fds[pos] = _fds[size-1];
         pPos = _hashtable.Lookup(_fds[pos].fd);
         
-        ASSERT(pPos != NULL);
+        ASSERT(pPos != nullptr);
        
         // If the volatile declaration above was not made, this block of code
         // gets over-optimized on older GCC compilers (g++ 4.2.1 on BSD) with with -O2
@@ -402,7 +402,7 @@ Cleanup:
 
 HRESULT CPoll::ChangeEventSet(int fd, uint32_t eventflags)
 {
-    size_t* pPos = NULL;
+    size_t* pPos = nullptr;
     size_t pos;
     HRESULT hr = S_OK;
     size_t size = _fds.size();
@@ -413,7 +413,7 @@ HRESULT CPoll::ChangeEventSet(int fd, uint32_t eventflags)
     ChkIf(size == 0, E_FAIL);
     
     pPos = _hashtable.Lookup(fd);
-    ChkIfA(pPos == NULL, E_FAIL);
+    ChkIfA(pPos == nullptr, E_FAIL);
     pos = *pPos;
     ChkIfA(pos >= size, E_FAIL);
     ChkIfA(_fds[pos].fd != fd, E_FAIL);
@@ -428,12 +428,12 @@ HRESULT CPoll::WaitForNextEvent(PollEvent* pPollEvent, int timeoutMilliseconds)
     HRESULT hr = S_OK;
     int ret;
     size_t size = _fds.size();
-    pollfd* list = NULL;
+    pollfd* list = nullptr;
     bool fFound = false;
     
     ChkIfA(_fInitialized == false, E_FAIL);    
     
-    ChkIfA(pPollEvent == NULL, E_INVALIDARG);
+    ChkIfA(pPollEvent == nullptr, E_INVALIDARG);
     pPollEvent->eventflags = 0;
     
     ChkIf(size == 0, S_FALSE);

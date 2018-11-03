@@ -271,7 +271,7 @@ HRESULT CTestMessageHandler::Test1()
     msgOut.spBufferOut = spBufferOut;
     msgOut.socketrole = RoleAA; // deliberately wrong - so we can validate if it got changed to RolePP
     
-    ChkA(CStunRequestHandler::ProcessRequest(msgIn, msgOut, &tas, NULL));
+    ChkA(CStunRequestHandler::ProcessRequest(msgIn, msgOut, &tas, nullptr));
     
     reader.Reset();
     ChkIfA(CStunMessageReader::BodyValidated != reader.AddBytes(spBufferOut->GetData(), spBufferOut->GetSize()), E_FAIL);
@@ -339,7 +339,7 @@ HRESULT CTestMessageHandler::Test2()
     msgOut.socketrole = RolePP; // deliberate initialized wrong
     msgOut.spBufferOut = spBufferOut;
     
-    ChkA(CStunRequestHandler::ProcessRequest(msgIn, msgOut, &tas, NULL));
+    ChkA(CStunRequestHandler::ProcessRequest(msgIn, msgOut, &tas, nullptr));
     
     // parse the response
     reader.Reset();

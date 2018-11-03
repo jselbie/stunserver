@@ -43,7 +43,7 @@ CStunSocketThread::~CStunSocketThread()
 
 void CStunSocketThread::ClearSocketArray()
 {
-    _arrSendSockets = NULL;
+    _arrSendSockets = nullptr;
     _socks.clear();
 }
 
@@ -55,8 +55,8 @@ HRESULT CStunSocketThread::Init(CStunSocket* arrayOfFourSockets, TransportAddres
     
     ChkIfA(_fThreadIsValid, E_UNEXPECTED);
 
-    ChkIfA(arrayOfFourSockets == NULL, E_INVALIDARG);
-    ChkIfA(pTSA == NULL, E_INVALIDARG);
+    ChkIfA(arrayOfFourSockets == nullptr, E_INVALIDARG);
+    ChkIfA(pTSA == nullptr, E_INVALIDARG);
     
     // if this thread was configured to listen on a single socket (aka "multi-threaded mode"), then 
     // validate that it exists
@@ -128,7 +128,7 @@ void CStunSocketThread::UninitThreadBuffers()
     _spBufferIn.reset();
     _spBufferOut.reset();
     
-    _msgIn.pReader = NULL;
+    _msgIn.pReader = nullptr;
     _msgOut.spBufferOut.reset();
 }
 
@@ -142,7 +142,7 @@ HRESULT CStunSocketThread::Start()
 
     ChkIfA(_socks.size() <= 0, E_FAIL);
 
-    err = ::pthread_create(&_pthread, NULL, CStunSocketThread::ThreadFunction, this);
+    err = ::pthread_create(&_pthread, nullptr, CStunSocketThread::ThreadFunction, this);
 
     ChkIfA(err != 0, ERRNO_TO_HRESULT(err));
     _fThreadIsValid = true;
@@ -170,7 +170,7 @@ HRESULT CStunSocketThread::SignalForStop(bool fPostMessages)
         {
             char data = 'x';
             
-            ASSERT(_socks[index] != NULL);
+            ASSERT(_socks[index] != nullptr);
             
             CSocketAddress addr(_socks[index]->GetLocalAddress());
             
@@ -195,7 +195,7 @@ HRESULT CStunSocketThread::SignalForStop(bool fPostMessages)
 
 HRESULT CStunSocketThread::WaitForStopAndClose()
 {
-    void* pRetValFromThread = NULL;
+    void* pRetValFromThread = nullptr;
 
     if (_fThreadIsValid)
     {
@@ -217,7 +217,7 @@ HRESULT CStunSocketThread::WaitForStopAndClose()
 void* CStunSocketThread::ThreadFunction(void* pThis)
 {
     ((CStunSocketThread*)pThis)->Run();
-    return NULL;
+    return nullptr;
 }
 
 // returns an index into _socks, not _arrSockets
@@ -226,7 +226,7 @@ CStunSocket* CStunSocketThread::WaitForSocketData()
     fd_set set = {};
     int nHighestSockValue = 0;
     int ret;
-    CStunSocket* pReadySocket = NULL;
+    CStunSocket* pReadySocket = nullptr;
     UNREFERENCED_VARIABLE(ret); // only referenced in ASSERT
     size_t nSocketCount = _socks.size();
     
@@ -239,7 +239,7 @@ CStunSocket* CStunSocketThread::WaitForSocketData()
 
     for (size_t index = 0; index < nSocketCount; index++)
     {
-        ASSERT(_socks[index] != NULL);
+        ASSERT(_socks[index] != nullptr);
         int sock = _socks[index]->GetSocketHandle();
         ASSERT(sock != -1);
         FD_SET(sock, &set);
@@ -247,7 +247,7 @@ CStunSocket* CStunSocketThread::WaitForSocketData()
     }
 
     // wait indefinitely for a socket
-    ret = ::select(nHighestSockValue+1, &set, NULL, NULL, NULL);
+    ret = ::select(nHighestSockValue+1, &set, nullptr, nullptr, nullptr);
     
     ASSERT(ret > 0); // This will be a benign assert, and should never happen.  But I will want to know if it does
 
@@ -266,7 +266,7 @@ CStunSocket* CStunSocketThread::WaitForSocketData()
         }
     }
     
-    ASSERT(pReadySocket != NULL);
+    ASSERT(pReadySocket != nullptr);
     
     return pReadySocket;
 }
@@ -306,16 +306,16 @@ void CStunSocketThread::Run()
                 break;
             }
 
-            ASSERT(pSocket != NULL);
+            ASSERT(pSocket != nullptr);
             
-            if (pSocket == NULL)
+            if (pSocket == nullptr)
             {
                 // just go back to waiting;
                 continue;
             }
         }
         
-        ASSERT(pSocket != NULL);
+        ASSERT(pSocket != nullptr);
 
         // now receive the data
         _spBufferIn->SetSize(0);
@@ -342,7 +342,7 @@ void CStunSocketThread::Run()
         
         Logging::LogMsg(LL_VERBOSE, "recvfrom returns %d from %s on local interface %s on thread %lu", ret, szIPRemote, szIPLocal, (unsigned long)threadid);
 
-        allowed_to_pass = (_spLimiter.get() != NULL) ? _spLimiter->RateCheck(_msgIn.addrRemote) : true;
+        allowed_to_pass = (_spLimiter.get() != nullptr) ? _spLimiter->RateCheck(_msgIn.addrRemote) : true;
         
         if (allowed_to_pass == false)
         {

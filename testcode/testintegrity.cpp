@@ -31,13 +31,13 @@ HRESULT CTestIntegrity::TestMessageIntegrity(bool fWithFingerprint, bool fLongCr
     
     CStunMessageBuilder builder;
     CStunMessageReader reader;
-    uint8_t *pMsg = NULL;
+    uint8_t *pMsg = nullptr;
     size_t sizeMsg = 0;
     CStunMessageReader::ReaderParseState state;
     CRefCountedBuffer spBuffer;
     
     builder.AddBindingRequestHeader();
-    builder.AddRandomTransactionId(NULL);
+    builder.AddRandomTransactionId(nullptr);
     builder.AddUserName(pszUserName);
     builder.AddRealm(pszRealm);
     

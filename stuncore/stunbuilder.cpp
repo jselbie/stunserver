@@ -126,7 +126,7 @@ HRESULT CStunMessageBuilder::AddRandomTransactionId(StunTransactionId* pTransId)
     {
         entropy ^= getpid();
         entropy ^= reinterpret_cast<uintptr_t>(this);
-        entropy ^= time(NULL);
+        entropy ^= time(nullptr);
         entropy ^= AtomicIncrement(&g_sequence_number);
     }
 
@@ -170,7 +170,7 @@ HRESULT CStunMessageBuilder::AddAttribute(uint16_t attribType, const void* data,
     HRESULT hr = S_OK;
     uint16_t sizeheader = size;
 
-    if (data == NULL)
+    if (data == nullptr)
     {
         size = 0;
     }
@@ -221,7 +221,7 @@ HRESULT CStunMessageBuilder::AddErrorCode(uint16_t errorNumber, const char* pszR
 {
     HRESULT hr = S_OK;
     uint8_t padBytes[4] = {0};
-    size_t strsize = (pszReason==NULL) ? 0 : strlen(pszReason);
+    size_t strsize = (pszReason==nullptr) ? 0 : strlen(pszReason);
     size_t size = strsize + 4;
     size_t sizeheader = size;
     size_t padding = 0;
@@ -277,7 +277,7 @@ HRESULT CStunMessageBuilder::AddUnknownAttributes(const uint16_t* arr, size_t co
     uint16_t unpaddedsize = size;
     bool fPad = false;
     
-    ChkIfA(arr == NULL, E_INVALIDARG);
+    ChkIfA(arr == nullptr, E_INVALIDARG);
     ChkIfA(count <= 0, E_INVALIDARG);
     
     // fix for RFC 3489. Since legacy clients can't understand implicit padding rules
@@ -422,7 +422,7 @@ HRESULT CStunMessageBuilder::AddFingerprintAttribute()
 {
     uint32_t value;
     CRefCountedBuffer spBuffer;
-    uint8_t* pData = NULL;
+    uint8_t* pData = nullptr;
     size_t length = 0;
     int offset;
 
@@ -478,15 +478,15 @@ HRESULT CStunMessageBuilder::AddMessageIntegrityImpl(uint8_t* key, size_t keysiz
     const size_t c_hmacsize = 20;
     uint8_t hmacvaluedummy[c_hmacsize] = {}; // zero-init
     unsigned int resultlength = c_hmacsize;
-    uint8_t* pDstBuf = NULL;
+    uint8_t* pDstBuf = nullptr;
     
     CRefCountedBuffer spBuffer;
-    void* pData = NULL;
+    void* pData = nullptr;
     size_t length = 0;
-    unsigned char* pHashResult = NULL;
+    unsigned char* pHashResult = nullptr;
     UNREFERENCED_VARIABLE(pHashResult);
     
-    ChkIfA(key==NULL || keysize <= 0, E_INVALIDARG);
+    ChkIfA(key==nullptr || keysize <= 0, E_INVALIDARG);
     
     // add in a "zero-init" HMAC value.  This adds 24 bytes to the length
     Chk(AddAttribute(STUN_ATTRIBUTE_MESSAGEINTEGRITY, hmacvaluedummy, ARRAYSIZE(hmacvaluedummy)));
@@ -508,7 +508,7 @@ HRESULT CStunMessageBuilder::AddMessageIntegrityImpl(uint8_t* key, size_t keysiz
 #ifndef __APPLE__
     pHashResult = HMAC(EVP_sha1(), key, keysize, (uint8_t*)pData, length, pDstBuf, &resultlength);
     ASSERT(resultlength == 20);
-    ASSERT(pHashResult != NULL);
+    ASSERT(pHashResult != nullptr);
 #else
     CCHmac(kCCHmacAlgSHA1, key, keysize,(uint8_t*)pData, length, pDstBuf);
     UNREFERENCED_VARIABLE(resultlength);
@@ -530,7 +530,7 @@ HRESULT CStunMessageBuilder::AddMessageIntegrityLongTerm(const char* pszUserName
     uint8_t key[MAX_KEY_SIZE + 1]; // long enough for 64-char strings and two semicolons and a null char for debugging
     
     uint8_t hash[MD5_DIGEST_LENGTH] = {};
-    uint8_t* pResult = NULL;
+    uint8_t* pResult = nullptr;
     uint8_t* pDst = key;
     
     size_t lenUserName = pszUserName ? strlen(pszUserName) : 0;
@@ -575,7 +575,7 @@ HRESULT CStunMessageBuilder::AddMessageIntegrityLongTerm(const char* pszUserName
     pResult = CC_MD5(key, lenTotal, hash);
 #endif
     
-    ASSERT(pResult != NULL);
+    ASSERT(pResult != nullptr);
     hr= AddMessageIntegrityImpl(hash, MD5_DIGEST_LENGTH);
     
 Cleanup:

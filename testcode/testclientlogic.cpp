@@ -328,7 +328,7 @@ HRESULT CTestClientLogic::TestBehaviorAndFiltering(bool fBehaviorTest, NatBehavi
         stunmsgOut.spBufferOut = spMsgResponse;
         spMsgResponse->SetSize(0);
         
-        ChkA(::CStunRequestHandler::ProcessRequest(stunmsgIn, stunmsgOut, &_tsa, NULL));
+        ChkA(::CStunRequestHandler::ProcessRequest(stunmsgIn, stunmsgOut, &_tsa, nullptr));
         
         // simulate the message coming back
         

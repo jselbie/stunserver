@@ -26,8 +26,8 @@
 
 CStunClientTestBase::CStunClientTestBase() :
 _fInit(false),
-_pConfig(NULL),
-_pResults(NULL),
+_pConfig(nullptr),
+_pResults(nullptr),
 _fCompleted(false),
 _transid() // zero-init
 {
@@ -38,8 +38,8 @@ HRESULT CStunClientTestBase::Init(StunClientLogicConfig* pConfig, StunClientResu
 {
     HRESULT hr = S_OK;
 
-    ChkIfA(pConfig == NULL, E_INVALIDARG);
-    ChkIfA(pResults == NULL, E_INVALIDARG);
+    ChkIfA(pConfig == nullptr, E_INVALIDARG);
+    ChkIfA(pResults == nullptr, E_INVALIDARG);
 
     _fInit = true;
     _pConfig = pConfig;

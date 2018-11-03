@@ -34,13 +34,13 @@ static HRESULT LookupPassword(bool fWithRealm, const char* pszUserName, const ch
     
     if (fWithRealm)
     {
-        if ((pszRealm == NULL) || (strcmp(pszRealm, c_szRealm)))
+        if ((pszRealm == nullptr) || (strcmp(pszRealm, c_szRealm)))
         {
             return E_FAIL;
         }
     }
     
-    if (pszUserName == NULL)
+    if (pszUserName == nullptr)
     {
         return E_FAIL;
     }
@@ -81,7 +81,7 @@ HRESULT CShortTermAuth::DoAuthCheck(AuthAttributes* pAuthAttributes, AuthRespons
         return S_OK;
     }
     
-    if (SUCCEEDED(LookupPassword(false, pAuthAttributes->szUser, NULL, pResponse->szPassword)))
+    if (SUCCEEDED(LookupPassword(false, pAuthAttributes->szUser, nullptr, pResponse->szPassword)))
     {
         // Returning "AllowConditional" indicates that the request can be accepted if and only if the
         // message integrity attribute can be validated with the value placed into pResponse->szPassword
@@ -160,7 +160,7 @@ HRESULT CLongTermAuth::CreateNonce(char *pszNonce)
     
     // If you use this code, make sure you change the value of c_szPrivateKey!
     
-    time_t thetime = time(NULL);
+    time_t thetime = time(nullptr);
     uint8_t hmacresult[20] = {};
     char szHMAC[20*2+1];
     char szTime[sizeof(time_t)*4];
@@ -180,12 +180,12 @@ HRESULT CLongTermAuth::CreateNonce(char *pszNonce)
 
 HRESULT CLongTermAuth::ValidateNonce(char* pszNonce)
 {
-    time_t thecurrenttime = time(NULL);
+    time_t thecurrenttime = time(nullptr);
     time_t thetime;
     uint8_t hmacresult[20] = {};
     char szHMAC[20*2+1];
     char szNonce[100];
-    char *pRightHalf = NULL;
+    char *pRightHalf = nullptr;
     time_t diff;
     unsigned int len = ARRAYSIZE(hmacresult);
     
@@ -194,7 +194,7 @@ HRESULT CLongTermAuth::ValidateNonce(char* pszNonce)
     
     pRightHalf = strstr(szNonce, ":");
     
-    if (pRightHalf == NULL)
+    if (pRightHalf == nullptr)
     {
         return E_FAIL;
     }

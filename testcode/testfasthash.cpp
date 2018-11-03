@@ -38,7 +38,7 @@ HRESULT CTestFastHash::AddOne(int val)
     Item item;
     item.key = val;
     int ret;
-    Item* pValue = NULL;
+    Item* pValue = nullptr;
 
     ret = _hashtable.Insert(val, item);
     ChkIf(ret < 0, E_FAIL);
@@ -46,7 +46,7 @@ HRESULT CTestFastHash::AddOne(int val)
     ChkIf(_hashtable.Exists(val)==false, E_FAIL);
     
     pValue = _hashtable.Lookup(val);
-    ChkIf(pValue == NULL, E_FAIL);
+    ChkIf(pValue == nullptr, E_FAIL);
     ChkIf(pValue->key != val, E_FAIL);
     
     
@@ -65,7 +65,7 @@ HRESULT CTestFastHash::RemoveOne(int val)
     
     ChkIf(_hashtable.Exists(val), E_FAIL);
     
-    ChkIf(_hashtable.Lookup(val) != NULL, E_FAIL);
+    ChkIf(_hashtable.Lookup(val) != nullptr, E_FAIL);
     
 Cleanup:
     return hr;
@@ -105,12 +105,12 @@ HRESULT CTestFastHash::ValidateRangeInSet(int first, int last)
     
     for (int x = first; x <= last; x++)   
     {
-        Item* pValue = NULL;
+        Item* pValue = nullptr;
         
         ChkIf(_hashtable.Exists(x)==false, E_FAIL);
         
         pValue = _hashtable.Lookup(x);
-        ChkIf(pValue == NULL, E_FAIL);
+        ChkIf(pValue == nullptr, E_FAIL);
         ChkIf(pValue->key != x, E_FAIL);
     }
     
@@ -124,7 +124,7 @@ HRESULT CTestFastHash::ValidateRangeNotInSet(int first, int last)
     
     for (int x = first; x <= last; x++)   
     {
-        ChkIf(_hashtable.Lookup(x) != NULL, E_FAIL);
+        ChkIf(_hashtable.Lookup(x) != nullptr, E_FAIL);
         ChkIf(_hashtable.Exists(x), E_FAIL);
     }
     
@@ -145,7 +145,7 @@ HRESULT CTestFastHash::ValidateRangeInIndex(int first, int last)
     {
         Item* pItem = _hashtable.LookupValueByIndex(x);
         
-        if (pItem == NULL)
+        if (pItem == nullptr)
         {
             continue;
         }

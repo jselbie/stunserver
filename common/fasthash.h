@@ -96,10 +96,10 @@ protected:
     
     
     
-    ItemNode* Find(const K& key, size_t* pHashIndex=NULL, ItemNode** ppPrev=NULL)
+    ItemNode* Find(const K& key, size_t* pHashIndex=nullptr, ItemNode** ppPrev=nullptr)
     {
         size_t hashindex = ((size_t)(FastHash_Hash(key))) % _tsize;
-        ItemNode* pPrev = NULL;
+        ItemNode* pPrev = nullptr;
         ItemNode* pProbe = _lookuptable[hashindex];
         while (pProbe)
         {
@@ -129,7 +129,7 @@ protected:
     {
         int index = 0;
         
-        if ((_indexlist == NULL) || (_size == 0))
+        if ((_indexlist == nullptr) || (_size == 0))
         {
             return;
         }
@@ -171,7 +171,7 @@ protected:
         // if size is 0, then that's an error
         // if there is no indexlist, then just bail
         if ( (_size == 0) ||
-             (_indexlist == NULL) ||
+             (_indexlist == nullptr) ||
              ((_size > 1) && (_fIndexValid==false)))
         {
             return;
@@ -209,7 +209,7 @@ public:
     
     FastHashBase()
     {
-        Init(0, 0, NULL, NULL, NULL, NULL);
+        Init(0, 0, nullptr, nullptr, nullptr, nullptr);
     }
     
     
@@ -226,10 +226,10 @@ public:
         
         _nodes = nodelist;
         _itemnodes = itemnodelist;
-        _freelist = NULL;
+        _freelist = nullptr;
         _lookuptable = table;
         _indexlist = indexlist;
-        _fIndexValid = (_indexlist != NULL);
+        _fIndexValid = (_indexlist != nullptr);
         _indexStart = 0;
         
         Reset();
@@ -238,12 +238,12 @@ public:
     
     void Reset()
     {
-        if (_lookuptable != NULL)
+        if (_lookuptable != nullptr)
         {
             memset(_lookuptable, '\0', sizeof(ItemNodePtr)*_tsize);
         }
         
-        if ((_fsize > 0) && (_itemnodes != NULL))
+        if ((_fsize > 0) && (_itemnodes != nullptr))
         {
             for (size_t x = 0; x < _fsize; x++)
             {
@@ -251,19 +251,19 @@ public:
                 _itemnodes[x].index = x;
             }
         
-            _itemnodes[_fsize-1].pNext = NULL;
+            _itemnodes[_fsize-1].pNext = nullptr;
         }
         
         _freelist = _itemnodes;
         _size = 0;
         
-        _fIndexValid = (_indexlist != NULL); // index is valid when we are empty
+        _fIndexValid = (_indexlist != nullptr); // index is valid when we are empty
         _indexStart = 0;
     }
     
     bool IsValid()
     {
-        return ((_tsize > 0) && (_fsize > 0) && (_itemnodes != NULL) && (_lookuptable != NULL) && (_nodes != NULL));
+        return ((_tsize > 0) && (_fsize > 0) && (_itemnodes != nullptr) && (_lookuptable != nullptr) && (_nodes != nullptr));
     }
     
     size_t Size()
@@ -284,11 +284,11 @@ public:
     int Insert(const K& key, V& value)
     {
         size_t hashindex = FastHash_Hash(key) % _tsize;
-        ItemNode* pInsert = NULL;
+        ItemNode* pInsert = nullptr;
         ItemNode* pHead = _lookuptable[hashindex];
-        Item* pItem = NULL;
+        Item* pItem = nullptr;
         
-        if (_freelist == NULL)
+        if (_freelist == nullptr)
         {
             return -1;
         }
@@ -317,18 +317,18 @@ public:
     {
         size_t hashindex;
         
-        ItemNode* pPrev = NULL;
+        ItemNode* pPrev = nullptr;
         ItemNode* pNode = Find(key, &hashindex, &pPrev);
-        ItemNode* pNext = NULL;
+        ItemNode* pNext = nullptr;
         
-        if (pNode == NULL)
+        if (pNode == nullptr)
         {
             return -1;
         }
         
         pNext = pNode->pNext;
         
-        if (pPrev == NULL)
+        if (pPrev == nullptr)
         {
             _lookuptable[hashindex] = pNext;
         }
@@ -350,7 +350,7 @@ public:
     
     V* Lookup(const K& key)
     {
-        V* pValue = NULL;
+        V* pValue = nullptr;
         ItemNode* pNode = Find(key);
         if (pNode)
         {
@@ -362,7 +362,7 @@ public:
     
     bool Exists(const K& key)
     {
-        return (Find(key) != NULL);
+        return (Find(key) != nullptr);
     }
     
     Item* LookupByIndex(size_t index)
@@ -370,9 +370,9 @@ public:
         int itemindex;
         int indexadjusted;
         
-        if ((index >= _size) || (_indexlist == NULL))
+        if ((index >= _size) || (_indexlist == nullptr))
         {
-            return NULL;
+            return nullptr;
         }
         
         if (_fIndexValid == false)
@@ -380,7 +380,7 @@ public:
             ReIndex();
             if (_fIndexValid == false)
             {
-                return NULL;
+                return nullptr;
             }
         }
         
@@ -392,7 +392,7 @@ public:
     V* LookupValueByIndex(size_t index)
     {
         Item* pItem = LookupByIndex(index);
-        return pItem ? &pItem->value : NULL;
+        return pItem ? &pItem->value : nullptr;
     }
     
 };
@@ -447,18 +447,18 @@ protected:
 public:
     
     FastHashDynamic() :
-    _nodesarray(NULL),
-    _itemnodesarray(NULL),
-    _lookuptablearray(NULL),
-    _indexarray(NULL)
+    _nodesarray(nullptr),
+    _itemnodesarray(nullptr),
+    _lookuptablearray(nullptr),
+    _indexarray(nullptr)
     {
     }
     
     FastHashDynamic(size_t fsize, size_t tsize) :
-    _nodesarray(NULL),
-    _itemnodesarray(NULL),
-    _lookuptablearray(NULL),
-    _indexarray(NULL)
+    _nodesarray(nullptr),
+    _itemnodesarray(nullptr),
+    _lookuptablearray(nullptr),
+    _indexarray(nullptr)
     {
         InitTable(fsize, tsize);
     }
@@ -488,7 +488,7 @@ public:
         _lookuptablearray = new ItemNodePtr[tsize];
         _indexarray = new int[fsize];
         
-        if ((_nodesarray == NULL) || (_itemnodesarray == NULL) || (_lookuptablearray == NULL) || (_indexarray==NULL))
+        if ((_nodesarray == nullptr) || (_itemnodesarray == nullptr) || (_lookuptablearray == nullptr) || (_indexarray==nullptr))
         {
             ResetTable();
             return -1;
@@ -501,18 +501,18 @@ public:
     void ResetTable()
     {
         delete [] _nodesarray;
-        _nodesarray = NULL;
+        _nodesarray = nullptr;
         
         delete [] _itemnodesarray;
-        _itemnodesarray = NULL;
+        _itemnodesarray = nullptr;
         
         delete [] _lookuptablearray;
-        _lookuptablearray = NULL;
+        _lookuptablearray = nullptr;
         
         delete [] _indexarray;
-        _indexarray = NULL;
+        _indexarray = nullptr;
         
-        this->Init(0,0, NULL, NULL, NULL, NULL);
+        this->Init(0,0, nullptr, nullptr, nullptr, nullptr);
     }
     
     

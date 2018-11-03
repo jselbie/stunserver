@@ -22,7 +22,7 @@
 
 
 CDataStream::CDataStream() :
-_pBuffer(NULL),
+_pBuffer(nullptr),
 _pos(0),
 _fNoGrow(false)
 {
@@ -47,7 +47,7 @@ HRESULT CDataStream::SetSizeHint(size_t size)
 void CDataStream::Reset()
 {
     _spBuffer.reset();
-    _pBuffer = NULL;
+    _pBuffer = nullptr;
     _pos = 0;
     _fNoGrow = false;
 }
@@ -142,7 +142,7 @@ HRESULT CDataStream::Write(const void* data, size_t size)
     size_t currentSize = GetSize();
     HRESULT hr = S_OK;
 
-    if ((size == 0) || (data == NULL))
+    if ((size == 0) || (data == nullptr))
     {
         return E_FAIL;
     }
@@ -227,10 +227,10 @@ HRESULT CDataStream::GetBuffer(CRefCountedBuffer* pBuffer)
     return hr;
 }
 
-// unsafe because the pointer is not guaranteed to be valid after subsequent writes.  Could also be NULL if nothing has been written
+// unsafe because the pointer is not guaranteed to be valid after subsequent writes.  Could also be nullptr if nothing has been written
 uint8_t* CDataStream::GetDataPointerUnsafe()
 {
-    uint8_t* pRet = NULL;
+    uint8_t* pRet = nullptr;
 
     if (_pBuffer)
     {

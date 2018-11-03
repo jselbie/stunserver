@@ -110,8 +110,8 @@ HRESULT CreateConfigFromCommandLine(ClientCmdLineArgs& args, StunClientLogicConf
     socketconfig.socktype = SOCK_DGRAM;
     socketconfig.addrLocal = CSocketAddress(0, 0);
 
-    ChkIfA(pConfig == NULL, E_INVALIDARG);
-    ChkIfA(pSocketConfig==NULL, E_INVALIDARG);
+    ChkIfA(pConfig == nullptr, E_INVALIDARG);
+    ChkIfA(pSocketConfig==nullptr, E_INVALIDARG);
 
 
     // family (protocol type) ------------------------------------
@@ -341,7 +341,7 @@ void TcpClientLoop(StunClientLogicConfig& config, ClientSocketConfig& socketconf
     int ret;
     size_t bytes_sent, bytes_recv;
     size_t bytes_to_send, max_bytes_recv, remaining;
-    uint8_t* pData=NULL;
+    uint8_t* pData=nullptr;
     size_t readsize;
     CStunMessageReader reader;
     StunClientResults results;
@@ -568,7 +568,7 @@ HRESULT UdpClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& s
         tv.tv_usec = 500000; // half-second
         tv.tv_sec = config.timeoutSeconds;
 
-        ret = select(sock+1, &set, NULL, NULL, &tv);
+        ret = select(sock+1, &set, nullptr, nullptr, &tv);
         if (ret > 0)
         {
             ret = ::recvfromex(sock, spMsg->GetData(), spMsg->GetAllocatedSize(), MSG_DONTWAIT, &addrRemote, &addrLocal);

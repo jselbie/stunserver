@@ -3,7 +3,7 @@
 #include "stunconnection.h"
 
 CConnectionPool::CConnectionPool() :
-_freelist(NULL)
+_freelist(nullptr)
 {
     
 }
@@ -30,10 +30,10 @@ HRESULT CConnectionPool::Grow()
     
     for (size_t i = 0; i < c_growrate; i++)
     {
-        StunConnection* pConn = NULL;
+        StunConnection* pConn = nullptr;
         pConn = new StunConnection();
         
-        if (pConn == NULL)
+        if (pConn == nullptr)
         {
             return E_OUTOFMEMORY;
         }
@@ -41,7 +41,7 @@ HRESULT CConnectionPool::Grow()
         pConn->_spOutputBuffer = CRefCountedBuffer(new CBuffer(MAX_STUN_MESSAGE_SIZE));
         pConn->_spReaderBuffer = CRefCountedBuffer(new CBuffer(MAX_STUN_MESSAGE_SIZE));
         
-        if ((pConn->_spOutputBuffer == NULL) || (pConn->_spReaderBuffer == NULL))
+        if ((pConn->_spOutputBuffer == nullptr) || (pConn->_spReaderBuffer == nullptr))
         {
             delete pConn;
             return E_OUTOFMEMORY;
@@ -56,20 +56,20 @@ HRESULT CConnectionPool::Grow()
 
 StunConnection* CConnectionPool::GetConnection(int sock, SocketRole role)
 {
-    StunConnection* pConn = NULL;
+    StunConnection* pConn = nullptr;
     
-    if (_freelist == NULL)
+    if (_freelist == nullptr)
     {
         Grow();
-        if (_freelist == NULL)
+        if (_freelist == nullptr)
         {
-            return NULL; // out of memory ?
+            return nullptr; // out of memory ?
         }
     }
     
     pConn = _freelist;
     _freelist = pConn->pNext;
-    pConn->pNext = NULL;
+    pConn->pNext = nullptr;
     
     // prep this connection for usage
     pConn->_reader.Reset();
@@ -78,7 +78,7 @@ StunConnection* CConnectionPool::GetConnection(int sock, SocketRole role)
     pConn->_stunsocket.Attach(sock);
     pConn->_stunsocket.SetRole(role);
     pConn->_txCount = 0;
-    pConn->_timeStart = time(NULL);
+    pConn->_timeStart = time(nullptr);
     pConn->_idHashTable = -1;    
     
     return pConn;

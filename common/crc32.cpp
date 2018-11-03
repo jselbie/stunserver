@@ -69,7 +69,7 @@ static const uint32_t crc_table[256] = {
 /* ========================================================================= */
 uint32_t crc32(uint32_t crc, uint8_t* buf, size_t len)
 {
-    if (buf == NULL) return 0L;
+    if (buf == nullptr) return 0L;
     crc = crc ^ 0xffffffffL;
     while (len >= 8)
     {

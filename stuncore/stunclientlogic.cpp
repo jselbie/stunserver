@@ -140,12 +140,12 @@ HRESULT CStunClientLogic::GetNextMessage(CRefCountedBuffer& spMsg, CSocketAddres
 {
     HRESULT hr = S_OK;
     uint32_t diff = 0;
-    IStunClientTest* pCurrentTest = NULL;
+    IStunClientTest* pCurrentTest = nullptr;
     bool fReadyToReturn = false;
 
     ChkIfA(_fInitialized == false, E_FAIL);
     ChkIfA(spMsg->GetAllocatedSize() == 0, E_INVALIDARG);
-    ChkIfA(pAddrDest == NULL, E_INVALIDARG);
+    ChkIfA(pAddrDest == nullptr, E_INVALIDARG);
 
     // clients should pass in the expected size
     ChkIfA(spMsg->GetAllocatedSize() < MAX_STUN_MESSAGE_SIZE, E_INVALIDARG);
@@ -219,7 +219,7 @@ Cleanup:
 HRESULT CStunClientLogic::ProcessResponse(CRefCountedBuffer& spMsg, CSocketAddress& addrRemote, CSocketAddress& addrLocal)
 {
     HRESULT hr = S_OK;
-    IStunClientTest* pCurrentTest = NULL;
+    IStunClientTest* pCurrentTest = nullptr;
 
     ChkIfA(_fInitialized == false, E_FAIL);
     ChkIfA(spMsg->GetSize() == 0, E_INVALIDARG);
@@ -241,7 +241,7 @@ Cleanup:
 HRESULT CStunClientLogic::GetResults(StunClientResults* pResults)
 {
     HRESULT hr=S_OK;
-    ChkIfA(pResults == NULL, E_INVALIDARG);
+    ChkIfA(pResults == nullptr, E_INVALIDARG);
     *pResults = _results;
 Cleanup:
     return hr;

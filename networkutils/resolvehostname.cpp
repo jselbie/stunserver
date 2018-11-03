@@ -26,7 +26,7 @@ HRESULT ResolveHostName(const char* pszHostName, int family, bool fNumericOnly, 
 
     int ret;
     HRESULT hr = S_OK;
-    addrinfo* pResultList = NULL;
+    addrinfo* pResultList = nullptr;
     
     addrinfo hints = {};
     
@@ -34,7 +34,7 @@ HRESULT ResolveHostName(const char* pszHostName, int family, bool fNumericOnly, 
     StringHelper::Trim(strHostName);
     
     ChkIf(strHostName.length() == 0, E_INVALIDARG);
-    ChkIf(pAddr==NULL, E_INVALIDARG);
+    ChkIf(pAddr==nullptr, E_INVALIDARG);
     
     hints.ai_family = family;
     if (fNumericOnly)
@@ -45,17 +45,17 @@ HRESULT ResolveHostName(const char* pszHostName, int family, bool fNumericOnly, 
     // without a socktype hint, getaddrinfo will return 3x the number of addresses (SOCK_STREAM, SOCK_DGRAM, and SOCK_RAW)
     hints.ai_socktype = SOCK_STREAM;
 
-    ret = getaddrinfo(strHostName.c_str(), NULL, &hints, &pResultList);
+    ret = getaddrinfo(strHostName.c_str(), nullptr, &hints, &pResultList);
     
     ChkIf(ret != 0, ERRNO_TO_HRESULT(ret));
-    ChkIf(pResultList==NULL, E_FAIL)
+    ChkIf(pResultList==nullptr, E_FAIL)
     
     // just pick the first one found
     *pAddr = CSocketAddress(*(pResultList->ai_addr));
     
 Cleanup:
 
-    if (pResultList != NULL) // android will crash if passed NULL
+    if (pResultList != nullptr) // android will crash if passed nullptr
     {
         ::freeaddrinfo(pResultList);
     }

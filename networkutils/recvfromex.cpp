@@ -72,11 +72,11 @@ ssize_t recvfromex(int sockfd, void* buf, size_t len, int flags, CSocketAddress*
 
         if (pDstAddr)
         {
-            struct cmsghdr* pCmsg = NULL;
+            struct cmsghdr* pCmsg = nullptr;
 
             InitSocketAddress(addrRemote.ss_family, pDstAddr);
 
-            for (pCmsg = CMSG_FIRSTHDR(&hdr); pCmsg != NULL; pCmsg = CMSG_NXTHDR(&hdr, pCmsg))
+            for (pCmsg = CMSG_FIRSTHDR(&hdr); pCmsg != nullptr; pCmsg = CMSG_NXTHDR(&hdr, pCmsg))
             {
                 // IPV6 address ----------------------------------------------------------
                 if ((pCmsg->cmsg_level == IPPROTO_IPV6) && (pCmsg->cmsg_type == IPV6_PKTINFO) && CMSG_DATA(pCmsg))

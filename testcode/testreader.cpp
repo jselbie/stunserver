@@ -72,7 +72,7 @@ HRESULT CTestReader::Test1()
     CStunMessageReader::ReaderParseState state;
 
     // reader is expecting at least enough bytes to fill the header
-    ChkIfA(reader.AddBytes(NULL, 0) != CStunMessageReader::HeaderNotRead, E_FAIL);
+    ChkIfA(reader.AddBytes(nullptr, 0) != CStunMessageReader::HeaderNotRead, E_FAIL);
     ChkIfA(reader.HowManyBytesNeeded() != STUN_HEADER_SIZE, E_FAIL);
 
     state = reader.AddBytes(req, requestsize);

@@ -358,7 +358,7 @@ HRESULT CTestPolling::Test2()
                     continue;
                 }
                 
-                ChkA(ConsumeEvent(&fd, NULL));
+                ChkA(ConsumeEvent(&fd, nullptr));
                 
                 if (randresult == 3)
                 {

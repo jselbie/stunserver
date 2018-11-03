@@ -30,7 +30,7 @@ namespace StringHelper
 {
     bool IsNullOrEmpty(const char* psz)
     {
-        return ((psz == NULL) || (psz[0] == '\0'));
+        return ((psz == nullptr) || (psz[0] == '\0'));
     }
 
 
@@ -41,7 +41,7 @@ namespace StringHelper
         std::string str2;
         const int diff = ('a' - 'A');
 
-        if ((psz == NULL) || (length == 0))
+        if ((psz == nullptr) || (length == 0))
         {
             return;
         }
@@ -68,7 +68,7 @@ namespace StringHelper
     {
         const char* psz = str.c_str();
 
-        if (psz == NULL)
+        if (psz == nullptr)
         {
             return;
         }
@@ -108,7 +108,7 @@ namespace StringHelper
     {
         int nVal = 0;
 
-        if (IsNullOrEmpty(psz) || (pnResult==NULL))
+        if (IsNullOrEmpty(psz) || (pnResult==nullptr))
         {
             return -1;
         }
