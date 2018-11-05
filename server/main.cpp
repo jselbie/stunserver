@@ -528,8 +528,8 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
             Logging::LogMsg(LL_ALWAYS, "Error with --threading. required argument must be between 0 - 64");
             Chk(hr);
         }
+        config.nThreadsPerSocket = threadcount;
     }
-    config.nThreadsPerSocket = threadcount;
 
     *pConfigOut = config;
     hr = S_OK;

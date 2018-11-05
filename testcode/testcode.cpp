@@ -27,6 +27,7 @@
 #include "testclientlogic.h"
 #include "testrecvfromex.h"
 #include "testfasthash.h"
+#include "testcrc32.h"
 #include "cmdlineparser.h"
 #include "oshelper.h"
 #include "prettyprint.h"
@@ -71,7 +72,7 @@ void ReaderFuzzTest()
 
 void RunUnitTests()
 {
-    std::vector<IUnitTest*> vecTests;
+    std::vector<std::shared_ptr<IUnitTest>> vecTests;
     
     std::shared_ptr<CTestDataStream> spTestDataStream(new CTestDataStream);
     std::shared_ptr<CTestReader> spTestReader(new CTestReader);
@@ -86,21 +87,22 @@ void RunUnitTests()
     std::shared_ptr<CTestPolling> spTestPolling(new CTestPolling);
     std::shared_ptr<CTestAtomicHelpers> spTestAtomicHelpers(new CTestAtomicHelpers);
     std::shared_ptr<CTestRateLimiter> spTestRateLimiter(new CTestRateLimiter);
+    std::shared_ptr<CTestCRC32> spTestCRC32(new CTestCRC32);
 
-    vecTests.push_back(spTestDataStream.get());
-    vecTests.push_back(spTestReader.get());
-    vecTests.push_back(spTestBuilder.get());
-    vecTests.push_back(spTestIntegrity.get());
-    vecTests.push_back(spTestMessageHandler.get());
-    vecTests.push_back(spTestCmdLineParser.get());
-    vecTests.push_back(spTestClientLogic.get());
-    vecTests.push_back(spTestRecvFromEx4.get());
-    vecTests.push_back(spTestRecvFromEx6.get());
-    vecTests.push_back(spTestFastHash.get());
-    vecTests.push_back(spTestPolling.get());
-    vecTests.push_back(spTestAtomicHelpers.get());
-    vecTests.push_back(spTestRateLimiter.get());
-
+    vecTests.push_back(spTestDataStream);
+    vecTests.push_back(spTestReader);
+    vecTests.push_back(spTestBuilder);
+    vecTests.push_back(spTestIntegrity);
+    vecTests.push_back(spTestMessageHandler);
+    vecTests.push_back(spTestCmdLineParser);
+    vecTests.push_back(spTestClientLogic);
+    vecTests.push_back(spTestRecvFromEx4);
+    vecTests.push_back(spTestRecvFromEx6);
+    vecTests.push_back(spTestFastHash);
+    vecTests.push_back(spTestPolling);
+    vecTests.push_back(spTestAtomicHelpers);
+    vecTests.push_back(spTestRateLimiter);
+    vecTests.push_back(spTestCRC32);
 
     for (size_t index = 0; index < vecTests.size(); index++)
     {
