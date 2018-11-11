@@ -131,21 +131,14 @@ as appropriate:
          
 
 
-class CShortTermAuth :
-    public CBasicRefCount,
-    public CObjectFactory<CShortTermAuth>,
-    public IStunAuth
+class CShortTermAuth : public IStunAuth
 {
 public:
     virtual HRESULT DoAuthCheck(AuthAttributes* pAuthAttributes, AuthResponse* pResponse);
-    ADDREF_AND_RELEASE_IMPL();
 };
 
 
-class CLongTermAuth :
-    public CBasicRefCount,
-    public CObjectFactory<CLongTermAuth>,
-    public IStunAuth
+class CLongTermAuth : public IStunAuth
 {
 private:
     void HmacToString(uint8_t* hmacvalue, char* pszResult);
@@ -155,7 +148,6 @@ private:
 public:
     
     virtual HRESULT DoAuthCheck(AuthAttributes* pAuthAttributes, AuthResponse* pResponse);
-    ADDREF_AND_RELEASE_IMPL();
 };
 
 
