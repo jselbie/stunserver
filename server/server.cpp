@@ -21,27 +21,22 @@
 #include "stunsocketthread.h"
 #include "server.h"
 #include "ratelimiter.h"
-
+#include "stunsocket.h"
 
 
 CStunServerConfig::CStunServerConfig() :
-fHasPP(false),
-fHasPA(false),
-fHasAP(false),
-fHasAA(false),
-nThreadsPerSocket(0),
-fTCP(false),
+nThreading(0),
 nMaxConnections(0), // zero means default
 fEnableDosProtection(false),
-fReuseAddr(false)
+fReuseAddr(false),
+fIsFullMode(false),
+fTCP(false)
 {
     ;
 }
 
-
-
 CStunServer::CStunServer() :
-_arrSockets() // zero-init
+_tsa() // zero-init
 {
     ;
 }
@@ -51,44 +46,90 @@ CStunServer::~CStunServer()
     Shutdown();
 }
 
-HRESULT CStunServer::AddSocket(TransportAddressSet* pTSA, SocketRole role, const CSocketAddress& addrListen, const CSocketAddress& addrAdvertise, bool fSetReuseFlag)
+HRESULT CStunServer::CreateSocket(SocketRole role, const CSocketAddress& addr, bool fReuseAddr)
 {
     HRESULT hr = S_OK;
-    
-    ASSERT(IsValidSocketRole(role));
-    
-    Chk(_arrSockets[role].UDPInit(addrListen, role, fSetReuseFlag));
-    ChkA(_arrSockets[role].EnablePktInfoOption(true));
+    auto spSocket = std::make_shared<CStunSocket>();
+    Chk(spSocket->UDPInit(addr, role, fReuseAddr));
+    ChkA(spSocket->EnablePktInfoOption(true)); // todo - why is this not always set inside UDPInit
+    ChkA(spSocket->SetRecvTimeout(10000));
+    _sockets.push_back(spSocket);
+Cleanup:
+    return hr;
+}
 
+HRESULT CStunServer::InitializeTSA(const CStunServerConfig& config)
+{
+    _tsa = {};
 
-#ifdef DEBUG
+    CSocketAddress addr[4] = {config.addrPP, config.addrPA, config.addrAP, config.addrAA};
+    CSocketAddress advertised[4] = {config.addrPrimaryAdvertised, config.addrPrimaryAdvertised, config.addrAlternateAdvertised, config.addrAlternateAdvertised};
+    bool validity[4] = {true, config.fIsFullMode, config.fIsFullMode, config.fIsFullMode};
+
+    static_assert(RolePP == (SocketRole)0);
+    static_assert(RolePA == (SocketRole)1);
+    static_assert(RoleAP == (SocketRole)2);
+    static_assert(RoleAA == (SocketRole)3);
+
+    for (size_t i = 0; i < 4; i++)
     {
-        CSocketAddress addrLocal = _arrSockets[role].GetLocalAddress();
-
-        // addrListen is the address we asked the socket to listen on via a call to bind()
-        // addrLocal is the socket address returned by getsockname after the socket is binded
-
-        // I can't think of any case where addrListen != addrLocal
-        // the ports will be different if addrListen.GetPort() is 0, but that
-        // should never happen.
-        
-        // but if the assert below fails, I want to know about it
-        ASSERT(addrLocal.IsSameIP_and_Port(addrListen));
+        if (validity[i])
+        {   
+            _tsa.set[i].fValid = true;
+            if (advertised[i].IsIPAddressZero() == false)
+            {
+                // set the TSA for this socket to what the configuration wants us to advertise this address for in ORIGIN and OTHER address attributes
+                _tsa.set[i].addr = advertised[i];
+                _tsa.set[i].addr.SetPort(addr[i].GetPort());
+            }
+            else
+            {
+                // use the socket's IP and port (OK if this is INADDR_ANY)
+                // the message handler code will use the local ip for ORIGIN
+                _tsa.set[i].addr = _sockets[i]->GetLocalAddress();
+            }
+        }
     }
-#endif
+    return S_OK;
+}
 
-    pTSA->set[role].fValid = true;    
-    if (addrAdvertise.IsIPAddressZero() == false)
+HRESULT CStunServer::CreateSockets(const CStunServerConfig& config)
+{
+    // four possible config types:
+    //   1. basic mode with 1 thread and 1 socket
+    //   2. basic mode with N threads and N sockets
+    //   3. full mode with 1 thread and 4 sockets
+    //   4. full mode with 4N threads and 4N sockets
+
+    // 1 and 2 are equivalent, so when we are in basic mode, just assume config.nThreading == 0 is the the same as config.nThreading == 1
+    // So really, only three configs: basic, full single threaded, and full multi-threaded
+
+    HRESULT hr = S_OK;
+    uint32_t numberOfThreads = (config.nThreading == 0) ? 1 : config.nThreading;
+    bool fReuseAddr = config.fReuseAddr || config.nThreading > 0; // allow SO_REUSEPORT to be set, even if threading was explicitly set to 1
+
+    ASSERT(_sockets.size() == 0);
+    _sockets.clear();
+
+    if (config.fIsFullMode == false)
     {
-        // set the TSA for this socket to what the configuration wants us to advertise this address for in ORIGIN and OTHER address attributes
-        pTSA->set[role].addr = addrAdvertise;
-        pTSA->set[role].addr.SetPort(addrListen.GetPort()); // use the original port
+        for (size_t i = 0; i < numberOfThreads; i++)
+        {
+            Chk(CreateSocket(RolePP, config.addrPP, fReuseAddr));
+        }
     }
     else
     {
-        pTSA->set[role].addr = addrListen; // use the socket's IP and port (OK if this is INADDR_ANY)
+        // in full mode, we create 4 * numberOfThreads sockets
+        for (size_t i = 0; i < numberOfThreads; i++)
+        {
+            Chk(CreateSocket(RolePP, config.addrPP, fReuseAddr));
+            Chk(CreateSocket(RolePA, config.addrPA, fReuseAddr));
+            Chk(CreateSocket(RoleAP, config.addrAP, fReuseAddr));
+            Chk(CreateSocket(RoleAA, config.addrAA, fReuseAddr));
+        }
     }
-    
+
 Cleanup:
     return hr;
 }
@@ -96,10 +137,9 @@ Cleanup:
 HRESULT CStunServer::Initialize(const CStunServerConfig& config)
 {
     HRESULT hr = S_OK;
-    int socketcount = 0;
-    std::shared_ptr<IStunAuth> _spAuth;
-    TransportAddressSet tsa = {};
     std::shared_ptr<RateLimiter> spLimiter;
+    size_t numberOfThreads = 1;
+    _spAuth = nullptr;
 
     // cleanup any thing that's going on now
     Shutdown();
@@ -107,75 +147,71 @@ HRESULT CStunServer::Initialize(const CStunServerConfig& config)
     // optional code: create an authentication provider and initialize it here (if you want authentication)
     // set the _spAuth member to reference it
     // _spAuth = std::make_shared<CYourAuthProvider>();
-    
-    // Create the sockets and initialize the TSA thing
-    if (config.fHasPP)
-    {
-        Chk(AddSocket(&tsa, RolePP, config.addrPP, config.addrPrimaryAdvertised, config.fReuseAddr));
-        socketcount++;
-    }
 
-    if (config.fHasPA)
-    {
-        Chk(AddSocket(&tsa, RolePA, config.addrPA, config.addrPrimaryAdvertised, config.fReuseAddr));
-        socketcount++;
-    }
+    Chk(CreateSockets(config));
+    ChkA(InitializeTSA(config));
 
-    if (config.fHasAP)
-    {
-        Chk(AddSocket(&tsa, RoleAP, config.addrAP, config.addrAlternateAdvertised, config.fReuseAddr));
-        socketcount++;
-    }
+    ChkIfA(_sockets.size() == 0, E_UNEXPECTED);
+    ChkIfA((config.fIsFullMode && _sockets.size() < 4), E_UNEXPECTED);
+    ChkIfA((config.fIsFullMode && _sockets.size() % 4), E_UNEXPECTED);
 
-    if (config.fHasAA)
+    if ((config.fIsFullMode == false) || (config.nThreading > 0))
     {
-        Chk(AddSocket(&tsa, RoleAA, config.addrAA, config.addrAlternateAdvertised, config.fReuseAddr));
-        socketcount++;
+        numberOfThreads = _sockets.size();
     }
-
-    ChkIf(socketcount == 0, E_INVALIDARG);
 
     if (config.fEnableDosProtection)
     {
-        Logging::LogMsg(LL_DEBUG, "Creating rate limiter for ddos protection\n");
         // hard coding to 25000 ip addresses
-        bool fMultiThreaded = (config.nThreadsPerSocket > 0);
+        bool fMultiThreaded = (numberOfThreads > 1);
+        Logging::LogMsg(LL_DEBUG, "Creating rate limiter for ddos protection (%s)\n", fMultiThreaded ? "multi-threaded" : "single-threaded");
         spLimiter = std::shared_ptr<RateLimiter>(new RateLimiter(25000, fMultiThreaded));
     }
 
-    if (config.nThreadsPerSocket <= 0)
-    {
-        Logging::LogMsg(LL_DEBUG, "Configuring single threaded mode\n");
-        
-        // create one thread for all the sockets
-        CStunSocketThread* pThread = new CStunSocketThread();
-        ChkIf(pThread==nullptr, E_OUTOFMEMORY);
+    Logging::LogMsg(LL_DEBUG, "Configuring multi threaded mode with %d sockets on %d threads\n", _sockets.size(), numberOfThreads);
 
-        _threads.push_back(pThread);
-        
-        Chk(pThread->Init(_arrSockets, &tsa, _spAuth, (SocketRole)-1, spLimiter));
-    }
-    else
+    for (size_t i = 0; i < numberOfThreads; i++)
     {
-        Logging::LogMsg(LL_DEBUG, "Configuring multi-threaded mode with %d threads per socket\n", config.nThreadsPerSocket);
+        std::vector<std::shared_ptr<CStunSocket>> arrayOfFourSockets;
+        SocketRole role;
 
-        // N threads for every socket
-        CStunSocketThread* pThread = nullptr;
-        for (size_t index = 0; index < ARRAYSIZE(_arrSockets); index++)
+        if (config.fIsFullMode)
         {
-            if (_arrSockets[index].IsValid())
+            size_t baseindex = (i/4) * 4;
+            arrayOfFourSockets.push_back(_sockets[baseindex + 0]);
+            arrayOfFourSockets.push_back(_sockets[baseindex + 1]);
+            arrayOfFourSockets.push_back(_sockets[baseindex + 2]);
+            arrayOfFourSockets.push_back(_sockets[baseindex + 3]);
+            ASSERT(arrayOfFourSockets[0]->GetRole() == RolePP);
+            ASSERT(arrayOfFourSockets[2]->GetRole() == RolePA);
+            ASSERT(arrayOfFourSockets[3]->GetRole() == RoleAP);
+            ASSERT(arrayOfFourSockets[3]->GetRole() == RoleAA);
+
+            if (config.nThreading == 0)
             {
-                SocketRole rolePrimaryRecv = _arrSockets[index].GetRole();
-                ASSERT(rolePrimaryRecv == (SocketRole)index);
-                for (int t = 0; t < config.nThreadsPerSocket; t++)
-                {
-                    pThread = new CStunSocketThread();
-                    ChkIf(pThread==nullptr, E_OUTOFMEMORY);
-                    _threads.push_back(pThread);
-                    Chk(pThread->Init(_arrSockets, &tsa, _spAuth, rolePrimaryRecv, spLimiter));
-                }
+                role = (SocketRole)-1; // the thread will recognize this as "listen on all four sockets"
+                ASSERT(numberOfThreads == 1);
+            }
+            else
+            {
+                role = (SocketRole)(i % 4);
             }
         }
+        else
+        {
+            arrayOfFourSockets.push_back(_sockets[i]);
+            arrayOfFourSockets.push_back(nullptr);
+            arrayOfFourSockets.push_back(nullptr);
+            arrayOfFourSockets.push_back(nullptr);
+            role = RolePP;
+
+            ASSERT(_sockets[i]->GetRole() == RolePP);
+            ASSERT(_sockets[i]->IsValid());
+        }
+
+        CStunSocketThread* pThread = new CStunSocketThread();
+        _threads.push_back(pThread);
+        Chk(pThread->Init(arrayOfFourSockets, _tsa, _spAuth, role, spLimiter));
     }
 
 
@@ -192,31 +228,27 @@ Cleanup:
 
 HRESULT CStunServer::Shutdown()
 {
-    size_t len;
-
     Stop();
 
-    // release the sockets and the thread
-
-    for (size_t index = 0; index < ARRAYSIZE(_arrSockets); index++)
+    for (auto pThread : _threads)
     {
-        _arrSockets[index].Close();
-    }
-
-    len = _threads.size();
-    for (size_t index = 0; index < len; index++)
-    {
-        CStunSocketThread* pThread = _threads[index];
         delete pThread;
-        _threads[index] = nullptr;
     }
     _threads.clear();
-    
+
+    for (auto spSocket : _sockets)
+    {
+        if (spSocket != nullptr)
+        {
+            spSocket->Close();
+        }
+    }
+    _sockets.clear();
+
     _spAuth.reset();
     
     return S_OK;
 }
-
 
 
 HRESULT CStunServer::Start()
@@ -247,8 +279,6 @@ Cleanup:
 
 HRESULT CStunServer::Stop()
 {
-
-
     size_t len = _threads.size();
 
     for (size_t index = 0; index < len; index++)
@@ -257,37 +287,84 @@ HRESULT CStunServer::Stop()
         if (pThread != nullptr)
         {
             // set the "exit flag" that each thread looks at when it wakes up from waiting
-            pThread->SignalForStop(false);
+            pThread->SignalForStop();
         }
     }
 
+    PostWakeupMessages();
 
     for (size_t index = 0; index < len; index++)
     {
         CStunSocketThread* pThread = _threads[index];
 
-        // Post a bunch of empty buffers to get the threads unblocked from whatever socket call they are on
-        // In multi-threaded mode, this may wake up a different thread.  But that's ok, since all threads start and stop together
         if (pThread != nullptr)
-        {
-            pThread->SignalForStop(true);
-        }
-    }
-
-    for (size_t index = 0; index < len; index++)
-    {
-        CStunSocketThread* pThread = _threads[index];
-
-        if  (pThread != nullptr)
         {
             pThread->WaitForStopAndClose();
         }
     }
 
-
     return S_OK;
 }
 
+void CStunServer::PostWakeupMessages()
+{
+    // This is getting harder to maintain.
+
+    // When all the threads shared the same socket, we just had to invoke sendto once for each thread.
+    // Then each thread would wakeup from its recvfrom call and detect the exit condition.
+
+    // In the new multi-threaded design mode, where each socket has the SO_REUSEPORT option set, the packets
+    // from the same source ip:port get queued into the same listening socket. (And when the socket
+    // closes, there's no requeuing to another listening socket). And there's
+    // some hash table lookup by which the OS maps to each.  So we can't guarantee that sending
+    // N packets will get received by all N threads.
+
+    // Workarounds: 
+    //    1. Use a random port for each send, and loop multiple times
+    //    2. Use a SO_RCVTIMEO on each socket so that they eventually all wake up
+    //    3. Combo of 1 and 2 with a conditional variable
+
+    size_t count = _sockets.size();
 
 
+    for (size_t i = 0; i < count; i++)
+    {
+        CStunSocket sock;
+        CSocketAddress addrLocal;
 
+        if (_sockets[i]->GetLocalAddress().GetFamily() == AF_INET)
+        {
+            addrLocal = CSocketAddress(0,0);
+        }
+        else
+        {
+            sockaddr_in6 addr6 = {};
+            addr6.sin6_family = AF_INET6;
+            addrLocal = CSocketAddress(addr6);
+        }
+
+        // bind socket to port 0 (auto assign), using the same family as the socket we are trying to unblock
+        HRESULT hr = sock.UDPInit(addrLocal, RolePP, false);
+        ASSERT(SUCCEEDED(hr));
+
+        if (SUCCEEDED(hr))
+        {
+            char data = 'x';
+            CSocketAddress addr(_sockets[i]->GetLocalAddress());
+
+            // If no specific adapter was binded to, IP will be 0.0.0.0
+            // Linux evidently treats 0.0.0.0 IP as loopback (and works)
+            // On Windows you can't send to 0.0.0.0. sendto will fail - switch to sending to localhost
+            if (addr.IsIPAddressZero())
+            {
+                CSocketAddress addrLocal;
+                CSocketAddress::GetLocalHost(addr.GetFamily(), &addrLocal);
+                addrLocal.SetPort(addr.GetPort());
+                addr = addrLocal;
+            }
+
+            ::sendto(sock.GetSocketHandle(), &data, 1, 0, addr.GetSockAddr(), addr.GetSockAddrLength());
+        }
+    }
+
+}

@@ -278,7 +278,7 @@ HRESULT CStunSocket::InitCommon(int socktype, const CSocketAddress& addrlocal, S
     int sock = -1;
     int ret;
     HRESULT hr = S_OK;
-    
+
     ASSERT((socktype == SOCK_DGRAM)||(socktype==SOCK_STREAM));
     
     sock = socket(addrlocal.GetFamily(), socktype, 0);
@@ -295,8 +295,17 @@ HRESULT CStunSocket::InitCommon(int socktype, const CSocketAddress& addrlocal, S
     
     if (fSetReuseFlag)
     {
+        int socket_option_reuse = SO_REUSEADDR;
+        // for now, just do SO_REUSEPORT on the UDP thread
+        // There's still some validation and we need to do on the TCP side to decide how to enable threading
+#ifdef SO_REUSEPORT
+        if (socktype == SOCK_DGRAM)
+        {
+            socket_option_reuse = SO_REUSEPORT;
+        }
+#endif        
         int fAllow = 1;
-        ret = ::setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &fAllow, sizeof(fAllow));
+        ret = ::setsockopt(sock, SOL_SOCKET, socket_option_reuse, &fAllow, sizeof(fAllow));
         ChkIf(ret == -1, ERRNOHR);
     }
     
@@ -329,4 +338,19 @@ HRESULT CStunSocket::TCPInit(const CSocketAddress& local, SocketRole role, bool 
     return InitCommon(SOCK_STREAM, local, role, fSetReuseFlag);
 }
 
+HRESULT CStunSocket::SetRecvTimeout(int milliseconds)
+{
+    HRESULT hr = S_OK;
+    timeval tv = {};
+    int result = 0;
+    ChkIfA(_sock == -1, E_UNEXPECTED);
 
+    tv.tv_sec = milliseconds / 1000;
+    tv.tv_usec = (milliseconds % 1000) * 1000;
+
+    result = ::setsockopt(_sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    ChkIf(result == -1, ERRNOHR);
+    hr = S_OK;
+Cleanup:
+    return hr;
+}

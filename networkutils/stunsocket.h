@@ -58,6 +58,8 @@ public:
     
     HRESULT EnablePktInfoOption(bool fEnable);
     HRESULT SetNonBlocking(bool fEnable);
+
+    HRESULT SetRecvTimeout(int milliseconds);
     
     void UpdateAddresses();
     

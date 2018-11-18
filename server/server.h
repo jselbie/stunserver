@@ -14,7 +14,6 @@
    limitations under the License.
 */
 
-
 #ifndef STUN_SERVER_H
 #define	STUN_SERVER_H
 
@@ -23,35 +22,26 @@
 #include "stunauth.h"
 #include "messagehandler.h"
 
-
-
-
 class CStunServerConfig
 {
 public:
+    uint32_t nThreading;  // when set to 0, all sockets on 1 thread. Otherwise, N threads per socket
     
-    bool fHasPP; // PP: Primary ip,   Primary port
-    bool fHasPA; // PA: Primary ip,   Alternate port
-    bool fHasAP; // AP: Alternate ip, Primary port
-    bool fHasAA; // AA: Alternate ip, Alternate port
-
-    int nThreadsPerSocket;  // when set to > 0, each socket gets N threads assigned to it, otherwise, all sockets on 1 thread
-    
-    bool fTCP; // if true, then use TCP instead of UDP
     uint32_t nMaxConnections; // only valid for TCP (on a per-thread basis)
 
     CSocketAddress addrPP; // address for PP
-    CSocketAddress addrPA; // address for PA
-    CSocketAddress addrAP; // address for AP
-    CSocketAddress addrAA; // address for AA
+    CSocketAddress addrPA; // address for PA, ignored if fIsFullMode==false
+    CSocketAddress addrAP; // address for AP, ignored if fIsFullMode==false
+    CSocketAddress addrAA; // address for AA, ignored if fIsFullMode==false
     
     CSocketAddress addrPrimaryAdvertised;    // public-IP for PP and PA (port is ignored)
     CSocketAddress addrAlternateAdvertised;  // public-IP for AP and AA (port is ignored)
     
     bool fEnableDosProtection; // enable denial of service protection
-
     bool fReuseAddr; // if true, the socket option SO_REUSEADDR will be set
-
+    bool fIsFullMode; // indicated that we are listening on PA, AP, and AA addresses above
+    bool fTCP; // if true, then use TCP instead of UDP
+    
     CStunServerConfig();
 };
 
@@ -59,13 +49,17 @@ public:
 class CStunServer 
 {
 private:
-    CStunSocket _arrSockets[4];
-
+    std::vector<std::shared_ptr<CStunSocket>> _sockets;
     std::vector<CStunSocketThread*> _threads;
 
+    TransportAddressSet _tsa;
     std::shared_ptr<IStunAuth> _spAuth;
-    
-    HRESULT AddSocket(TransportAddressSet* pTSA, SocketRole role, const CSocketAddress& addrListen, const CSocketAddress& addrAdvertise, bool fSetReuseFlag);
+
+    HRESULT InitializeTSA(const CStunServerConfig& config);
+    HRESULT CreateSocket(SocketRole role, const CSocketAddress& addr, bool fReuseAddr);
+    HRESULT CreateSockets(const CStunServerConfig& config);
+
+    void PostWakeupMessages();
     
 public:
     CStunServer();
@@ -78,7 +72,4 @@ public:
     HRESULT Stop();
 };
 
-
-
 #endif	/* SERVER_H */
-

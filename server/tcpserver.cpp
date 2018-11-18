@@ -844,15 +844,15 @@ HRESULT CTCPServer::Initialize(const CStunServerConfig& config)
     // tsaHandler is sort of a hack for TCP.  It's really just a glorified indication to the the
     // CStunRequestHandler code to figure out if it can offer a CHANGED-ADDRESS attribute.
     
-    InitTSA(&tsaHandler, RolePP, config.fHasPP, config.addrPP, config.addrPrimaryAdvertised);
-    InitTSA(&tsaHandler, RolePA, config.fHasPA, config.addrPA, config.addrPrimaryAdvertised);
-    InitTSA(&tsaHandler, RoleAP, config.fHasAP, config.addrAP, config.addrAlternateAdvertised);
-    InitTSA(&tsaHandler, RoleAA, config.fHasAA, config.addrAA, config.addrAlternateAdvertised);
+    InitTSA(&tsaHandler, RolePP, true, config.addrPP, config.addrPrimaryAdvertised);
+    InitTSA(&tsaHandler, RolePA, config.fIsFullMode, config.addrPA, config.addrPrimaryAdvertised);
+    InitTSA(&tsaHandler, RoleAP, config.fIsFullMode, config.addrAP, config.addrAlternateAdvertised);
+    InitTSA(&tsaHandler, RoleAA, config.fIsFullMode, config.addrAA, config.addrAlternateAdvertised);
     
-    InitTSA(&tsaListenAll, RolePP, config.fHasPP, config.addrPP, CSocketAddress());
-    InitTSA(&tsaListenAll, RolePA, config.fHasPA, config.addrPA, CSocketAddress());
-    InitTSA(&tsaListenAll, RoleAP, config.fHasAP, config.addrAP, CSocketAddress());
-    InitTSA(&tsaListenAll, RoleAA, config.fHasAA, config.addrAA, CSocketAddress());
+    InitTSA(&tsaListenAll, RolePP, true, config.addrPP, CSocketAddress());
+    InitTSA(&tsaListenAll, RolePA, config.fIsFullMode, config.addrPA, CSocketAddress());
+    InitTSA(&tsaListenAll, RoleAP, config.fIsFullMode, config.addrAP, CSocketAddress());
+    InitTSA(&tsaListenAll, RoleAA, config.fIsFullMode, config.addrAA, CSocketAddress());
     
     if (config.fEnableDosProtection)
     {

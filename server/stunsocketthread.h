@@ -14,8 +14,6 @@
    limitations under the License.
 */
 
-
-
 #ifndef STUNSOCKETTHREAD_H
 #define	STUNSOCKETTHREAD_H
 
@@ -33,13 +31,11 @@ public:
     CStunSocketThread();
     ~CStunSocketThread();
     
-    HRESULT Init(CStunSocket* arrayOfFourSockets, TransportAddressSet* pTSA, std::shared_ptr<IStunAuth> spAuth, SocketRole rolePrimaryRecv, std::shared_ptr<RateLimiter>& _spRateLimiter);
+    HRESULT Init(std::vector<std::shared_ptr<CStunSocket>>& arrayOfFourSockets, const TransportAddressSet& tsa, std::shared_ptr<IStunAuth> spAuth, SocketRole rolePrimaryRecv, std::shared_ptr<RateLimiter>& _spRateLimiter);
     HRESULT Start();
 
-    HRESULT SignalForStop(bool fPostMessages);
+    HRESULT SignalForStop();
     HRESULT WaitForStopAndClose();
-    
-    
     
 private:
     
@@ -50,8 +46,8 @@ private:
     
     CStunSocket* WaitForSocketData();
     
-    CStunSocket* _arrSendSockets;  // matches CStunServer::_arrSockets
-    std::vector<CStunSocket*> _socks; // sockets for receiving on
+    std::vector<std::shared_ptr<CStunSocket>> _arrSendSockets; // 1 socket in basic mode.  4 sockets in full mode
+    std::vector<std::shared_ptr<CStunSocket>> _socks; // 1 socket in multi-threaded or basic mode.  4 sockets in single-threaded full mode
     
     bool _fNeedToExit;
     pthread_t _pthread;
@@ -67,7 +63,7 @@ private:
     CStunMessageReader _reader;
     CRefCountedBuffer _spBufferReader; // buffer internal to the reader
     CRefCountedBuffer _spBufferIn;     // buffer we receive requests on
-    CRefCountedBuffer _spBufferOut;    // buffer we send response on
+    CRefCountedBuffer _spBufferOut;    // buffer we send responses on
     StunMessageIn _msgIn;
     StunMessageOut _msgOut;
     
@@ -79,11 +75,10 @@ private:
     HRESULT ProcessRequestAndSendResponse();
     
     void ClearSocketArray();
+
+    void DumpInitParams(std::vector<std::shared_ptr<CStunSocket>>& arrayOfFourSockets, const TransportAddressSet& tsa, SocketRole rolePrimaryRecv);
     
 };
-
-
-
 
 #endif	/* STUNSOCKETTHREAD_H */
 

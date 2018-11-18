@@ -163,22 +163,20 @@ void DumpConfig(CStunServerConfig &config)
     std::string strSocket;
 
 
-    if (config.fHasPP)
-    {
-        config.addrPP.ToString(&strSocket);
-        Logging::LogMsg(LL_DEBUG, "PP = %s", strSocket.c_str());
-    }
-    if (config.fHasPA)
+    config.addrPP.ToString(&strSocket);
+    Logging::LogMsg(LL_DEBUG, "PP = %s", strSocket.c_str());
+
+    if (config.fIsFullMode)
     {
         config.addrPA.ToString(&strSocket);
         Logging::LogMsg(LL_DEBUG, "PA = %s", strSocket.c_str());
     }
-    if (config.fHasAP)
+    if (config.fIsFullMode)
     {
         config.addrAP.ToString(&strSocket);
         Logging::LogMsg(LL_DEBUG, "AP = %s", strSocket.c_str());
     }
-    if (config.fHasAA)
+    if (config.fIsFullMode)
     {
         config.addrAA.ToString(&strSocket);
         Logging::LogMsg(LL_DEBUG, "AA = %s", strSocket.c_str());
@@ -398,13 +396,13 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
     if (mode == Basic)
     {
         uint16_t port = (uint16_t)((int16_t)nPrimaryPort);
+        config.fIsFullMode = false;
         // in basic mode, if no adapter is specified, bind to all of them
         if (args.strPrimaryInterface.length() == 0)
         {
             if (family == AF_INET)
             {
                 config.addrPP = CSocketAddress(0, port);
-                config.fHasPP = true;
             }
             else if (family == AF_INET6)
             {
@@ -412,7 +410,6 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
                 addr6.sin6_family = AF_INET6;
                 config.addrPP = CSocketAddress(addr6);
                 config.addrPP.SetPort(port);
-                config.fHasPP = true;
             }
         }
         else
@@ -425,7 +422,6 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
                 Chk(hr);
             }
             config.addrPP = addr;
-            config.fHasPP = true;
         }
     }
     else  // Full mode
@@ -466,19 +462,17 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
 
         config.addrPP = addrPrimary;
         config.addrPP.SetPort(portPrimary);
-        config.fHasPP = true;
 
         config.addrPA = addrPrimary;
         config.addrPA.SetPort(portAlternate);
-        config.fHasPA = true;
 
         config.addrAP = addrAlternate;
         config.addrAP.SetPort(portPrimary);
-        config.fHasAP = true;
 
         config.addrAA = addrAlternate;
         config.addrAA.SetPort(portAlternate);
-        config.fHasAA = true;
+
+        config.fIsFullMode = true;
 
     }
 
@@ -501,7 +495,7 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
         if (mode != Full)
         {
             Logging::LogMsg(LL_ALWAYS, "Error. --altadvertised was specified, but --mode param was not set to FULL.");
-            ChkIf(config.fHasAA, E_INVALIDARG);
+            ChkIf(config.fIsFullMode, E_INVALIDARG);
         }
         
         hr = ::NumericIPToAddress(family, pszAltAdvertised, &config.addrAlternateAdvertised);
@@ -528,7 +522,7 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
             Logging::LogMsg(LL_ALWAYS, "Error with --threading. required argument must be between 0 - 64");
             Chk(hr);
         }
-        config.nThreadsPerSocket = threadcount;
+        config.nThreading = threadcount;
     }
 
     *pConfigOut = config;
@@ -858,7 +852,7 @@ int main(int argc, char** argv)
     }
 
 
-    Logging::LogMsg(LL_DEBUG, "Server is exiting");
+    Logging::LogMsg(LL_DEBUG, "Server is exiting. This may take a few seconds to complete.");
     
     
     for (auto itor = udpServers.begin(); itor != udpServers.end(); itor++)

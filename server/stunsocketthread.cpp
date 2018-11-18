@@ -37,56 +37,64 @@ _tsa() // zero-init
 
 CStunSocketThread::~CStunSocketThread()
 {
-    SignalForStop(true);
+    SignalForStop();
     WaitForStopAndClose();
 }
 
 void CStunSocketThread::ClearSocketArray()
 {
-    _arrSendSockets = nullptr;
+    _arrSendSockets.clear();
     _socks.clear();
 }
 
-HRESULT CStunSocketThread::Init(CStunSocket* arrayOfFourSockets, TransportAddressSet* pTSA, std::shared_ptr<IStunAuth> spAuth, SocketRole rolePrimaryRecv, std::shared_ptr<RateLimiter>& spLimiter)
+void CStunSocketThread::DumpInitParams(std::vector<std::shared_ptr<CStunSocket>>& arrayOfFourSockets, const TransportAddressSet& tsa, SocketRole rolePrimaryRecv)
+{
+    Logging::LogMsg(LL_VERBOSE, "CStunSocketThread initialized with:");
+    for (auto spStunSocket : arrayOfFourSockets)
+    {
+        Logging::LogMsg(LL_VERBOSE, "sock handle: %d", (spStunSocket == nullptr) ? -1 : (int)spStunSocket->GetSocketHandle());
+    }
+}
+
+HRESULT CStunSocketThread::Init(std::vector<std::shared_ptr<CStunSocket>>& arrayOfFourSockets, const TransportAddressSet& tsa, std::shared_ptr<IStunAuth> spAuth, SocketRole rolePrimaryRecv, std::shared_ptr<RateLimiter>& spLimiter)
 {
     HRESULT hr = S_OK;
+
+    DumpInitParams(arrayOfFourSockets, tsa, rolePrimaryRecv);
     
+    // if -1 was passed, then we are in "multi socket mode", otherwise, 1 socket to receive on
     bool fSingleSocketRecv = ::IsValidSocketRole(rolePrimaryRecv);
     
     ChkIfA(_fThreadIsValid, E_UNEXPECTED);
 
-    ChkIfA(arrayOfFourSockets == nullptr, E_INVALIDARG);
-    ChkIfA(pTSA == nullptr, E_INVALIDARG);
+    ChkIfA(arrayOfFourSockets.size() == 0, E_INVALIDARG);
     
     // if this thread was configured to listen on a single socket (aka "multi-threaded mode"), then 
     // validate that it exists
     if (fSingleSocketRecv)
     {
-        ChkIfA(arrayOfFourSockets[rolePrimaryRecv].IsValid()==false, E_UNEXPECTED);
+        ChkIfA(arrayOfFourSockets[rolePrimaryRecv] == nullptr, E_UNEXPECTED);
+        ChkIfA(arrayOfFourSockets[rolePrimaryRecv]->IsValid()==false, E_UNEXPECTED);
     }
     
     _arrSendSockets = arrayOfFourSockets;
-    
-    // initialize the TSA thing
-    _tsa = *pTSA;
+    _tsa = tsa;
     
     if (fSingleSocketRecv)
     {
         // only one socket to listen on
-        _socks.push_back(&_arrSendSockets[rolePrimaryRecv]);
+        _socks.push_back(_arrSendSockets[rolePrimaryRecv]);
     }
     else
     {
-        for (size_t i = 0; i < 4; i++)
+        for (auto spSocket : arrayOfFourSockets)
         {
-            if (_arrSendSockets[i].IsValid())
+            if (spSocket != nullptr && spSocket->IsValid())
             {
-                _socks.push_back(&_arrSendSockets[i]);
+                _socks.push_back(spSocket);
             }
         }
     }
-    
-    
 
     Chk(InitThreadBuffers());
 
@@ -151,45 +159,10 @@ Cleanup:
     return hr;
 }
 
-
-
-
-HRESULT CStunSocketThread::SignalForStop(bool fPostMessages)
+HRESULT CStunSocketThread::SignalForStop()
 {
-
     HRESULT hr = S_OK;
-
     _fNeedToExit = true;
-
-    // have the socket send a message to itself
-    // if another thread is sharing the same socket, this may wake that thread up to
-    // but all the threads should be started and shutdown together
-    if (fPostMessages)
-    {
-        for (size_t index = 0; index < _socks.size(); index++)
-        {
-            char data = 'x';
-            
-            ASSERT(_socks[index] != nullptr);
-            
-            CSocketAddress addr(_socks[index]->GetLocalAddress());
-            
-
-            // If no specific adapter was binded to, IP will be 0.0.0.0
-            // Linux evidently treats 0.0.0.0 IP as loopback (and works)
-            // On Windows you can't send to 0.0.0.0. sendto will fail - switch to sending to localhost
-            if (addr.IsIPAddressZero())
-            {
-                CSocketAddress addrLocal;
-                CSocketAddress::GetLocalHost(addr.GetFamily(), &addrLocal);
-                addrLocal.SetPort(addr.GetPort());
-                addr = addrLocal;
-            }
-            
-            ::sendto(_socks[index]->GetSocketHandle(), &data, 1, 0, addr.GetSockAddr(), addr.GetSockAddrLength());
-        }
-    }
-
     return hr;
 }
 
@@ -261,7 +234,7 @@ CStunSocket* CStunSocketThread::WaitForSocketData()
         
         if (FD_ISSET(sock, &set))
         {
-            pReadySocket = _socks[indexconverted];
+            pReadySocket = _socks[indexconverted].get(); // todo - let this method return a shared_ptr
             break;
         }
     }
@@ -277,7 +250,7 @@ void CStunSocketThread::Run()
     size_t nSocketCount = _socks.size();
     bool fMultiSocketMode = (nSocketCount > 1);
     int recvflags = fMultiSocketMode ? MSG_DONTWAIT : 0;
-    CStunSocket* pSocket = _socks[0];
+    CStunSocket* pSocket = _socks[0].get();
     int ret;
     char szIPRemote[100] = {};
     char szIPLocal[100] = {};
@@ -321,14 +294,27 @@ void CStunSocketThread::Run()
         _spBufferIn->SetSize(0);
 
         ret = ::recvfromex(pSocket->GetSocketHandle(), _spBufferIn->GetData(), _spBufferIn->GetAllocatedSize(), recvflags, &_msgIn.addrRemote, &_msgIn.addrLocal);
-
-        // recvfromex no longer sets the port value on the local address
-        if (ret >= 0)
+        if (ret < 0)
         {
-            _msgIn.addrLocal.SetPort(pSocket->GetLocalAddress().GetPort());
+            int err = errno;
+            if ((err == EAGAIN) || (err == EWOULDBLOCK))
+            {
+                Logging::LogMsg(LL_VERBOSE_EXTREME, "recvfromex returned timeout error");
+            }
+            else
+            {
+                Logging::LogMsg(LL_VERBOSE, "recvfromex returned error: %d", err);
+            }
+            continue;
         }
-        
 
+        if (_fNeedToExit)
+        {
+            break;
+        }
+
+        _msgIn.addrLocal.SetPort(pSocket->GetLocalAddress().GetPort());
+       
         if (Logging::GetLogLevel() >= LL_VERBOSE)
         {
             _msgIn.addrRemote.ToStringBuffer(szIPRemote, 100);
@@ -340,28 +326,16 @@ void CStunSocketThread::Run()
             szIPLocal[0] = '\0';
         }
         
-        Logging::LogMsg(LL_VERBOSE, "recvfrom returns %d from %s on local interface %s on thread %lu", ret, szIPRemote, szIPLocal, (unsigned long)threadid);
+        Logging::LogMsg(LL_VERBOSE, "recvfrom returns %d from %s on local interface %s on thread %lu sr=%d", ret, szIPRemote, szIPLocal, (unsigned long)threadid, (int)pSocket->GetRole());
 
         allowed_to_pass = (_spLimiter.get() != nullptr) ? _spLimiter->RateCheck(_msgIn.addrRemote) : true;
-        
         if (allowed_to_pass == false)
         {
-            Logging::LogMsg(LL_VERBOSE, "RateLimiter signals false for packet from %s", szIPRemote);
-        }
-
-        if ((ret < 0) || (allowed_to_pass == false))
-        {
-            // error
-            continue;
-        }
-
-        if (_fNeedToExit)
-        {
-            break;
+           Logging::LogMsg(LL_VERBOSE, "RateLimiter signals false for packet from %s", szIPRemote);
+           continue;
         }
 
         _spBufferIn->SetSize(ret);
-        
         _msgIn.socketrole = pSocket->GetRole();
         
         
@@ -395,8 +369,8 @@ HRESULT CStunSocketThread::ProcessRequestAndSendResponse()
     Chk(CStunRequestHandler::ProcessRequest(_msgIn, _msgOut, &_tsa, _spAuth.get()));
 
     ASSERT(_tsa.set[_msgOut.socketrole].fValid);
-    ASSERT(_arrSendSockets[_msgOut.socketrole].IsValid());
-    sockout = _arrSendSockets[_msgOut.socketrole].GetSocketHandle();
+    ASSERT(_arrSendSockets[_msgOut.socketrole]->IsValid());
+    sockout = _arrSendSockets[_msgOut.socketrole]->GetSocketHandle();
     ASSERT(sockout != -1);
     
     // find the socket that matches the role specified by msgOut
