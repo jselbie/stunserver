@@ -66,10 +66,10 @@ HRESULT CStunServer::InitializeTSA(const CStunServerConfig& config)
     CSocketAddress advertised[4] = {config.addrPrimaryAdvertised, config.addrPrimaryAdvertised, config.addrAlternateAdvertised, config.addrAlternateAdvertised};
     bool validity[4] = {true, config.fIsFullMode, config.fIsFullMode, config.fIsFullMode};
 
-    static_assert(RolePP == (SocketRole)0);
-    static_assert(RolePA == (SocketRole)1);
-    static_assert(RoleAP == (SocketRole)2);
-    static_assert(RoleAA == (SocketRole)3);
+    static_assert(RolePP == (SocketRole)0, "RolePP expected to be 0");
+    static_assert(RolePA == (SocketRole)1, "RolePA expected to be 1");
+    static_assert(RoleAP == (SocketRole)2, "RoleAP expected to be 2");
+    static_assert(RoleAA == (SocketRole)3, "RoleAA expected to be 3");
 
     for (size_t i = 0; i < 4; i++)
     {

@@ -299,7 +299,7 @@ void CStunSocketThread::Run()
             int err = errno;
             if ((err == EAGAIN) || (err == EWOULDBLOCK))
             {
-                Logging::LogMsg(LL_VERBOSE_EXTREME, "recvfromex returned timeout error");
+//                Logging::LogMsg(LL_VERBOSE_EXTREME, "recvfromex returned timeout error");
             }
             else
             {
