@@ -6,7 +6,7 @@ DEFINES := -DNDEBUG
 # CLANG compiler works fine
 # CXX := /usr/bin/clang++
 
-STANDARD_FLAGS := -Wall -Wuninitialized --std=c++11
+STANDARD_FLAGS := -Wall -Wuninitialized -std=c++11
 
 RELEASE_FLAGS := -O2
 DEBUG_FLAGS := -g
