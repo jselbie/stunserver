@@ -8,10 +8,13 @@ DEFINES := -DNDEBUG
 
 # g++ versions less than 6 will default to C++ 98
 ifeq ($(CXX),g++)
-  CPPSTD := $(shell test `g++ --version | grep ^g++ | sed 's/^.* //g' | cut -d '.' -f 1` -ge 6 || echo -std=gnu++11 )
+  lessthansix := $(shell expr `g++ -dumpversion | cut -d '.' -f 1` \< 6 )
+  ifeq ($(lessthansix), 1)
+    CPPSTD := -std=gnu++11
+  endif
 endif
 
-STANDARD_FLAGS := -Wall -Wuninitialized $(CPPSTD)
+STANDARD_FLAGS := -Wall -Wuninitialized 
 
 RELEASE_FLAGS := -O2
 DEBUG_FLAGS := -g
@@ -35,10 +38,10 @@ endif
 
 %.hpp.gch: %.hpp
 	echo Building precompiled header: $@
-	$(COMPILE.cpp) $(INCLUDES) $(DEFINES) $(STANDARD_FLAGS) $(FLAVOR_FLAGS) $^
+	$(COMPILE.cpp) $(CPPSTD) $(INCLUDES) $(DEFINES) $(STANDARD_FLAGS) $(FLAVOR_FLAGS) $^
 
 %.o: %.cpp
-	$(COMPILE.cpp) $(INCLUDES) $(DEFINES) $(STANDARD_FLAGS) $(FLAVOR_FLAGS) $^
+	$(COMPILE.cpp) $(CPPSTD) $(INCLUDES) $(DEFINES) $(STANDARD_FLAGS) $(FLAVOR_FLAGS) $^
 
 # put "all" target first so that it is the default
 all:
