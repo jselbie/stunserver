@@ -6,7 +6,12 @@ DEFINES := -DNDEBUG
 # CLANG compiler works fine
 # CXX := /usr/bin/clang++
 
-STANDARD_FLAGS := -Wall -Wuninitialized -std=c++11
+# g++ versions less than 6 will default to C++ 98
+ifeq ($(CXX),g++)
+  CPPSTD := $(shell test `g++ --version | grep ^g++ | sed 's/^.* //g' | cut -d '.' -f 1` -ge 6 || echo -std=gnu++11 )
+endif
+
+STANDARD_FLAGS := -Wall -Wuninitialized $(CPPSTD)
 
 RELEASE_FLAGS := -O2
 DEBUG_FLAGS := -g
