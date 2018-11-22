@@ -6,13 +6,17 @@ DEFINES := -DNDEBUG
 # CLANG compiler works fine
 # CXX := /usr/bin/clang++
 
-# g++ versions less than 6 will default to C++ 98
-ifeq ($(CXX),g++)
-  lessthansix := $(shell expr `g++ -dumpversion | cut -d '.' -f 1` \< 6 )
-  ifeq ($(lessthansix), 1)
-    CPPSTD := -std=gnu++11
-  endif
-endif
+# C++ 11 compiler is required
+# I'd prefer not to have to set this mode explicitly, but...
+#    g++ version 6 and up will default to at least C++ 14 or higher, and no need to set there
+# However...
+#    g++ versions less than 6  support it, but require -std=c++11 or -gnu++11 passed
+#    With -std=c++11 passed, Cygwin will hide APIs such as getnetworkinfo, so gnu++11 is needed (or other macro)
+#    Even with XCode 10, Mac Clang compiler defaults to C++98
+#    So, short of writing a maybe-portable script that sniffs compiler support...
+#    Explicitly setting gnu++11 is the best (works on Clang too)
+#    Maybe it's time to learn CMAKE or Autoconf
+CPPSTD := -std=gnu++11
 
 STANDARD_FLAGS := -Wall -Wuninitialized 
 
