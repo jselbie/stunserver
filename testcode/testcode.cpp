@@ -136,16 +136,20 @@ void PrettyPrintTest()
     delete [] buffer;
 }
 
+void benchmark_test(int threads);
+
 int main(int argc, char** argv)
 {
     CCmdLineParser cmdline;
     std::string strFuzz;
     std::string strPP;
+    std::string strBench;
     bool fParseError = false;
 
     
     cmdline.AddOption("fuzz", no_argument, &strFuzz);
     cmdline.AddOption("pp", no_argument, &strPP);
+    cmdline.AddOption("bench", optional_argument, &strBench);
     
     cmdline.ParseCommandLine(argc, argv, 1, &fParseError);
     
@@ -156,6 +160,11 @@ int main(int argc, char** argv)
     else if (strPP.size() > 0)
     {
         PrettyPrintTest();
+    }
+    else if (strBench.size() > 0)
+    {
+        int threads = atoi(strBench.c_str());
+        benchmark_test(threads);
     }
     else
     {

@@ -354,6 +354,7 @@ HRESULT CStunSocketThread::ProcessRequestAndSendResponse()
     HRESULT hr = S_OK;
     int sendret = -1;
     int sockout = -1;
+    int err = 0;
 
     // Reset the reader object and re-attach the buffer
     _reader.Reset();
@@ -375,11 +376,12 @@ HRESULT CStunSocketThread::ProcessRequestAndSendResponse()
     
     // find the socket that matches the role specified by msgOut
     sendret = ::sendto(sockout, _spBufferOut->GetData(), _spBufferOut->GetSize(), 0, _msgOut.addrDest.GetSockAddr(), _msgOut.addrDest.GetSockAddrLength());
+    err = (sendret == -1) ? errno : 0;
     
     
     if (Logging::GetLogLevel() >= LL_VERBOSE)
     {
-        Logging::LogMsg(LL_VERBOSE, "sendto returns %d (err == %d)\n", sendret, errno);
+        Logging::LogMsg(LL_VERBOSE, "sendto returns %d (err == %d)\n", sendret, (int)err);
     }
 
         
