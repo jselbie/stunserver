@@ -19,6 +19,9 @@ struct RateTrackerAddress
     {
         return ((other.addrbytes[0] == addrbytes[0]) && (other.addrbytes[1] == addrbytes[1]));
     }
+    RateTrackerAddress() : addrbytes()
+    {
+    }
 };
 
 inline size_t FastHash_Hash(const RateTrackerAddress& addr)
