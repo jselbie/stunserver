@@ -136,10 +136,8 @@ HRESULT CTestFastHash::ValidateRangeInIndex(int first, int last)
 {
     HRESULT hr = S_OK;
     const int length = last - first + 1;
-    bool* arr = new bool[length];
+    bool* arr = new bool[length]();  // zero-init
     size_t size = _hashtable.Size();
-    
-    memset(arr, '\0', length);
     
     for (int x = 0; x < (int)size; x++)
     {

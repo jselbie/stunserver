@@ -53,7 +53,10 @@
 #include <vector>
 #include <list>
 #include <string>
+#include <sstream>
 #include <memory>
+#include <algorithm>
+#include <atomic>
 
 
 #ifdef IS_LINUX

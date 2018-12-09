@@ -240,7 +240,7 @@ public:
     {
         if (_lookuptable != nullptr)
         {
-            memset(_lookuptable, '\0', sizeof(ItemNodePtr)*_tsize);
+            std::fill(_lookuptable, _lookuptable+_tsize, nullptr);
         }
         
         if ((_fsize > 0) && (_itemnodes != nullptr))

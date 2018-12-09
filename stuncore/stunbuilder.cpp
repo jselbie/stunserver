@@ -17,8 +17,6 @@
 
 
 #include "commonincludes.hpp"
-#include <sstream>
-#include <atomic>
 
 
 #include "stringhelper.h"
