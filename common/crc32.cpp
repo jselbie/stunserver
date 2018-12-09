@@ -67,7 +67,7 @@ static const uint32_t crc_table[256] = {
 #define DO8(buf)  DO4(buf); DO4(buf);
 
 /* ========================================================================= */
-uint32_t crc32(uint32_t crc, uint8_t* buf, size_t len)
+uint32_t crc32(uint32_t crc, const uint8_t* buf, size_t len)
 {
     if (buf == nullptr) return 0L;
     crc = crc ^ 0xffffffffL;

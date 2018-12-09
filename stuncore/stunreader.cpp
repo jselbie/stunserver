@@ -55,7 +55,7 @@ void CStunMessageReader::Reset()
     _indexMessageIntegrity = -1;
     _countAttributes = 0;
     
-    memset(&_transactionid, '\0', sizeof(_transactionid));
+    _transactionid = {};
     _msgTypeNormalized = 0xffff;
     _msgClass = StunMsgClassInvalidMessageClass;
     _msgLength = 0;

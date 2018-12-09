@@ -38,7 +38,8 @@ private:
     HRESULT AddMappedAddressImpl(uint16_t attribute, const CSocketAddress& addr);
     
     HRESULT AddMessageIntegrityImpl(uint8_t* key, size_t keysize);
-    
+
+    uint32_t GetEntropy();
 
 public:
     CStunMessageBuilder();
@@ -83,6 +84,8 @@ public:
     HRESULT GetResult(CRefCountedBuffer* pspBuffer);
 
     CDataStream& GetStream();
+
+    friend class CTestBuilder;
 };
 
 #endif

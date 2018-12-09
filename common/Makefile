@@ -1,7 +1,7 @@
 include ../common.inc
 
 PROJECT_TARGET := libcommon.a
-PROJECT_SRCS := atomichelpers.cpp cmdlineparser.cpp common.cpp condmutex.cpp crc32.cpp fasthash.cpp getconsolewidth.cpp getmillisecondcounter.cpp logger.cpp prettyprint.cpp stringhelper.cpp
+PROJECT_SRCS := cmdlineparser.cpp common.cpp condmutex.cpp crc32.cpp fasthash.cpp getconsolewidth.cpp getmillisecondcounter.cpp logger.cpp prettyprint.cpp stringhelper.cpp
 PROJECT_OBJS := $(subst .cpp,.o,$(PROJECT_SRCS))
 INCLUDES := $(BOOST_INCLUDE)
 PRECOMP_H_GCH := commonincludes.hpp.gch

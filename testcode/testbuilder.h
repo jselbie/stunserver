@@ -26,6 +26,7 @@ class CTestBuilder : public IUnitTest
 public:
     HRESULT Test1();
     HRESULT Test2();
+    HRESULT TestEntropy();
 
     virtual HRESULT Run();
 

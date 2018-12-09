@@ -33,7 +33,6 @@
 #include "prettyprint.h"
 #include "polling.h"
 #include "testpolling.h"
-#include "testatomichelpers.h"
 #include "testratelimiter.h"
 
 void ReaderFuzzTest()
@@ -85,7 +84,6 @@ void RunUnitTests()
     std::shared_ptr<CTestRecvFromExIPV6> spTestRecvFromEx6(new CTestRecvFromExIPV6);
     std::shared_ptr<CTestFastHash> spTestFastHash(new CTestFastHash);
     std::shared_ptr<CTestPolling> spTestPolling(new CTestPolling);
-    std::shared_ptr<CTestAtomicHelpers> spTestAtomicHelpers(new CTestAtomicHelpers);
     std::shared_ptr<CTestRateLimiter> spTestRateLimiter(new CTestRateLimiter);
     std::shared_ptr<CTestCRC32> spTestCRC32(new CTestCRC32);
 
@@ -100,7 +98,6 @@ void RunUnitTests()
     vecTests.push_back(spTestRecvFromEx6);
     vecTests.push_back(spTestFastHash);
     vecTests.push_back(spTestPolling);
-    vecTests.push_back(spTestAtomicHelpers);
     vecTests.push_back(spTestRateLimiter);
     vecTests.push_back(spTestCRC32);
 

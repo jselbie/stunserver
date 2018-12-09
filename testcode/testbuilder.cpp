@@ -27,6 +27,7 @@ HRESULT CTestBuilder::Run()
     HRESULT hr = S_OK;
     Chk(Test1())
     Chk(Test2());
+    Chk(TestEntropy());
 Cleanup:
     return hr;
 }
@@ -137,5 +138,24 @@ HRESULT CTestBuilder::Test2()
 Cleanup:
     return hr;
 }
+
+HRESULT CTestBuilder::TestEntropy()
+{
+    CStunMessageBuilder builder;
+    HRESULT hr = S_OK;
+    uint32_t prev = 0;
+
+    for (int x = 0; x < 15; x++)
+    {
+        uint32_t e = builder.GetEntropy();
+        ChkIfA(e == 0, E_FAIL);
+        ChkIfA(e == prev, E_FAIL);
+        prev = e;
+    }
+Cleanup:
+    return hr;
+}
+
+
 
 

@@ -17,9 +17,13 @@
 
 
 #include "commonincludes.hpp"
+#include <sstream>
+#include <atomic>
+
 
 #include "stringhelper.h"
-#include "atomichelpers.h"
+
+#include "oshelper.h"
 
 #include "stunbuilder.h"
 
@@ -32,12 +36,10 @@
 #endif
 
 #include "crc32.h"
-
-
 #include "stunauth.h"
 
 
-static int g_sequence_number = 0xaaaaaaaa;
+std::atomic<int> g_sequence_number;
 
 
 CStunMessageBuilder::CStunMessageBuilder() :
@@ -91,6 +93,25 @@ HRESULT CStunMessageBuilder::AddTransactionId(const StunTransactionId& transid)
     return _stream.Write(transid.id, sizeof(transid.id));
 }
 
+uint32_t CStunMessageBuilder::GetEntropy()
+{
+    uint32_t entropy = 0;    
+    std::ostringstream ss;
+    ss << g_sequence_number.fetch_add(1);
+    ss << '.';
+    ss << getpid();
+    ss << '.';
+    ss << reinterpret_cast<uintptr_t>(this);
+    ss << '.';
+    ss << time(nullptr);
+    ss << '.';
+    ss << GetMillisecondCounter();
+    std::string str;
+    str = ss.str();
+    entropy = crc32(0, (const uint8_t*)(str.c_str()), str.size());   
+    return entropy;
+}
+
 HRESULT CStunMessageBuilder::AddRandomTransactionId(StunTransactionId* pTransId)
 {
     StunTransactionId transid;
@@ -98,10 +119,8 @@ HRESULT CStunMessageBuilder::AddRandomTransactionId(StunTransactionId* pTransId)
 
     uint32_t entropy=0;
 
-
     // on x86, the rdtsc instruction is about as good as it gets for a random sequence number
     // on linux, there's /dev/urandom
-
 
 #ifdef _WIN32
     // on windows, there's lots of simple stuff we can get at to give us a random number
@@ -121,20 +140,14 @@ HRESULT CStunMessageBuilder::AddRandomTransactionId(StunTransactionId* pTransId)
     	}
     }
 
-
     if (entropy == 0)
     {
-        entropy ^= getpid();
-        entropy ^= reinterpret_cast<uintptr_t>(this);
-        entropy ^= time(nullptr);
-        entropy ^= AtomicIncrement(&g_sequence_number);
+        entropy = GetEntropy();
     }
 
 #endif
 
-
     srand(entropy);
-
 
     // the first four bytes of the transaction id is always the magic cookie
     // followed by 12 bytes of the real transaction id
