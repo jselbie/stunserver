@@ -378,8 +378,8 @@ HRESULT CStunRequestHandler::ValidateAuth()
         return S_OK; // nothing to do if there is no auth mechanism in place
     }
     
-    memset(&authattributes, '\0', sizeof(authattributes));
-    memset(&authresponse, '\0', sizeof(authresponse));
+    authattributes = {};
+    authresponse = {};
     
     reader.GetStringAttributeByType(STUN_ATTRIBUTE_USERNAME, authattributes.szUser, ARRAYSIZE(authattributes.szUser));
     reader.GetStringAttributeByType(STUN_ATTRIBUTE_REALM, authattributes.szRealm, ARRAYSIZE(authattributes.szRealm));

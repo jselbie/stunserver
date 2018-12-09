@@ -45,7 +45,7 @@ HRESULT CStunClientTestBase::Init(StunClientLogicConfig* pConfig, StunClientResu
     _pConfig = pConfig;
     _pResults = pResults;
     _fCompleted = false;
-    memset(&_transid, 0, sizeof(_transid));
+    _transid = {};
 
 Cleanup:
     return hr;
