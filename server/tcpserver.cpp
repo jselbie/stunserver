@@ -53,13 +53,13 @@ void CTCPStunThread::Reset()
     
     _fListenSocketsOnEpoll = false;
     
-    memset(&_tsaListen, '\0', sizeof(_tsaListen));
+    _tsaListen = {};
     
     _fNeedToExit = false;
     _spAuth.ReleaseAndClear();
     _role = RolePP;
     
-    memset(&_tsa, '\0', sizeof(_tsa));
+    _tsa = {};
     
     _maxConnections = c_MaxNumberOfConnectionsDefault;
 

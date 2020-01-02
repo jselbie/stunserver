@@ -602,7 +602,7 @@ HRESULT LoadConfigsFromFile(const std::string& filename, std::vector<StartupArgs
             configurations.push_back(args);
         }
     }
-    catch(ptree_error ex1)
+    catch(ptree_error& ex1)
     {
         Logging::LogMsg(LL_ALWAYS, "Error processing configuration file: %s", ex1.what());
         error = true;
