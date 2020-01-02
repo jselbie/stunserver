@@ -342,7 +342,7 @@ HRESULT CStunMessageReader::ValidateMessageIntegrityLong(const char* pszUser, co
     }
     *pDst = '0'; // null terminate for debugging (does not get hashed)
     
-    ASSERT((pDst-key) == totallength);
+    ASSERT(key+totallength == pDst);
     
 #ifndef __APPLE__
     ChkIfA(NULL == MD5(key, totallength, hash), E_FAIL);

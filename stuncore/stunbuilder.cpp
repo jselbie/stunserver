@@ -568,7 +568,7 @@ HRESULT CStunMessageBuilder::AddMessageIntegrityLongTerm(const char* pszUserName
     pDst += lenPassword;
     *pDst ='\0'; // null terminate for debugging (this char doesn not get hashed
     
-    ASSERT((pDst-key) == lenTotal);
+    ASSERT(key+lenTotal == pDst);
 
 #ifndef __APPLE__
     pResult = MD5(key, lenTotal, hash);
