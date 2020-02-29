@@ -53,13 +53,14 @@ void CTCPStunThread::Reset()
     
     _fListenSocketsOnEpoll = false;
     
-    _tsaListen = {};
+    TransportAddressSet emptyTSA = {};
+    _tsaListen = emptyTSA; 
     
     _fNeedToExit = false;
     _spAuth.ReleaseAndClear();
     _role = RolePP;
     
-    _tsa = {};
+    _tsa = emptyTSA;
     
     _maxConnections = c_MaxNumberOfConnectionsDefault;
 
