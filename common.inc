@@ -17,6 +17,8 @@ CRYPTO_LIBS := -lcrypto
 
 #SOLARIS HACK
 UNAME := $(shell uname -s)
+UNAMEOS := $(shell uname -o)
+
 ifeq ($(UNAME),SunOS)
   SOCKET_LIBS := -lsocket -lnsl
 endif
@@ -24,6 +26,11 @@ endif
 #Mac hack
 ifeq ($(UNAME),Darwin)
   CRYPTO_LIBS :=
+endif
+
+#Cygwin hack for ASLR
+ifeq ($(UNAMEOS), Cygwin)
+  ASLR_FLAGS := -Xlinker --dynamicbase
 endif
 
 .PHONY: all clean debug

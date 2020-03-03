@@ -14,6 +14,6 @@ clean:
 	rm -f $(PROJECT_OBJS) $(PROJECT_TARGET) 
 
 $(PROJECT_TARGET): $(PROJECT_OBJS)
-	$(LINK.cpp) -o $@ $^ $(LIB_PATH) $(LIBS) $(SOCKET_LIBS) $(CRYPTO_LIBS)
+	$(LINK.cpp) -o $@ $^ $(LIB_PATH) $(LIBS) $(SOCKET_LIBS) $(CRYPTO_LIBS) $(ASLR_FLAGS)
 
 
