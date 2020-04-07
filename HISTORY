@@ -44,3 +44,5 @@ Version 1.2.13 - Support config file and multiple protocols in the same process 
 Version 1.2.14 - Docker support and OpenSSL compile issue
 
 Version 1.2.15 - For for --ddp command line option.
+
+Version 1.2.16 - ASLR Support on Cygwin builds 
