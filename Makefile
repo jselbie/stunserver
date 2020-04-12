@@ -23,6 +23,12 @@ debug: all
 profile: T := profile
 profile: all
 
+pgo1: T := pgo1
+pgo1: all
+
+pgo2: T := pgo2
+pgo2: all
+
 clean:	T := clean
 clean: everything
 	rm -f stunserver stunclient stuntestcode
