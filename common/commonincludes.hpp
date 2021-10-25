@@ -46,7 +46,12 @@
 #include <net/if.h>
 #include <stdarg.h>
 #include <math.h>
+
+#if __has_include(<termios.h>)
+#include <termios.h>
+#elif __has_include(<sys/termios.h>)
 #include <sys/termios.h>
+#endif
 
 #include <boost/shared_ptr.hpp>
 #include <boost/scoped_array.hpp>
