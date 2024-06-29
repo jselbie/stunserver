@@ -23,36 +23,44 @@
 #include "testmessagehandler.h"
 
 #include "testclientlogic.h"
+#include "stuntypes.h"
 
 
 HRESULT CTestClientLogic::Run()
 {
     HRESULT hr = S_OK;
+    std::vector<NatBehavior> behaviorTests = {DirectMapping, EndpointIndependentMapping, AddressDependentMapping, AddressAndPortDependentMapping};
+    std::vector<NatFiltering> filteringTests = {EndpointIndependentFiltering, AddressDependentFiltering, AddressAndPortDependentFiltering};
+
     
     ChkA(Test1());
-    
-    printf("Testing detection for DirectMapping\n");
-    ChkA(TestBehaviorAndFiltering(true, DirectMapping, false, EndpointIndependentFiltering));
-    
-    printf("Testing detection for EndpointIndependent mapping\n");
-    ChkA(TestBehaviorAndFiltering(true, EndpointIndependentMapping, false, EndpointIndependentFiltering));
-    
-    printf("Testing detection for AddressDependentMapping\n");
-    ChkA(TestBehaviorAndFiltering(true, AddressDependentMapping, false, EndpointIndependentFiltering));
-    
-    printf("Testing detection for AddressAndPortDependentMapping\n");
-    ChkA(TestBehaviorAndFiltering(true, AddressAndPortDependentMapping, false, EndpointIndependentFiltering));
-    
-    printf("Testing detection for EndpointIndependentFiltering\n");
-    ChkA(TestBehaviorAndFiltering(true, EndpointIndependentMapping, true, EndpointIndependentFiltering));
 
-    printf("Testing detection for AddressDependentFiltering\n");
-    ChkA(TestBehaviorAndFiltering(true, EndpointIndependentMapping, true, AddressDependentFiltering));
-    
-    printf("Testing detection for AddressAndPortDependentFiltering\n");
-    ChkA(TestBehaviorAndFiltering(true, EndpointIndependentMapping, true, AddressAndPortDependentFiltering));
-    
-    
+
+    for (size_t i = 0; i < behaviorTests.size(); i++)
+    {
+        std::string testName = NatBehaviorToString(behaviorTests[i]);
+        printf("Testing Behavior detection for %s\n", testName.c_str());
+        ChkA(TestBehaviorAndFiltering(true, behaviorTests[i], false, AddressAndPortDependentFiltering));
+    }
+
+    for (size_t i = 0; i < filteringTests.size(); i++)
+    {
+        std::string testName = NatFilteringToString(filteringTests[i]);
+        printf("Testing Filtering detection for %s\n", testName.c_str());
+        ChkA(TestBehaviorAndFiltering(false, EndpointIndependentMapping, true, filteringTests[i]));
+    }
+
+    for (size_t b = 0; b < behaviorTests.size(); b++)
+    {
+        for (size_t f = 0; f < filteringTests.size(); f++)
+        {
+             std::string behaviorName = NatBehaviorToString(behaviorTests[b]);
+             std::string filteringName = NatFilteringToString(filteringTests[f]);
+             std::string testDescription = "Testing mix of [" + behaviorName + "] + [" + filteringName+"]";
+             printf("%s\n", testDescription.c_str());
+             ChkA(TestBehaviorAndFiltering(true, behaviorTests[b], true, filteringTests[f]));
+        }
+    }
     
 Cleanup:
     return hr;
@@ -384,7 +392,14 @@ HRESULT CTestClientLogic::TestBehaviorAndFiltering(bool fBehaviorTest, NatBehavi
     results.Init(); // zero it out
     _spClientLogic->GetResults(&results);
     
-    ChkIfA(results.behavior != behavior, E_UNEXPECTED);
+    if (fBehaviorTest)
+    {
+        ChkIfA(results.behavior != behavior, E_UNEXPECTED);
+    }
+    if (fFilteringTest)
+    {
+        ChkIfA(results.filtering != filtering, E_UNEXPECTED);
+    }
     
 Cleanup:
             

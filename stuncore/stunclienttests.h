@@ -100,8 +100,7 @@ protected:
     
 public:
     CFilteringTest();
-    
-    void PreRunCheck();
+
     bool IsReadyToRun();
     HRESULT GetMessage(CRefCountedBuffer& spMsg, CSocketAddress* pAddrDest) ;
     HRESULT ProcessResponse(CRefCountedBuffer& spMsg, CSocketAddress& addrRemote, CSocketAddress& addrLocal) ;
