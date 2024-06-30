@@ -46,3 +46,6 @@ Version 1.2.14 - Docker support and OpenSSL compile issue
 Version 1.2.15 - For for --ddp command line option.
 
 Version 1.2.16 - ASLR Support on Cygwin builds 
+
+Version 1.2.17 - Client fix for filtering test (does not impact server)
+

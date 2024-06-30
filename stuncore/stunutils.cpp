@@ -85,3 +85,35 @@ Cleanup:
 
 }
 
+std::string NatBehaviorToString(NatBehavior behavior)
+{
+    std::string str;
+
+    switch (behavior)
+    {
+        case UnknownBehavior:  str="Unknown Behavior"; break;
+        case DirectMapping:  str="Direct Mapping"; break;
+        case EndpointIndependentMapping: str = "Endpoint Independent Mapping"; break;
+        case AddressDependentMapping: str = "Address Dependent Mapping"; break;
+        case AddressAndPortDependentMapping: str = "Address and Port Dependent Mapping"; break;
+        default: ASSERT(false); str = "Unknown NAT Behavior"; break;
+    }
+
+    return str;
+}
+
+std::string NatFilteringToString(NatFiltering filtering)
+{
+    std::string str;
+
+    switch (filtering)
+    {
+        case UnknownFiltering:  str="Unknown Filtering"; break;
+        case DirectConnectionFiltering:  str="Direct Mapping (Filtering)"; break;
+        case EndpointIndependentFiltering: str = "Endpoint Independent Filtering"; break;
+        case AddressDependentFiltering: str = "Address Dependent Filtering"; break;
+        case AddressAndPortDependentFiltering: str = "Address and Port Dependent Filtering"; break;
+        default: ASSERT(false); str = "Unknown NAT Filtering"; break;
+    }
+    return str;
+}

@@ -232,7 +232,7 @@ HRESULT CStunClientLogic::ProcessResponse(CRefCountedBuffer& spMsg, CSocketAddre
 
     hr = pCurrentTest->ProcessResponse(spMsg, addrRemote, addrLocal);
     // this likely puts the test into the completed state
-    // A subsequent call to GetNextMessage will invoke the next tset
+    // A subsequent call to GetNextMessage will invoke the next test
 
 Cleanup:
     return hr;

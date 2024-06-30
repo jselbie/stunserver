@@ -178,5 +178,23 @@ const uint32_t STUN_HEADER_SIZE = 20;
 const uint32_t MAX_STUN_MESSAGE_SIZE = 800; // some reasonable length
 const uint32_t MAX_STUN_ATTRIBUTE_SIZE = 780; // more than reasonable
 
+enum NatBehavior
+{
+    UnknownBehavior,
+    DirectMapping,                  // IP address and port are the same between client and server view (NO NAT)
+    EndpointIndependentMapping,     // same mapping regardless of IP:port original packet sent to (the kind of NAT we like)
+    AddressDependentMapping,        // mapping changes for local socket based on remote IP address only, but remote port can change (partially symmetric, not great)
+    AddressAndPortDependentMapping  // different port mapping if the ip address or port change (symmetric NAT, difficult to predict port mappings)
+};
+
+enum NatFiltering
+{
+    UnknownFiltering,
+    DirectConnectionFiltering,
+    EndpointIndependentFiltering,    // shouldn't be common unless connection is already direct (can receive on mapped address from anywhere regardless of where the original send went)
+    AddressDependentFiltering,       // IP-restricted NAT
+    AddressAndPortDependentFiltering // port-restricted NAT
+};
+
 
 #endif

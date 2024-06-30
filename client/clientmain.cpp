@@ -256,38 +256,6 @@ Cleanup:
 }
 
 
-
-
-void NatBehaviorToString(NatBehavior behavior, std::string* pStr)
-{
-    std::string& str = *pStr;
-
-    switch (behavior)
-    {
-        case UnknownBehavior:  str="Unknown Behavior"; break;
-        case DirectMapping:  str="Direct Mapping"; break;
-        case EndpointIndependentMapping: str = "Endpoint Independent Mapping"; break;
-        case AddressDependentMapping: str = "Address Dependent Mapping"; break;
-        case AddressAndPortDependentMapping: str = "Address and Port Dependent Mapping"; break;
-        default: ASSERT(false); str = ""; break;
-    }
-}
-
-void NatFilteringToString(NatFiltering filtering, std::string* pStr)
-{
-    std::string& str = *pStr;
-
-    switch (filtering)
-    {
-        case UnknownFiltering:  str="Unknown Behavior"; break;
-        case DirectConnectionFiltering:  str="Direct Mapping"; break;
-        case EndpointIndependentFiltering: str = "Endpoint Independent Filtering"; break;
-        case AddressDependentFiltering: str = "Address Dependent Filtering"; break;
-        case AddressAndPortDependentFiltering: str = "Address and Port Dependent Filtering"; break;
-        default: ASSERT(false); str = ""; break;
-    }
-}
-
 void DumpResults(StunClientLogicConfig& config, StunClientResults& results)
 {
     char szBuffer[100];
@@ -310,7 +278,7 @@ void DumpResults(StunClientLogicConfig& config, StunClientResults& results)
         Logging::LogMsg(LL_ALWAYS, "Behavior test: %s", results.fBehaviorTestSuccess?"success":"fail");
         if (results.fBehaviorTestSuccess)
         {
-            NatBehaviorToString(results.behavior, &strResult);
+            strResult = NatBehaviorToString(results.behavior);
             Logging::LogMsg(LL_ALWAYS, "Nat behavior: %s", strResult.c_str());
         }
     }
@@ -320,7 +288,7 @@ void DumpResults(StunClientLogicConfig& config, StunClientResults& results)
         Logging::LogMsg(LL_ALWAYS, "Filtering test: %s", results.fFilteringTestSuccess?"success":"fail");
         if (results.fFilteringTestSuccess)
         {
-            NatFilteringToString(results.filtering, &strResult);
+            strResult = NatFilteringToString(results.filtering);
             Logging::LogMsg(LL_ALWAYS, "Nat filtering: %s", strResult.c_str());
         }
     }

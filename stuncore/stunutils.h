@@ -24,4 +24,7 @@ bool IsTransactionIdValid(StunTransactionId& transid);
 HRESULT GetXorMappedAddress(uint8_t* pData, size_t size, StunTransactionId &transid, CSocketAddress* pAddr);
 HRESULT GetMappedAddress(uint8_t* pData, size_t size, CSocketAddress* pAddr);
 
+std::string NatBehaviorToString(NatBehavior behavior);
+std::string NatFilteringToString(NatFiltering filtering);
+
 #endif

@@ -341,21 +341,6 @@ CFilteringTest::CFilteringTest()
 }
 
 
-void CFilteringTest::PreRunCheck()
-{
-    // if the binding test detected "direct", there's nothing for us to do except declare this as "endpoint indedepent"
-    if (_fIsTest3 == false)
-    {
-        if (_pResults->fBindingTestSuccess && _pResults->fIsDirect)
-        {
-            _fCompleted = true;
-            _pResults->filtering = ::EndpointIndependentFiltering;
-            _pResults->fFilteringTestSuccess = true;
-        }
-    }
-}
-
-
 bool CFilteringTest::IsReadyToRun()
 {
     // we can run if the CBasicBindingTest succeeded and we have an "other" address
