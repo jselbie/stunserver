@@ -457,6 +457,7 @@ HRESULT UdpClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& s
     CSocketAddress addrRemote; // who we
     CSocketAddress addrLocal;
     int ret;
+    bool connected = false;
     fd_set set;
     timeval tv = {};
     std::string strAddr;
@@ -498,6 +499,26 @@ HRESULT UdpClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& s
         {
             addrDest.ToString(&strAddr);
             ASSERT(spMsg->GetSize() > 0);
+
+            if (!config.fFilteringTest)
+            {
+                std::string strAddr;
+                addrDest.ToString(&strAddr);
+                Logging::LogMsg(LL_DEBUG, "Connecting UDP socket to %s", strAddr.c_str());
+
+                ret = ::connect(sock, addrDest.GetSockAddr(), addrDest.GetSockAddrLength());
+
+                if (ret)
+                {
+                    HRESULT hrRet = ERRNOHR;
+                    Logging::LogMsg(LL_DEBUG, "ERROR.  connect failed (errno = %d)", errno);
+                    Chk(hrRet);
+                }
+                else
+                {
+                    connected = true;
+                }
+            }
             
             if (Logging::GetLogLevel() >= LL_DEBUG)
             {
@@ -506,11 +527,18 @@ HRESULT UdpClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& s
                 Logging::LogMsg(LL_DEBUG, "Sending message to %s", strAddr.c_str());
             }
 
-            ret = ::sendto(sock, spMsg->GetData(), spMsg->GetSize(), 0, addrDest.GetSockAddr(), addrDest.GetSockAddrLength());
+            if (connected)
+            {
+                ret = ::send(sock, spMsg->GetData(), spMsg->GetSize(), 0);
+            }
+            else
+            {
+                ret = ::sendto(sock, spMsg->GetData(), spMsg->GetSize(), 0, addrDest.GetSockAddr(), addrDest.GetSockAddrLength());
+            }
 
             if (ret <= 0)
             {
-                Logging::LogMsg(LL_DEBUG, "ERROR.  sendto failed (errno = %d)", errno);
+                Logging::LogMsg(LL_DEBUG, "ERROR.  %s failed (errno = %d)", connected ? "send" : "sendto", errno);
             }
             // there's not much we can do if "sendto" fails except time out and try again
         }
