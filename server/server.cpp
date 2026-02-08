@@ -57,7 +57,7 @@ HRESULT CStunServer::AddSocket(TransportAddressSet* pTSA, SocketRole role, const
     
     ASSERT(IsValidSocketRole(role));
     
-    Chk(_arrSockets[role].UDPInit(addrListen, role, fSetReuseFlag));
+    Chk(_arrSockets[role].UDPInit(addrListen, role, fSetReuseFlag, false));
     ChkA(_arrSockets[role].EnablePktInfoOption(true));
 
 

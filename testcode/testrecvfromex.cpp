@@ -70,9 +70,9 @@ HRESULT CTestRecvFromEx::DoTest(bool fIPV6)
     
     
     // create two sockets listening on INADDR_ANY.  One for sending and one for receiving
-    ChkA(socketSend.UDPInit(addrAny, RolePP, false));
+    ChkA(socketSend.UDPInit(addrAny, RolePP, false, false));
 
-    ChkA(socketRecv.UDPInit(addrAny, RolePP, false));
+    ChkA(socketRecv.UDPInit(addrAny, RolePP, false, false));
     
     socketRecv.EnablePktInfoOption(true);
     

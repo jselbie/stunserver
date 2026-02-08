@@ -179,7 +179,7 @@ HRESULT CTCPStunThread::CreateListenSockets()
     {
         if (_tsaListen.set[r].fValid)
         {
-            ChkA(_socketListenArray[r].TCPInit(_tsaListen.set[r].addr, (SocketRole)r, true));
+            ChkA(_socketListenArray[r].TCPInit(_tsaListen.set[r].addr, (SocketRole)r, true, false));
             _socketTable[r] = _socketListenArray[r].GetSocketHandle();
             ChkA(_socketListenArray[r].SetNonBlocking(true));
             ret = listen(_socketTable[r], 128); // 128 - large backlog.

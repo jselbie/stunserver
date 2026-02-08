@@ -327,7 +327,7 @@ void TcpClientLoop(StunClientLogicConfig& config, ClientSocketConfig& socketconf
     {
     
         stunsocket.Close();
-        hr = stunsocket.TCPInit(addrLocal, RolePP, true);
+        hr = stunsocket.TCPInit(socketconfig.addrLocal, RolePP, true, true);
         if (FAILED(hr))
         {
             Logging::LogMsg(LL_ALWAYS, "Unable to create local socket for TCP connection (hr == %x)", hr);
@@ -474,7 +474,7 @@ HRESULT UdpClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& s
         Chk(hr);
     }
 
-    hr = stunSocket.UDPInit(socketconfig.addrLocal, RolePP, false);
+    hr = stunSocket.UDPInit(socketconfig.addrLocal, RolePP, false, false);
     if (FAILED(hr))
     {
         Logging::LogMsg(LL_ALWAYS, "Unable to create local socket: (error = x%x)", hr);
