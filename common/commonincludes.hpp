@@ -33,7 +33,6 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-#include <unistd.h>
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
@@ -41,12 +40,13 @@
 #include <errno.h>
 #include <sys/time.h>
 #include <stdlib.h>
-#include <memory.h>
 #include <ifaddrs.h>
 #include <net/if.h>
 #include <stdarg.h>
 #include <math.h>
-#include <sys/termios.h>
+// termios.h provides terminal I/O definitions (TIOCGWINSZ for terminal width detection)
+// Note: Use <termios.h> (POSIX standard), not <sys/termios.h> (not available on Android NDK)
+#include <termios.h>
 
 #include <boost/shared_ptr.hpp>
 #include <boost/scoped_array.hpp>
