@@ -273,7 +273,7 @@ void CStunSocket::UpdateAddresses()
 
 
 
-HRESULT CStunSocket::InitCommon(int socktype, const CSocketAddress& addrlocal, SocketRole role, bool fSetReuseFlag)
+HRESULT CStunSocket::InitCommon(int socktype, const CSocketAddress& addrlocal, SocketRole role, bool fSetReuseFlag, bool fSetReusePortFlag)
 {
     int sock = -1;
     int ret;
@@ -299,7 +299,19 @@ HRESULT CStunSocket::InitCommon(int socktype, const CSocketAddress& addrlocal, S
         ret = ::setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &fAllow, sizeof(fAllow));
         ChkIf(ret == -1, ERRNOHR);
     }
-    
+
+#ifdef SO_REUSEPORT
+    if (fSetReusePortFlag)
+    {
+        int fAllow = 1;
+        ret = ::setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &fAllow, sizeof(fAllow));
+        if (ret == -1)
+        {
+            Logging::LogMsg(LL_DEBUG, "Warning: Failed to set SO_REUSEPORT option (errno = %d)", errno);
+        }
+    }
+#endif
+
     ret = bind(sock, addrlocal.GetSockAddr(), addrlocal.GetSockAddrLength());
     ChkIf(ret == -1, ERRNOHR);
     
@@ -319,14 +331,14 @@ Cleanup:
 
 
 
-HRESULT CStunSocket::UDPInit(const CSocketAddress& local, SocketRole role, bool fSetReuseFlag)
+HRESULT CStunSocket::UDPInit(const CSocketAddress& local, SocketRole role, bool fSetReuseFlag, bool fSetReusePortFlag)
 {
-    return InitCommon(SOCK_DGRAM, local, role, fSetReuseFlag);
+    return InitCommon(SOCK_DGRAM, local, role, fSetReuseFlag, fSetReusePortFlag);
 }
 
-HRESULT CStunSocket::TCPInit(const CSocketAddress& local, SocketRole role, bool fSetReuseFlag)
+HRESULT CStunSocket::TCPInit(const CSocketAddress& local, SocketRole role, bool fSetReuseFlag, bool fSetReusePortFlag)
 {
-    return InitCommon(SOCK_STREAM, local, role, fSetReuseFlag);
+    return InitCommon(SOCK_STREAM, local, role, fSetReuseFlag, fSetReusePortFlag);
 }
 
 
