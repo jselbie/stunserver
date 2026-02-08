@@ -570,10 +570,15 @@ HRESULT CStunMessageBuilder::AddMessageIntegrityLongTerm(const char* pszUserName
     
     ASSERT(key+lenTotal == pDst);
 
-#ifndef __APPLE__
+#ifdef __APPLE__
+    pResult = CC_MD5(key, lenTotal, hash);
+#elif OPENSSL_VERSION_NUMBER < 0x30000000L
     pResult = MD5(key, lenTotal, hash);
 #else
-    pResult = CC_MD5(key, lenTotal, hash);
+    if (EVP_Digest(key, lenTotal, hash, NULL, EVP_md5(), NULL))
+    {
+        pResult = hash;
+    }
 #endif
     
     ASSERT(pResult != NULL);
