@@ -304,7 +304,7 @@ void TcpClientLoop(StunClientLogicConfig& config, ClientSocketConfig& socketconf
     int sock;
     CRefCountedBuffer spMsg(new CBuffer(1500));
     CRefCountedBuffer spMsgReader(new CBuffer(1500));
-    CSocketAddress addrDest, addrLocal;
+    CSocketAddress addrDest, addrLocal = socketconfig.addrLocal;
     HRESULT hrRet, hrResult;
     int ret;
     size_t bytes_sent, bytes_recv;
