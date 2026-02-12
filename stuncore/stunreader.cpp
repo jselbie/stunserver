@@ -578,6 +578,16 @@ HRESULT CStunMessageReader::GetResponseOriginAddress(CSocketAddress* pAddr)
     
 }
 
+HRESULT CStunMessageReader::GetResponseAddress(CSocketAddress* pAddr)
+{
+    HRESULT hr = S_OK;
+
+    // RESPONSE-ADDRESS is an RFC 3489 attribute that allows the client to specify
+    // a different IP and port for receiving the response (used in Binding Lifetime Discovery)
+    hr = GetAddressHelper(STUN_ATTRIBUTE_RESPONSEADDRESS, pAddr);
+
+    return hr;
+}
 
 HRESULT CStunMessageReader::GetStringAttributeByType(uint16_t attributeType, char* pszValue, /*in-out*/ size_t size)
 {

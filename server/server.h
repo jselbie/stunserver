@@ -52,6 +52,8 @@ public:
 
     bool fReuseAddr; // if true, the socket option SO_REUSEADDR will be set
 
+    bool fAllowResponseAddressUnsafe; // if true, allow RFC3489 RESPONSE-ADDRESS attribute (security risk)
+
     CStunServerConfig();
 };
 

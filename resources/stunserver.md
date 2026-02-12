@@ -30,6 +30,8 @@ The following options are supported.
     --primaryadvertised
     --altadvertised
     --configfile
+    --reuseaddr
+    --allow-response-address-unsafe
     --help
 
 Details of each option are as follows.
@@ -201,6 +203,18 @@ ____
 **--reuseaddr**
 
 The --reuseaddr switch allows the STUN server port to be shared with other processes. This is useful for scenarios where another process needs to send from the STUN server port.
+
+____
+
+**--allow-response-address-unsafe**
+
+The --allow-response-address-unsafe switch enables support for the RFC 3489 RESPONSE-ADDRESS attribute. This attribute allows clients to specify a different IP address and port for receiving the STUN response, which is used for "Binding Lifetime Discovery" as described in RFC 3489.
+
+**WARNING:** This option creates a security vulnerability as it allows the STUN server to be used as an amplification vector for denial-of-service (DoS) attacks. An attacker could send STUN requests with a spoofed source address and include a RESPONSE-ADDRESS attribute pointing to a victim's IP address, causing the server to send responses to the victim.
+
+Only enable this option if you specifically need RFC 3489 compatibility for Binding Lifetime Discovery and understand the security implications.
+
+This option is disabled by default.
 
 ____
 

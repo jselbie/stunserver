@@ -84,6 +84,7 @@ HRESULT CStunRequestHandler::ProcessRequestImpl()
     CStunMessageReader &reader = *(_pMsgIn->pReader);
     
     uint16_t responseport = 0;
+    CSocketAddress responseAddress;
     
     // ignore anything that is not a request (with no response)
     ChkIf(reader.GetMessageClass() != StunMsgClassRequest, E_FAIL);
@@ -96,7 +97,25 @@ HRESULT CStunRequestHandler::ProcessRequestImpl()
     reader.GetTransactionId(&_transid);
     _fLegacyMode = reader.IsMessageLegacyFormat();
     
-    // we always try to honor the response port
+    // RFC 3489: Check for RESPONSE-ADDRESS attribute first (used for Binding Lifetime Discovery)
+    // This attribute allows the client to specify a different IP and port for receiving the response
+    // Only process this attribute if explicitly enabled (it's a security risk)
+    if (_pAddrSet->fAllowResponseAddressUnsafe && SUCCEEDED(reader.GetResponseAddress(&responseAddress)))
+    {
+        _fRequestHasResponsePort = true; // treat this similar to RESPONSE-PORT
+        
+        if (_pMsgIn->fConnectionOriented)
+        {
+            // special case for TCP - we can't send response to a different address for connection oriented sockets
+            _error.errorcode = STUN_ERROR_BADREQUEST;
+        }
+        else
+        {
+            _pMsgOut->addrDest = responseAddress;
+        }
+    }
+    
+    // we always try to honor the response port (RESPONSE-PORT takes precedence over RESPONSE-ADDRESS port)
     reader.GetResponsePort(&responseport);
     if (responseport != 0)
     {

@@ -110,6 +110,7 @@ public:
     HRESULT GetMappedAddress(CSocketAddress* pAddress);
     HRESULT GetOtherAddress(CSocketAddress* pAddress);
     HRESULT GetResponseOriginAddress(CSocketAddress* pAddress);
+    HRESULT GetResponseAddress(CSocketAddress* pAddress);
     
     HRESULT GetStringAttributeByType(uint16_t attributeType, char* pszValue, /*in-out*/ size_t size);
     
