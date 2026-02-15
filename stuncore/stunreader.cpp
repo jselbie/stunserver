@@ -151,22 +151,24 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
     bool fNoOtherAttributesAfterIntegrity = false;
     const size_t c_hmacsize = 20;
     uint8_t hmaccomputed[c_hmacsize] = {}; // zero-init
-    unsigned int hmaclength = c_hmacsize;
-#ifndef __APPLE__
-    HMAC_CTX* ctx = NULL;
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-    HMAC_CTX ctxData = {};
-    ctx = &ctxData;
-    HMAC_CTX_init(ctx);
-#else
-    ctx = HMAC_CTX_new();
-#endif
-#else
+#ifdef __APPLE__
     CCHmacContext* ctx = NULL;
     CCHmacContext ctxData = {};
     ctx = &ctxData;
-    
-    UNREFERENCED_VARIABLE(hmaclength);
+#elif OPENSSL_VERSION_NUMBER < 0x10100000L
+    HMAC_CTX* ctx = NULL;
+    unsigned int hmaclength = c_hmacsize;
+    HMAC_CTX ctxData = {};
+    ctx = &ctxData;
+    HMAC_CTX_init(ctx);
+#elif OPENSSL_VERSION_NUMBER < 0x30000000L
+    HMAC_CTX* ctx = HMAC_CTX_new();
+    unsigned int hmaclength = c_hmacsize;
+#else
+    EVP_MAC* mac = EVP_MAC_fetch(NULL, "HMAC", NULL);
+    EVP_MAC_CTX* ctx = EVP_MAC_CTX_new(mac);
+    EVP_MAC_free(mac);
+    size_t hmaclength = c_hmacsize;
 #endif
     uint32_t chunk32;
     uint16_t chunk16;
@@ -204,23 +206,28 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
     stream.Attach(spBuffer, false);
     
     // Here comes the fun part.  If there is a fingerprint attribute, we have to adjust the length header in computing the hash
-#ifndef __APPLE__
-#if OPENSSL_VERSION_NUMBER < 0x10100000L // could be lower!
-    HMAC_Init(ctx, key, keylength, EVP_sha1());
-#else
-    HMAC_Init_ex(ctx, key, keylength, EVP_sha1(), NULL);
-#endif
-#else
+#ifdef __APPLE__
     CCHmacInit(ctx, kCCHmacAlgSHA1, key, keylength);
+#elif OPENSSL_VERSION_NUMBER < 0x10100000L // could be lower!
+    HMAC_Init(ctx, key, keylength, EVP_sha1());
+#elif OPENSSL_VERSION_NUMBER < 0x30000000L
+    HMAC_Init_ex(ctx, key, keylength, EVP_sha1(), NULL);
+#else
+    OSSL_PARAM params[2];
+    params[0] = OSSL_PARAM_construct_utf8_string("digest", (char*)"SHA1", 0);
+    params[1] = OSSL_PARAM_construct_end();
+    EVP_MAC_init(ctx, key, keylength, params);
 #endif
     fContextInit = true;
     
     // message type
     Chk(stream.ReadUint16(&chunk16));
-#ifndef __APPLE__
+#ifdef __APPLE__
+    CCHmacUpdate(ctx, &chunk16, sizeof(chunk16));
+#elif OPENSSL_VERSION_NUMBER < 0x30000000L
     HMAC_Update(ctx, (unsigned char*)&chunk16, sizeof(chunk16));
 #else
-    CCHmacUpdate(ctx, &chunk16, sizeof(chunk16));
+    EVP_MAC_update(ctx, (unsigned char*)&chunk16, sizeof(chunk16));
 #endif
     
     // message length
@@ -237,10 +244,12 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
         chunk16 = htons(adjustedlengthHeader);
     }
     
-#ifndef __APPLE__
+#ifdef __APPLE__
+    CCHmacUpdate(ctx, &chunk16, sizeof(chunk16));
+#elif OPENSSL_VERSION_NUMBER < 0x30000000L
     HMAC_Update(ctx, (unsigned char*)&chunk16, sizeof(chunk16));
 #else
-    CCHmacUpdate(ctx, &chunk16, sizeof(chunk16));
+    EVP_MAC_update(ctx, (unsigned char*)&chunk16, sizeof(chunk16));
 #endif
     
     // now include everything up to the hash attribute itself.
@@ -255,17 +264,21 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
     for (size_t count = 0; count < nChunks; count++)
     {
         Chk(stream.ReadUint32(&chunk32));
-#ifndef __APPLE__
+#ifdef __APPLE__
+        CCHmacUpdate(ctx, &chunk32, sizeof(chunk32));
+#elif OPENSSL_VERSION_NUMBER < 0x30000000L
         HMAC_Update(ctx, (unsigned char*)&chunk32, sizeof(chunk32));
 #else
-        CCHmacUpdate(ctx, &chunk32, sizeof(chunk32));
+        EVP_MAC_update(ctx, (unsigned char*)&chunk32, sizeof(chunk32));
 #endif
     }
     
-#ifndef __APPLE__
+#ifdef __APPLE__
+    CCHmacFinal(ctx, hmaccomputed);
+#elif OPENSSL_VERSION_NUMBER < 0x30000000L
     HMAC_Final(ctx, hmaccomputed, &hmaclength);
 #else
-    CCHmacFinal(ctx, hmaccomputed);
+    EVP_MAC_final(ctx, hmaccomputed, &hmaclength, sizeof(hmaccomputed));
 #endif
     
     
@@ -277,14 +290,14 @@ HRESULT CStunMessageReader::ValidateMessageIntegrity(uint8_t* key, size_t keylen
 Cleanup:
     if (fContextInit)
     {
-#ifndef __APPLE__
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-        HMAC_CTX_cleanup(ctx);
-#else
-        HMAC_CTX_free(ctx);
-#endif
-#else
+#ifdef __APPLE__
         UNREFERENCED_VARIABLE(fContextInit);
+#elif OPENSSL_VERSION_NUMBER < 0x10100000L
+        HMAC_CTX_cleanup(ctx);
+#elif OPENSSL_VERSION_NUMBER < 0x30000000L
+        HMAC_CTX_free(ctx);
+#else
+        EVP_MAC_CTX_free(ctx);
 #endif
     }
         
@@ -344,13 +357,13 @@ HRESULT CStunMessageReader::ValidateMessageIntegrityLong(const char* pszUser, co
     
     ASSERT(key+totallength == pDst);
     
-#ifndef __APPLE__
+#ifdef __APPLE__
+    CC_MD5(key, totallength, hash);
+#elif OPENSSL_VERSION_NUMBER < 0x30000000L
     ChkIfA(NULL == MD5(key, totallength, hash), E_FAIL);
 #else
-        CC_MD5(key, totallength, hash);
+    ChkIfA(0 == EVP_Digest(key, totallength, hash, NULL, EVP_md5(), NULL), E_FAIL);
 #endif
-    
-    
     
     Chk(ValidateMessageIntegrity(hash, ARRAYSIZE(hash)));
     
