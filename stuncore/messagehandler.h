@@ -57,6 +57,7 @@ struct TransportAddress
 struct TransportAddressSet
 {
     TransportAddress set[4]; // one for each socket role RolePP, RolePA, RoleAP, and RoleAA
+    bool fAllowResponseAddressUnsafe; // if true, allow RFC3489 RESPONSE-ADDRESS attribute (security risk)
 };
 
 struct StunErrorCode

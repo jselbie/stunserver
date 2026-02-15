@@ -33,7 +33,8 @@ fMultiThreadedMode(false),
 fTCP(false),
 nMaxConnections(0), // zero means default
 fEnableDosProtection(false),
-fReuseAddr(false)
+fReuseAddr(false),
+fAllowResponseAddressUnsafe(false)
 {
     ;
 }
@@ -103,6 +104,9 @@ HRESULT CStunServer::Initialize(const CStunServerConfig& config)
 
     // cleanup any thing that's going on now
     Shutdown();
+    
+    // set the fAllowResponseAddressUnsafe flag from config
+    tsa.fAllowResponseAddressUnsafe = config.fAllowResponseAddressUnsafe;
     
     // optional code: create an authentication provider and initialize it here (if you want authentication)
     // set the _spAuth member to reference it

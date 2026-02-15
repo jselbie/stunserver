@@ -844,6 +844,10 @@ HRESULT CTCPServer::Initialize(const CStunServerConfig& config)
     // tsaHandler is sort of a hack for TCP.  It's really just a glorified indication to the the
     // CStunRequestHandler code to figure out if it can offer a CHANGED-ADDRESS attribute.
     
+    // set the fAllowResponseAddressUnsafe flag from config
+    tsaHandler.fAllowResponseAddressUnsafe = config.fAllowResponseAddressUnsafe;
+    tsaListenAll.fAllowResponseAddressUnsafe = config.fAllowResponseAddressUnsafe;
+    
     InitTSA(&tsaHandler, RolePP, config.fHasPP, config.addrPP, config.addrPrimaryAdvertised);
     InitTSA(&tsaHandler, RolePA, config.fHasPA, config.addrPA, config.addrPrimaryAdvertised);
     InitTSA(&tsaHandler, RoleAP, config.fHasAP, config.addrAP, config.addrAlternateAdvertised);

@@ -129,6 +129,7 @@ struct StartupArgs
     std::string strDosProtect;
     std::string strConfigFile;
     std::string strReuseAddr;
+    std::string strAllowResponseAddressUnsafe;
     
 };
 
@@ -151,6 +152,7 @@ void DumpStartupArgs(StartupArgs& args)
     PRINTARG(strMaxConnections);
     PRINTARG(strDosProtect);
     PRINTARG(strReuseAddr);
+    PRINTARG(strAllowResponseAddressUnsafe);
     Logging::LogMsg(LL_DEBUG, "--------------------------\n");
 }
 
@@ -513,6 +515,9 @@ HRESULT BuildServerConfigurationFromArgs(StartupArgs& argsIn, CStunServerConfig*
     // ---- REUSE ADDRESS SWITCH -------------------------------------------
     config.fReuseAddr = (argsIn.strReuseAddr.length() > 0);
 
+    // ---- ALLOW RESPONSE ADDRESS (UNSAFE) -------------------------------------------
+    config.fAllowResponseAddressUnsafe = (argsIn.strAllowResponseAddressUnsafe.length() > 0);
+
     *pConfigOut = config;
     hr = S_OK;
 
@@ -542,6 +547,7 @@ HRESULT ParseCommandLineArgs(int argc, char** argv, int startindex, StartupArgs*
     cmdline.AddOption("ddp", no_argument, &pStartupArgs->strDosProtect);
     cmdline.AddOption("configfile", required_argument, &pStartupArgs->strConfigFile);
     cmdline.AddOption("reuseaddr", no_argument, &pStartupArgs->strReuseAddr);
+    cmdline.AddOption("allow-response-address-unsafe", no_argument, &pStartupArgs->strAllowResponseAddressUnsafe);
 
     cmdline.ParseCommandLine(argc, argv, startindex, &fError);
 
@@ -598,6 +604,7 @@ HRESULT LoadConfigsFromFile(const std::string& filename, std::vector<StartupArgs
             args.strMaxConnections = child.get("maxconn", "");
             args.strDosProtect = child.get("ddp", "");
             args.strReuseAddr = child.get("reuseaddr", "");
+            args.strAllowResponseAddressUnsafe = child.get("allow-response-address-unsafe", "");
             
             configurations.push_back(args);
         }
