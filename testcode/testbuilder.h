@@ -26,6 +26,8 @@ class CTestBuilder : public IUnitTest
 public:
     HRESULT Test1();
     HRESULT Test2();
+    HRESULT Test3();
+    HRESULT Test4();
 
     virtual HRESULT Run();
 
