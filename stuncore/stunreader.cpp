@@ -488,6 +488,7 @@ HRESULT CStunMessageReader::GetErrorCode(uint16_t* pErrorNumber)
 
     pAttrib = _mapAttributes.Lookup(STUN_ATTRIBUTE_ERRORCODE);
     ChkIf(pAttrib == NULL, E_FAIL);
+    ChkIf(pAttrib->size < 4, E_FAIL);
 
     // first 21 bits of error-code attribute must be zero.
     // followed by 3 bits of "class" and 8 bits for the error number modulo 100

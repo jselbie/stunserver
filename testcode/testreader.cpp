@@ -52,6 +52,11 @@ HRESULT CTestReader::Run()
     HRESULT hr = S_OK;
     Chk(Test1());
     Chk(Test2());
+    Chk(TestErrorCodeMissing());
+    Chk(TestErrorCodeValid());
+    Chk(TestErrorCodeWithReason());
+    Chk(TestErrorCodeTruncatedValue());
+    Chk(TestErrorCodeNullOut());
 Cleanup:
     return hr;
 }
@@ -136,6 +141,153 @@ HRESULT CTestReader::Test2()
 Cleanup:
     return hr;
 }
+
+// ---------------------------------------------------------------------------
+// GetErrorCode tests
+// ---------------------------------------------------------------------------
+
+// No ERROR-CODE attribute present: GetErrorCode must return failure.
+HRESULT CTestReader::TestErrorCodeMissing()
+{
+    HRESULT hr = S_OK;
+    CStunMessageBuilder builder;
+    CRefCountedBuffer spBuffer;
+    CStunMessageReader reader;
+    uint16_t errorCode = 0;
+
+    ChkA(builder.AddBindingRequestHeader());
+    ChkA(builder.AddRandomTransactionId(NULL));
+    ChkA(builder.FixLengthField());
+    ChkA(builder.GetResult(&spBuffer));
+
+    ChkIfA(CStunMessageReader::BodyValidated != reader.AddBytes(spBuffer->GetData(), spBuffer->GetSize()), E_FAIL);
+    ChkIfA(SUCCEEDED(reader.GetErrorCode(&errorCode)), E_FAIL);
+
+Cleanup:
+    return hr;
+}
+
+// Well-formed ERROR-CODE attributes (size >= 4, no reason phrase): verify all
+// standard error codes round-trip correctly.
+HRESULT CTestReader::TestErrorCodeValid()
+{
+    static const uint16_t c_codes[] = {
+        STUN_ERROR_TRYALTERNATE,
+        STUN_ERROR_BADREQUEST,
+        STUN_ERROR_UNAUTHORIZED,
+        STUN_ERROR_UNKNOWNATTRIB,
+        STUN_ERROR_STALENONCE,
+        STUN_ERROR_SERVERERROR,
+    };
+
+    HRESULT hr = S_OK;
+    for (size_t i = 0; i < ARRAYSIZE(c_codes); i++)
+    {
+        CStunMessageBuilder builder;
+        CRefCountedBuffer spBuffer;
+        CStunMessageReader reader;
+        uint16_t errorCode = 0;
+
+        ChkA(builder.AddBindingResponseHeader(false));
+        ChkA(builder.AddRandomTransactionId(NULL));
+        ChkA(builder.AddErrorCode(c_codes[i], NULL));
+        ChkA(builder.FixLengthField());
+        ChkA(builder.GetResult(&spBuffer));
+
+        ChkIfA(CStunMessageReader::BodyValidated != reader.AddBytes(spBuffer->GetData(), spBuffer->GetSize()), E_FAIL);
+        ChkA(reader.GetErrorCode(&errorCode));
+        ChkIfA(errorCode != c_codes[i], E_FAIL);
+    }
+
+Cleanup:
+    return hr;
+}
+
+// ERROR-CODE attribute with a reason phrase: class and number must still decode
+// correctly regardless of how long the trailing UTF-8 reason phrase is.
+HRESULT CTestReader::TestErrorCodeWithReason()
+{
+    HRESULT hr = S_OK;
+    CStunMessageBuilder builder;
+    CRefCountedBuffer spBuffer;
+    CStunMessageReader reader;
+    uint16_t errorCode = 0;
+
+    ChkA(builder.AddBindingResponseHeader(false));
+    ChkA(builder.AddRandomTransactionId(NULL));
+    ChkA(builder.AddErrorCode(STUN_ERROR_BADREQUEST, "Bad Request"));
+    ChkA(builder.FixLengthField());
+    ChkA(builder.GetResult(&spBuffer));
+
+    ChkIfA(CStunMessageReader::BodyValidated != reader.AddBytes(spBuffer->GetData(), spBuffer->GetSize()), E_FAIL);
+    ChkA(reader.GetErrorCode(&errorCode));
+    ChkIfA(errorCode != STUN_ERROR_BADREQUEST, E_FAIL);
+
+Cleanup:
+    return hr;
+}
+
+// ERROR-CODE attribute value shorter than the required 4 bytes: GetErrorCode must
+// return failure for sizes 0, 1, 2, and 3.  Size 0 was the original out-of-bounds
+// read; all four are now rejected by the size < 4 guard.
+HRESULT CTestReader::TestErrorCodeTruncatedValue()
+{
+    HRESULT hr = S_OK;
+    // Four bytes that look like a valid error-code body (class=4, num=0 → 400).
+    // We truncate the declared length to expose undersized attributes.
+    static const uint8_t c_validBody[4] = {0x00, 0x00, 0x04, 0x00};
+
+    for (uint16_t badSize = 0; badSize <= 3; badSize++)
+    {
+        CStunMessageBuilder builder;
+        CRefCountedBuffer spBuffer;
+        CStunMessageReader reader;
+        uint16_t errorCode = 0xffff;
+
+        ChkA(builder.AddBindingResponseHeader(false));
+        ChkA(builder.AddRandomTransactionId(NULL));
+        // AddAttribute bypasses AddErrorCode's own minimum-size check, letting us
+        // craft an attribute with a declared length smaller than 4.
+        ChkA(builder.AddAttribute(STUN_ATTRIBUTE_ERRORCODE,
+                                  (badSize > 0) ? c_validBody : NULL,
+                                  badSize));
+        ChkA(builder.FixLengthField());
+        ChkA(builder.GetResult(&spBuffer));
+
+        // The parser must accept the message (it only rejects oversized attributes).
+        ChkIfA(CStunMessageReader::BodyValidated != reader.AddBytes(spBuffer->GetData(), spBuffer->GetSize()), E_FAIL);
+
+        // GetErrorCode must reject the undersized attribute cleanly, not crash.
+        ChkIfA(SUCCEEDED(reader.GetErrorCode(&errorCode)), E_FAIL);
+    }
+
+Cleanup:
+    return hr;
+}
+
+// NULL output pointer: GetErrorCode must return E_INVALIDARG without touching
+// the attribute data.
+HRESULT CTestReader::TestErrorCodeNullOut()
+{
+    HRESULT hr = S_OK;
+    CStunMessageBuilder builder;
+    CRefCountedBuffer spBuffer;
+    CStunMessageReader reader;
+
+    ChkA(builder.AddBindingResponseHeader(false));
+    ChkA(builder.AddRandomTransactionId(NULL));
+    ChkA(builder.AddErrorCode(STUN_ERROR_BADREQUEST, NULL));
+    ChkA(builder.FixLengthField());
+    ChkA(builder.GetResult(&spBuffer));
+
+    ChkIfA(CStunMessageReader::BodyValidated != reader.AddBytes(spBuffer->GetData(), spBuffer->GetSize()), E_FAIL);
+    ChkIfA(reader.GetErrorCode(NULL) != E_INVALIDARG, E_FAIL);
+
+Cleanup:
+    return hr;
+}
+
+// ---------------------------------------------------------------------------
 
 HRESULT CTestReader::TestFixedReadSizes(size_t chunksize)
 {
